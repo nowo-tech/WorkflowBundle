@@ -1,0 +1,26 @@
+{% if definition is defined %}
+    <ul class="nav nav-pills flex-wrap gap-1 mb-4">
+        {% set sections = [
+            constant('Nowo\\WorkflowBundle\\Form\\WorkflowDefinitionFormSection::General'),
+            constant('Nowo\\WorkflowBundle\\Form\\WorkflowDefinitionFormSection::MatchRules'),
+            constant('Nowo\\WorkflowBundle\\Form\\WorkflowDefinitionFormSection::Places'),
+            constant('Nowo\\WorkflowBundle\\Form\\WorkflowDefinitionFormSection::Transitions'),
+        ] %}
+        {% for editSection in sections %}
+            <li class="nav-item">
+                <a
+                    class="nav-link{% if section is defined and section == editSection %} active{% endif %}"
+                    {% if section is defined and section == editSection %}aria-current="page"{% endif %}
+                    href="{{ path(editSection.routeName(), {id: definition.id}) }}"
+                >
+                    {{ ('form.section.' ~ editSection.value)|trans({}, 'nowo_workflow') }}
+                </a>
+            </li>
+        {% endfor %}
+        <li class="nav-item ms-lg-auto">
+            <a class="nav-link text-muted" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">
+                {{ 'action.view'|trans({}, 'nowo_workflow') }}
+            </a>
+        </li>
+    </ul>
+{% endif %}

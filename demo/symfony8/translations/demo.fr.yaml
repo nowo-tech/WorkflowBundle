@@ -1,0 +1,98 @@
+brand: 'Démo Workflow'
+title: 'Démo Workflow Bundle'
+lead: 'Définissez des workflows en base de données avec des règles de correspondance, résolvez-les par contexte et exécutez des transitions.'
+
+nav:
+  home: Accueil
+  resolver: 'Labo résolveur'
+  crud: 'CRUD Workflow'
+  change_requests: 'Demandes de changement'
+  orders: Commandes
+  documents: Documents
+  expenses: Dépenses
+  purchase_orders: 'Bons de commande'
+  toggle: 'Basculer la navigation'
+
+home:
+  branching:
+    title: 'Branchements — approuver / rejeter / demander des modifications'
+    text: '%entity% montre plusieurs options en review, des boucles (resubmit, reopen) et des annulations. Voir le diagramme interactif dans l''admin.'
+    playground: 'Playground demandes de changement'
+    diagram: 'Voir le diagramme'
+  resolver:
+    title: 'Labo résolveur'
+    text: 'Testez des combinaisons de paramètres et voyez quel workflow l''emporte (spécificité + priorité).'
+    action: 'Ouvrir le labo'
+  orders:
+    title: '0 param — approbation avec branchements'
+    text: '%entity% — approuver/rejeter depuis review, avec boucle reopen.'
+    action: 'Playground commandes'
+  documents:
+    title: '1 param — document_type'
+    text: '%entity% résout les workflows invoice vs contract.'
+    action: 'Playground documents'
+  expenses:
+    title: '2 params — tenant + department'
+    text: '%entity% choisit les flux finance/HR pour ACME, ou le flux Globex à un param.'
+    action: 'Playground dépenses'
+  purchase_orders:
+    title: '3 params — tenant + region + amount_tier'
+    text: '%entity% escalade les PO ACME EU à forte valeur vers la revue CFO.'
+    action: 'Playground bons de commande'
+  crud:
+    title: CRUD
+    text: 'Gérez les définitions de workflow en base de données.'
+    action: 'Admin workflow'
+
+playground:
+  create: Créer
+  no_items: 'Aucun élément pour le moment. Créez-en un ci-dessus.'
+  resolved: 'Workflow'
+  no_transitions: 'Aucune transition disponible (état terminal).'
+  orders:
+    title: 'Commandes — approbation avec branchements (0 règles)'
+    hint: 'Depuis review vous pouvez approuver ou rejeter ; les rejetés peuvent être réouverts. Le playground demandes de changement ajoute request changes → resubmit.'
+    create: 'Créer une commande'
+    title_field: Titre
+  change_requests:
+    title: 'Demandes de changement — workflow à branchements'
+    intro: '%entity% utilise %workflow% : plusieurs chemins depuis review, plus les boucles resubmit et reopen.'
+    seed_warning: 'Workflow démo non chargé. Exécutez %command% (ou redémarrez le conteneur Docker pour un seed automatique).'
+    try_path: 'Essayez : Submit → Request changes → Resubmit → Approve. Ou : Submit → Reject → Reopen. Cancel depuis draft ou review.'
+    view_diagram: 'Voir le diagramme de flux'
+    happy_path: 'Chemin nominal'
+    happy_path_desc: 'draft → review → approved'
+    changes_loop: 'Boucle de modifications'
+    changes_loop_desc: 'review → changes_needed → review → …'
+    rejection_loop: 'Boucle de rejet'
+    rejection_loop_desc: 'review → rejected → reopen → draft'
+    create: 'Créer une demande de changement'
+  resolver:
+    title: 'Labo résolveur de workflows'
+    intro: 'Simulez la recherche par classe de sujet et paramètres. Meilleur match = plus de règles, puis priorité la plus élevée.'
+    subject_class: 'Classe du sujet'
+    resolve: Résoudre
+    error: Erreur
+    resolved: 'Workflow résolu'
+    all_matches: 'Tous les workflows correspondants'
+    rules: Règles
+    specificity: Spécificité
+  documents:
+    title: 'Documents — 1 param (document_type)'
+    type: Type
+    create: 'Créer un document'
+    option_invoice: 'invoice → invoice_processing'
+    option_contract: 'contract → contract_review'
+  expenses:
+    title: 'Dépenses — 2 params (tenant + department)'
+    create: 'Créer une dépense'
+    tenant: Tenant
+    department: Département
+  purchase_orders:
+    title: 'Bons de commande — 3 params (tenant + region + amount_tier)'
+    create: 'Créer un bon de commande'
+    tenant: Tenant
+    region: Région
+    amount_tier: 'Tranche de montant'
+    option_high: 'high → revue CFO'
+    option_low: 'low → flux EU standard'

@@ -1,0 +1,160 @@
+brand: 'Nowo Workflow'
+title_suffix: 'Nowo Workflow'
+
+locale:
+  en: Inglese
+  es: Spagnolo
+  fr: Francese
+  it: Italiano
+
+nav:
+  dashboard: Dashboard
+  definitions: Definizioni
+  new_definition: 'Nuova definizione'
+  toggle: 'Attiva/disattiva navigazione'
+
+action:
+  view: Visualizza
+  show: Dettaglio
+  edit: Modifica
+  delete: Elimina
+  save: Salva
+  cancel: Annulla
+  apply: Applica
+  create_one: 'Creane una'
+  close: Chiudi
+  add_place: 'Aggiungi stato'
+  add_transition: 'Aggiungi transizione'
+  add_match_rule: 'Aggiungi regola'
+
+status:
+  enabled: Attivo
+  disabled: Disattivo
+  default: predefinito
+  initial: Iniziale
+
+workflow_type:
+  state_machine: 'Macchina a stati'
+  workflow: Workflow
+
+page:
+  dashboard: Dashboard
+  definitions: Definizioni
+  new_definition: 'Nuova definizione di workflow'
+  edit_definition: 'Modifica definizione di workflow'
+  edit_definition_general: 'Modifica workflow — Generale'
+  edit_definition_match_rules: 'Modifica workflow — Regole di corrispondenza'
+  edit_definition_places: 'Modifica workflow — Stati'
+  edit_definition_transitions: 'Modifica workflow — Transizioni'
+
+dashboard:
+  title: 'Workflow Symfony guidati dal database'
+  intro: 'Gestisci le definizioni di workflow nel database e usale a runtime tramite %class%.'
+  definitions: Definizioni
+  empty_prefix: 'Nessuna definizione di workflow ancora.'
+  empty_suffix: 'oppure esegui'
+
+definition:
+  index_title: 'Definizioni di workflow'
+  none_found: 'Nessuna definizione trovata.'
+  marking: marcatura
+  priority: priorità
+  no_places: 'Questo workflow non ha ancora stati. Aggiungili nell''editor per visualizzare il flusso.'
+  match_rules: 'Regole di corrispondenza'
+  match_default: 'Corrisponde a qualsiasi soggetto di %class% quando non c''è un workflow più specifico.'
+  runtime_binding: 'Binding runtime'
+  subject_class: 'Classe del soggetto'
+  marking_property: 'Proprietà di marcatura'
+  initial_place: 'Stato iniziale'
+  places_transitions: 'Stati / transizioni'
+  confirm_delete: 'Eliminare questa definizione di workflow?'
+
+table:
+  name: Nome
+  slug: Slug
+  type: Tipo
+  subject: Soggetto
+  status: Stato
+  match_rules: 'Regole di corrispondenza'
+  priority: Priorità
+  places: Stati
+  transitions: Transizioni
+  actions: Azioni
+
+collection:
+  no_places: 'Nessuno stato ancora. Clicca «Aggiungi stato» per crearne uno.'
+  no_transitions: 'Nessuna transizione ancora. Clicca «Aggiungi transizione» per crearne una.'
+  no_match_rules: 'Nessuna regola ancora. Lascia vuoto per un workflow predefinito, o clicca «Aggiungi regola».'
+  confirm_delete: 'Rimuovere questo elemento? Salva il modulo per persistere le modifiche.'
+
+modal:
+  add_place: 'Aggiungi stato'
+  edit_place: 'Modifica stato'
+  add_transition: 'Aggiungi transizione'
+  edit_transition: 'Modifica transizione'
+  add_match_rule: 'Aggiungi regola'
+  edit_match_rule: 'Modifica regola'
+
+form:
+  section:
+    general: Generale
+    match_rules: 'Regole di corrispondenza'
+    places: Stati
+    transitions: Transizioni
+  help:
+    match_rules: 'Tutte le regole devono corrispondere (AND). Lascia vuoto per un workflow predefinito sulla classe del soggetto.'
+    match_rules_list: 'Definisci regole sui parametri per selezionare questo workflow. Lascia vuoto per un workflow predefinito.'
+    transition_places: 'Le opzioni provengono dalla sezione Places. Configura prima gli stati se necessario.'
+    places_list: 'Gestisci gli stati del workflow. Le modifiche si salvano inviando il modulo.'
+  field:
+    name: Nome
+    slug: Slug
+    type: Tipo
+    initial_place: 'Stato iniziale'
+    subject_class: 'Classe del soggetto (FQCN)'
+    marking_property: 'Proprietà di marcatura'
+    enabled: Attivo
+    priority: 'Priorità (più alta vince in caso di parità)'
+    description: Descrizione
+    match_rules: 'Regole di corrispondenza (vuoto = predefinito per la classe)'
+    places: Stati
+    transitions: Transizioni
+    parameter_key: 'Chiave parametro'
+    parameter_value: 'Valore parametro'
+    order: Ordine
+    label: Etichetta
+    from_places: 'Stati di origine'
+    to_places: 'Stati di destinazione'
+  placeholder:
+    select_places: 'Cerca e seleziona stati…'
+
+diagram:
+  title: 'Diagramma di flusso'
+  hint: 'Clicca uno stato o una transizione per vedere la configurazione.'
+  back_edges: 'Transizioni di ritorno / ciclo'
+  legend:
+    initial: 'Stato iniziale'
+    place: 'Stato (clic per i dettagli)'
+    transition: 'Transizione (clic per i dettagli)'
+  modal:
+    name: Nome
+    label: Etichetta
+    sort_order: Ordine
+    incoming: 'Transizioni in entrata'
+    outgoing: 'Transizioni in uscita'
+    no_transitions: 'Nessuna transizione collegata a questo stato.'
+    from: Da
+    to: A
+    state_machine_help: 'Transizione a macchina a stati: sposta il soggetto da uno stato a un altro.'
+    workflow_help: 'Transizione workflow: può collegare più stati sorgente e destinazione.'
+  transition_from: da
+  transition_to: a
+
+flash:
+  created: 'Definizione di workflow creata.'
+  updated: 'Definizione di workflow aggiornata.'
+  deleted: 'Definizione di workflow eliminata.'
+
+error:
+  not_found_id: 'Definizione di workflow #%id% non trovata.'
+  not_found_slug: 'Definizione di workflow "%slug%" non trovata.'

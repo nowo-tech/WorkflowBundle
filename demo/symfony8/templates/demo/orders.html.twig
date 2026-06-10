@@ -1,0 +1,48 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'playground.orders.title'|trans({}, 'demo') }}{% endblock %}
+
+{% block body %}
+    <h1 class="h2 mb-4">{{ 'playground.orders.title'|trans({}, 'demo') }}</h1>
+
+    <div class="alert alert-light border shadow-sm mb-4">
+        {{ 'playground.orders.hint'|trans({}, 'demo') }}
+        <a href="{{ path('demo_change_requests') }}">{{ 'nav.change_requests'|trans({}, 'demo') }}</a>.
+    </div>
+
+    <form method="post" action="{{ path('demo_orders_new') }}" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label" for="title">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</label>
+                    <input class="form-control" type="text" name="title" id="title" required>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">{{ 'playground.orders.create'|trans({}, 'demo') }}</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% for item in orders %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <strong>#{{ item.entity.id }}</strong>
+                    <span>{{ item.entity.title }}</span>
+                    <span class="badge text-bg-primary">{{ item.marking }}</span>
+                </div>
+                <p class="text-muted small mb-3">{{ 'playground.resolved'|trans({}, 'demo') }}: <code>{{ item.workflow_slug }}</code></p>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for transition in item.transitions %}
+                        <form method="post" action="{{ path('demo_orders_transition', {id: item.entity.id, transition: transition}) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">{{ transition }}</button>
+                        </form>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <p class="text-muted">{{ 'playground.no_items'|trans({}, 'demo') }}</p>
+    {% endfor %}
+{% endblock %}

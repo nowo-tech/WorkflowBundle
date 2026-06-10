@@ -1,0 +1,383 @@
+<script>
+(function () {
+    const tomSelectRegistry = new WeakMap();
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function readInput(entry, suffix) {
+        const input = entry.querySelector(`[name$="[${suffix}]"]`);
+        return input ? input.value.trim() : '';
+    }
+
+    function readMultiSelect(entry, suffix) {
+        const select = entry.querySelector(`[name$="[${suffix}][]"]`);
+        if (!select) {
+            return [];
+        }
+
+        const instance = tomSelectRegistry.get(select);
+        if (instance) {
+            return instance.getValue();
+        }
+
+        return Array.from(select.selectedOptions).map((option) => option.value);
+    }
+
+    function captureEntryState(entry, key) {
+        if (key === 'places') {
+            return {
+                name: readInput(entry, 'name'),
+                label: readInput(entry, 'label'),
+                sortOrder: readInput(entry, 'sortOrder'),
+            };
+        }
+
+        if (key === 'matchRules') {
+            return {
+                parameterKey: readInput(entry, 'parameterKey'),
+                parameterValue: readInput(entry, 'parameterValue'),
+                sortOrder: readInput(entry, 'sortOrder'),
+            };
+        }
+
+        return {
+            name: readInput(entry, 'name'),
+            label: readInput(entry, 'label'),
+            fromPlaces: readMultiSelect(entry, 'fromPlaces'),
+            toPlaces: readMultiSelect(entry, 'toPlaces'),
+        };
+    }
+
+    function restoreEntryState(entry, key, state) {
+        if (!state) {
+            return;
+        }
+
+        const setInput = (suffix, value) => {
+            const input = entry.querySelector(`[name$="[${suffix}]"]`);
+            if (input) {
+                input.value = value ?? '';
+            }
+        };
+
+        if (key === 'places') {
+            setInput('name', state.name);
+            setInput('label', state.label);
+            setInput('sortOrder', state.sortOrder);
+            return;
+        }
+
+        if (key === 'matchRules') {
+            setInput('parameterKey', state.parameterKey);
+            setInput('parameterValue', state.parameterValue);
+            setInput('sortOrder', state.sortOrder);
+            return;
+        }
+
+        setInput('name', state.name);
+        setInput('label', state.label);
+        setMultiSelectValues(entry, 'fromPlaces', state.fromPlaces ?? []);
+        setMultiSelectValues(entry, 'toPlaces', state.toPlaces ?? []);
+    }
+
+    function setMultiSelectValues(entry, suffix, values) {
+        const select = entry.querySelector(`[name$="[${suffix}][]"]`);
+        if (!select) {
+            return;
+        }
+
+        const instance = tomSelectRegistry.get(select);
+        if (instance) {
+            instance.setValue(values, true);
+            return;
+        }
+
+        Array.from(select.options).forEach((option) => {
+            option.selected = values.includes(option.value);
+        });
+    }
+
+    function destroyTomSelectIn(entry) {
+        entry.querySelectorAll('.nowo-place-multiselect').forEach((select) => {
+            const instance = tomSelectRegistry.get(select);
+            if (instance) {
+                instance.destroy();
+                tomSelectRegistry.delete(select);
+            }
+        });
+    }
+
+    function initTomSelectIn(entry, placeNames, placeholder) {
+        if (typeof TomSelect === 'undefined') {
+            return;
+        }
+
+        entry.querySelectorAll('.nowo-place-multiselect').forEach((select) => {
+            const existing = tomSelectRegistry.get(select);
+            if (existing) {
+                existing.destroy();
+                tomSelectRegistry.delete(select);
+            }
+
+            const selected = Array.from(select.selectedOptions).map((option) => option.value);
+            const options = new Set([...(placeNames || []), ...selected]);
+
+            select.innerHTML = '';
+            options.forEach((name) => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                if (selected.includes(name)) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            tomSelectRegistry.set(select, new TomSelect(select, {
+                plugins: ['remove_button'],
+                persist: false,
+                create: false,
+                maxItems: null,
+                placeholder: placeholder || '',
+                hideSelected: true,
+                closeAfterSelect: false,
+            }));
+        });
+    }
+
+    function reindexCollection(root) {
+        const prefix = root.dataset.formPrefix;
+        const entries = root.querySelectorAll('[data-collection-entry]');
+
+        entries.forEach((entry, index) => {
+            entry.dataset.collectionEntry = String(index);
+
+            entry.querySelectorAll('[name]').forEach((input) => {
+                input.name = input.name.replace(
+                    new RegExp(`${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\[\\d+\\]`),
+                    `${prefix}[${index}]`,
+                );
+            });
+
+            entry.querySelectorAll('[id]').forEach((input) => {
+                input.id = input.id.replace(/_\d+_/, `_${index}_`);
+            });
+
+            entry.querySelectorAll('label[for]').forEach((label) => {
+                label.htmlFor = label.htmlFor.replace(/_\d+_/, `_${index}_`);
+            });
+        });
+
+        root.dataset.index = String(entries.length);
+    }
+
+    function formatList(values) {
+        if (!values || values.length === 0) {
+            return '—';
+        }
+
+        return values.map((value) => `<code>${escapeHtml(value)}</code>`).join(', ');
+    }
+
+    function renderRow(root, entry, index) {
+        const key = root.dataset.collectionKey;
+        const tr = document.createElement('tr');
+        tr.dataset.rowIndex = String(index);
+
+        if (key === 'places') {
+            const name = readInput(entry, 'name') || '—';
+            const label = readInput(entry, 'label') || '—';
+            const sortOrder = readInput(entry, 'sortOrder') || '0';
+            tr.innerHTML = `
+                <td class="fw-semibold">${escapeHtml(name)}</td>
+                <td>${escapeHtml(label)}</td>
+                <td>${escapeHtml(sortOrder)}</td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                        <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                    </div>
+                </td>
+            `;
+            return tr;
+        }
+
+        if (key === 'matchRules') {
+            const parameterKey = readInput(entry, 'parameterKey') || '—';
+            const parameterValue = readInput(entry, 'parameterValue') || '—';
+            const sortOrder = readInput(entry, 'sortOrder') || '0';
+            tr.innerHTML = `
+                <td class="fw-semibold"><code>${escapeHtml(parameterKey)}</code></td>
+                <td><code>${escapeHtml(parameterValue)}</code></td>
+                <td>${escapeHtml(sortOrder)}</td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                        <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                    </div>
+                </td>
+            `;
+            return tr;
+        }
+
+        const name = readInput(entry, 'name') || '—';
+        const label = readInput(entry, 'label') || '—';
+        tr.innerHTML = `
+            <td class="fw-semibold">${escapeHtml(name)}</td>
+            <td>${escapeHtml(label)}</td>
+            <td>${formatList(readMultiSelect(entry, 'fromPlaces'))}</td>
+            <td>${formatList(readMultiSelect(entry, 'toPlaces'))}</td>
+            <td class="text-end">
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                    <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                </div>
+            </td>
+        `;
+
+        return tr;
+    }
+
+    function rebuildTable(root) {
+        const tbody = root.querySelector('[data-collection-table]');
+        const emptyState = root.querySelector('[data-collection-empty]');
+        const entries = root.querySelectorAll('[data-collection-entry]');
+
+        tbody.innerHTML = '';
+        entries.forEach((entry, index) => {
+            tbody.appendChild(renderRow(root, entry, index));
+        });
+
+        if (emptyState) {
+            emptyState.classList.toggle('d-none', entries.length > 0);
+        }
+    }
+
+    function getEntryByIndex(root, index) {
+        return root.querySelector(`[data-collection-entry="${index}"]`);
+    }
+
+    function createManager(root) {
+        const key = root.dataset.collectionKey;
+        const modalElement = document.getElementById(root.dataset.modalId);
+        const modalBody = modalElement.querySelector('[data-modal-body]');
+        const modalTitle = modalElement.querySelector('.modal-title');
+        const entriesHost = root.querySelector('[data-collection-entries]');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+        const placeNames = JSON.parse(root.dataset.placeNames || '[]');
+        const placeholder = root.dataset.placePlaceholder || '';
+
+        let activeEntry = null;
+        let snapshot = null;
+        let isNewEntry = false;
+
+        function closeEditor(apply) {
+            if (!activeEntry) {
+                return;
+            }
+
+            destroyTomSelectIn(activeEntry);
+
+            if (!apply) {
+                restoreEntryState(activeEntry, key, snapshot);
+            }
+
+            if (isNewEntry && !apply) {
+                activeEntry.remove();
+                reindexCollection(root);
+            } else {
+                entriesHost.appendChild(activeEntry);
+            }
+
+            activeEntry = null;
+            snapshot = null;
+            isNewEntry = false;
+            modalBody.innerHTML = '';
+            rebuildTable(root);
+        }
+
+        function openEditor(entry, isNew) {
+            activeEntry = entry;
+            isNewEntry = isNew;
+            snapshot = captureEntryState(entry, key);
+
+            modalTitle.textContent = isNew
+                ? modalTitle.dataset.modalTitleAdd
+                : modalTitle.dataset.modalTitleEdit;
+
+            modalBody.appendChild(entry);
+
+            if (key === 'transitions') {
+                initTomSelectIn(entry, placeNames, placeholder);
+            }
+
+            modal.show();
+        }
+
+        function addEntry() {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = root.dataset.prototype.replace(/__name__/g, '0');
+            const entry = wrapper.firstElementChild;
+            if (!entry) {
+                return;
+            }
+
+            entriesHost.appendChild(entry);
+            reindexCollection(root);
+            openEditor(entriesHost.lastElementChild, true);
+        }
+
+        root.querySelector('[data-collection-add]').addEventListener('click', addEntry);
+
+        root.querySelector('[data-collection-table]').addEventListener('click', (event) => {
+            const editIndex = event.target.closest('[data-row-edit]')?.dataset.rowEdit;
+            const deleteIndex = event.target.closest('[data-row-delete]')?.dataset.rowDelete;
+
+            if (editIndex !== undefined) {
+                const entry = getEntryByIndex(root, editIndex);
+                if (entry) {
+                    openEditor(entry, false);
+                }
+                return;
+            }
+
+            if (deleteIndex !== undefined) {
+                if (!window.confirm('{{ 'collection.confirm_delete'|trans({}, 'nowo_workflow')|e('js') }}')) {
+                    return;
+                }
+
+                const entry = getEntryByIndex(root, deleteIndex);
+                entry?.remove();
+                reindexCollection(root);
+                rebuildTable(root);
+            }
+        });
+
+        modalElement.querySelector('[data-modal-apply]').addEventListener('click', () => {
+            closeEditor(true);
+            modal.hide();
+        });
+
+        modalElement.querySelector('[data-modal-cancel]').addEventListener('click', () => {
+            closeEditor(false);
+            modal.hide();
+        });
+
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            if (activeEntry) {
+                closeEditor(false);
+            }
+        });
+
+        rebuildTable(root);
+    }
+
+    document.querySelectorAll('.workflow-collection').forEach(createManager);
+})();
+</script>

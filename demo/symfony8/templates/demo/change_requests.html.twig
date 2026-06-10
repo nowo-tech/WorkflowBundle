@@ -1,0 +1,88 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'playground.change_requests.title'|trans({}, 'demo') }}{% endblock %}
+
+{% block body %}
+    <div class="mb-4">
+        <h1 class="h2 mb-2">{{ 'playground.change_requests.title'|trans({}, 'demo') }}</h1>
+        <p class="text-muted mb-0">
+            {{ 'playground.change_requests.intro'|trans({'%entity%': 'DemoChangeRequest', '%workflow%': 'change_request_review'}, 'demo') }}
+        </p>
+    </div>
+
+    {% if workflow_definition is null %}
+        <div class="alert alert-warning border-0 shadow-sm">
+            {{ 'playground.change_requests.seed_warning'|trans({'%command%': 'php bin/console nowo:workflow:seed-demo'}, 'demo') }}
+        </div>
+    {% endif %}
+
+    <div class="alert alert-info border-0 shadow-sm">
+        {{ 'playground.change_requests.try_path'|trans({}, 'demo') }}
+        <a class="alert-link ms-1" href="{{ path('nowo_workflow_definition_show_by_slug', {slug: 'change_request_review'}) }}">{{ 'playground.change_requests.view_diagram'|trans({}, 'demo') }}</a>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100 border-success shadow-sm">
+                <div class="card-body">
+                    <h2 class="h6 text-success">{{ 'playground.change_requests.happy_path'|trans({}, 'demo') }}</h2>
+                    <p class="small text-muted mb-0">{{ 'playground.change_requests.happy_path_desc'|trans({}, 'demo') }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-warning shadow-sm">
+                <div class="card-body">
+                    <h2 class="h6 text-warning">{{ 'playground.change_requests.changes_loop'|trans({}, 'demo') }}</h2>
+                    <p class="small text-muted mb-0">{{ 'playground.change_requests.changes_loop_desc'|trans({}, 'demo') }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 border-danger shadow-sm">
+                <div class="card-body">
+                    <h2 class="h6 text-danger">{{ 'playground.change_requests.rejection_loop'|trans({}, 'demo') }}</h2>
+                    <p class="small text-muted mb-0">{{ 'playground.change_requests.rejection_loop_desc'|trans({}, 'demo') }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" action="{{ path('demo_change_requests_new') }}" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label" for="title">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</label>
+                    <input class="form-control" type="text" name="title" id="title" value="Upgrade payment gateway" required>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">{{ 'playground.change_requests.create'|trans({}, 'demo') }}</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% for item in change_requests %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <strong>#{{ item.entity.id }}</strong>
+                    <span>{{ item.entity.title }}</span>
+                    <span class="badge text-bg-primary">{{ item.marking|replace({'_': ' '})|title }}</span>
+                </div>
+                <p class="text-muted small mb-3">{{ 'playground.resolved'|trans({}, 'demo') }}: <code>{{ item.workflow_slug }}</code></p>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for transition in item.transitions %}
+                        <form method="post" action="{{ path('demo_change_requests_transition', {id: item.entity.id, transition: transition}) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">{{ transition|replace({'_': ' '})|title }}</button>
+                        </form>
+                    {% else %}
+                        <span class="text-muted small">{{ 'playground.no_transitions'|trans({}, 'demo') }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <p class="text-muted">{{ 'playground.no_items'|trans({}, 'demo') }}</p>
+    {% endfor %}
+{% endblock %}

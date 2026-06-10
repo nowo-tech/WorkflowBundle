@@ -1,0 +1,98 @@
+brand: 'Demo Workflow'
+title: 'Demo Workflow Bundle'
+lead: 'Definisci workflow nel database con regole di corrispondenza, risolvili per contesto ed esegui transizioni.'
+
+nav:
+  home: Home
+  resolver: 'Lab resolver'
+  crud: 'CRUD Workflow'
+  change_requests: 'Richieste di modifica'
+  orders: Ordini
+  documents: Documenti
+  expenses: Spese
+  purchase_orders: 'Ordini di acquisto'
+  toggle: 'Attiva/disattiva navigazione'
+
+home:
+  branching:
+    title: 'Ramificazioni — approva / rifiuta / richiedi modifiche'
+    text: '%entity% mostra più opzioni in review, loop (resubmit, reopen) e cancellazioni. Vedi il diagramma interattivo nell''admin.'
+    playground: 'Playground richieste di modifica'
+    diagram: 'Vedi diagramma'
+  resolver:
+    title: 'Lab resolver'
+    text: 'Prova combinazioni di parametri e scopri quale workflow vince (specificità + priorità).'
+    action: 'Apri lab resolver'
+  orders:
+    title: '0 param — approvazione con ramificazioni'
+    text: '%entity% — approva/rifiuta da review, con loop reopen.'
+    action: 'Playground ordini'
+  documents:
+    title: '1 param — document_type'
+    text: '%entity% risolve workflow invoice vs contract.'
+    action: 'Playground documenti'
+  expenses:
+    title: '2 param — tenant + department'
+    text: '%entity% sceglie flussi finance/HR per ACME, o flusso Globex a un param.'
+    action: 'Playground spese'
+  purchase_orders:
+    title: '3 param — tenant + region + amount_tier'
+    text: '%entity% scala PO ACME EU ad alto valore alla revisione CFO.'
+    action: 'Playground ordini di acquisto'
+  crud:
+    title: CRUD
+    text: 'Gestisci le definizioni di workflow nel database.'
+    action: 'Admin workflow'
+
+playground:
+  create: Crea
+  no_items: 'Nessun elemento ancora. Creane uno sopra.'
+  resolved: 'Workflow'
+  no_transitions: 'Nessuna transizione disponibile (stato terminale).'
+  orders:
+    title: 'Ordini — approvazione con ramificazioni (0 regole)'
+    hint: 'Da review puoi approvare o rifiutare; i rifiutati possono essere riaperti. Il playground richieste di modifica aggiunge request changes → resubmit.'
+    create: 'Crea ordine'
+    title_field: Titolo
+  change_requests:
+    title: 'Richieste di modifica — workflow ramificato'
+    intro: '%entity% usa %workflow%: più percorsi da review, più loop resubmit e reopen.'
+    seed_warning: 'Workflow demo non caricato. Esegui %command% (o riavvia il container Docker per seed automatico).'
+    try_path: 'Prova: Submit → Request changes → Resubmit → Approve. Oppure: Submit → Reject → Reopen. Cancel da draft o review.'
+    view_diagram: 'Vedi diagramma di flusso'
+    happy_path: 'Percorso felice'
+    happy_path_desc: 'draft → review → approved'
+    changes_loop: 'Loop modifiche'
+    changes_loop_desc: 'review → changes_needed → review → …'
+    rejection_loop: 'Loop rifiuto'
+    rejection_loop_desc: 'review → rejected → reopen → draft'
+    create: 'Crea richiesta di modifica'
+  resolver:
+    title: 'Lab resolver workflow'
+    intro: 'Simula la ricerca per classe del soggetto e parametri. Miglior match = più regole, poi priorità più alta.'
+    subject_class: 'Classe del soggetto'
+    resolve: Risolvi
+    error: Errore
+    resolved: 'Workflow risolto'
+    all_matches: 'Tutti i workflow corrispondenti'
+    rules: Regole
+    specificity: Specificità
+  documents:
+    title: 'Documenti — 1 param (document_type)'
+    type: Tipo
+    create: 'Crea documento'
+    option_invoice: 'invoice → invoice_processing'
+    option_contract: 'contract → contract_review'
+  expenses:
+    title: 'Spese — 2 param (tenant + department)'
+    create: 'Crea spesa'
+    tenant: Tenant
+    department: Dipartimento
+  purchase_orders:
+    title: 'Ordini di acquisto — 3 param (tenant + region + amount_tier)'
+    create: 'Crea ordine di acquisto'
+    tenant: Tenant
+    region: Regione
+    amount_tier: 'Fascia importo'
+    option_high: 'high → revisione CFO'
+    option_low: 'low → flusso EU standard'

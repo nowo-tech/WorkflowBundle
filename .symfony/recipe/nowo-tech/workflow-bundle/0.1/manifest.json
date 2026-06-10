@@ -1,0 +1,12 @@
+{
+    "manifests": {
+        "nowo-tech/workflow-bundle": {
+            "copy": [
+                "config/packages/nowo_workflow.yaml"
+            ],
+            "bundles": {
+                "Nowo\\WorkflowBundle\\NowoWorkflowBundle": ["all"]
+            }
+        }
+    }
+}

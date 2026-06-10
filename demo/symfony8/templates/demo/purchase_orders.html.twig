@@ -1,0 +1,62 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'playground.purchase_orders.title'|trans({}, 'demo') }}{% endblock %}
+
+{% block body %}
+    <h1 class="h2 mb-4">{{ 'playground.purchase_orders.title'|trans({}, 'demo') }}</h1>
+
+    <form method="post" action="{{ path('demo_purchase_orders_new') }}" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label" for="title">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</label>
+                    <input class="form-control" type="text" name="title" id="title" value="Server hardware">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="tenant">{{ 'playground.purchase_orders.tenant'|trans({}, 'demo') }}</label>
+                    <input class="form-control" type="text" name="tenant" id="tenant" value="acme">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="region">{{ 'playground.purchase_orders.region'|trans({}, 'demo') }}</label>
+                    <select class="form-select" name="region" id="region">
+                        <option value="eu">eu</option>
+                        <option value="us">us</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" for="amount_tier">{{ 'playground.purchase_orders.amount_tier'|trans({}, 'demo') }}</label>
+                    <select class="form-select" name="amount_tier" id="amount_tier">
+                        <option value="high">{{ 'playground.purchase_orders.option_high'|trans({}, 'demo') }}</option>
+                        <option value="low">{{ 'playground.purchase_orders.option_low'|trans({}, 'demo') }}</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">{{ 'playground.purchase_orders.create'|trans({}, 'demo') }}</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% for item in purchase_orders %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <strong>#{{ item.entity.id }}</strong>
+                    <span>{{ item.entity.title }}</span>
+                    <span class="badge text-bg-secondary">{{ item.entity.tenant }}/{{ item.entity.region }}/{{ item.entity.amountTier }}</span>
+                    <span class="badge text-bg-primary">{{ item.marking }}</span>
+                </div>
+                <p class="text-muted small mb-3">{{ 'playground.resolved'|trans({}, 'demo') }}: <code>{{ item.workflow_slug }}</code></p>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for transition in item.transitions %}
+                        <form method="post" action="{{ path('demo_purchase_orders_transition', {id: item.entity.id, transition: transition}) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">{{ transition }}</button>
+                        </form>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <p class="text-muted">{{ 'playground.no_items'|trans({}, 'demo') }}</p>
+    {% endfor %}
+{% endblock %}

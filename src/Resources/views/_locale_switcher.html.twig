@@ -1,0 +1,16 @@
+{% if nowo_workflow_locales|length > 1 %}
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            {{ ('locale.' ~ app.request.locale)|trans({}, 'nowo_workflow') }}
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+            {% for locale in nowo_workflow_locales %}
+                <li>
+                    <a class="dropdown-item{% if app.request.locale == locale %} active{% endif %}" href="{{ path(locale_route|default('nowo_workflow_locale_switch'), {_locale: locale}) }}">
+                        {{ ('locale.' ~ locale)|trans({}, 'nowo_workflow') }}
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    </li>
+{% endif %}

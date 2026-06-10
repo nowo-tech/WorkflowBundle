@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'playground.expenses.title'|trans({}, 'demo') }}{% endblock %}
+
+{% block body %}
+    <h1 class="h2 mb-4">{{ 'playground.expenses.title'|trans({}, 'demo') }}</h1>
+
+    <form method="post" action="{{ path('demo_expenses_new') }}" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label" for="title">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</label>
+                    <input class="form-control" type="text" name="title" id="title" value="Team lunch">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="tenant">{{ 'playground.expenses.tenant'|trans({}, 'demo') }}</label>
+                    <select class="form-select" name="tenant" id="tenant">
+                        <option value="acme">acme</option>
+                        <option value="globex">globex</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="department">{{ 'playground.expenses.department'|trans({}, 'demo') }}</label>
+                    <select class="form-select" name="department" id="department">
+                        <option value="finance">finance</option>
+                        <option value="hr">hr</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">{{ 'playground.expenses.create'|trans({}, 'demo') }}</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% for item in expenses %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <strong>#{{ item.entity.id }}</strong>
+                    <span>{{ item.entity.title }}</span>
+                    <span class="badge text-bg-secondary">{{ item.entity.tenant }}/{{ item.entity.department }}</span>
+                    <span class="badge text-bg-primary">{{ item.marking }}</span>
+                </div>
+                <p class="text-muted small mb-3">{{ 'playground.resolved'|trans({}, 'demo') }}: <code>{{ item.workflow_slug }}</code></p>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for transition in item.transitions %}
+                        <form method="post" action="{{ path('demo_expenses_transition', {id: item.entity.id, transition: transition}) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">{{ transition }}</button>
+                        </form>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <p class="text-muted">{{ 'playground.no_items'|trans({}, 'demo') }}</p>
+    {% endfor %}
+{% endblock %}

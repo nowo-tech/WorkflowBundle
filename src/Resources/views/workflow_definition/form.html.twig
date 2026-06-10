@@ -1,0 +1,81 @@
+{% extends '@NowoWorkflow/layout.html.twig' %}
+
+{% block title %}{{ title|trans({}, 'nowo_workflow') }}{% endblock %}
+
+{% block stylesheets %}
+    {% if section.value == 'transitions' %}
+        <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+    {% endif %}
+{% endblock %}
+
+{% block body %}
+    <div class="mb-4">
+        <h1 class="h2 mb-1">{{ title|trans({}, 'nowo_workflow') }}</h1>
+        {% if definition is defined %}
+            <p class="text-muted mb-0"><code>{{ definition.slug }}</code> · {{ definition.name }}</p>
+        {% endif %}
+    </div>
+
+    {% include '@NowoWorkflow/workflow_definition/_edit_nav.html.twig' %}
+
+    {{ form_start(form, {attr: {
+        'id': 'workflow-definition-form',
+    }}) }}
+
+        {% if section.value == 'general' %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.general'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">{{ form_row(form.name) }}</div>
+                        <div class="col-md-6">{{ form_row(form.slug) }}</div>
+                        <div class="col-md-4">{{ form_row(form.type) }}</div>
+                        <div class="col-md-4">{{ form_row(form.initialPlace) }}</div>
+                        <div class="col-md-4">{{ form_row(form.priority) }}</div>
+                        <div class="col-md-6">{{ form_row(form.subjectClass) }}</div>
+                        <div class="col-md-6">{{ form_row(form.markingProperty) }}</div>
+                        <div class="col-12">{{ form_row(form.enabled) }}</div>
+                        <div class="col-12">{{ form_row(form.description) }}</div>
+                    </div>
+                </div>
+            </div>
+        {% elseif section.value == 'match_rules' %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.match_rules'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-body">
+                    {% include '@NowoWorkflow/workflow_definition/_match_rules_section.html.twig' %}
+                </div>
+            </div>
+        {% elseif section.value == 'places' %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.places'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-body">
+                    {% include '@NowoWorkflow/workflow_definition/_places_section.html.twig' %}
+                </div>
+            </div>
+        {% elseif section.value == 'transitions' %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.transitions'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-body">
+                    {% include '@NowoWorkflow/workflow_definition/_transitions_section.html.twig' %}
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-primary">{{ 'action.save'|trans({}, 'nowo_workflow') }}</button>
+            {% if definition is defined %}
+                <a class="btn btn-outline-secondary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.cancel'|trans({}, 'nowo_workflow') }}</a>
+            {% endif %}
+        </div>
+    {{ form_end(form) }}
+{% endblock %}
+
+{% block javascripts %}
+    {% if section.value in ['match_rules', 'places', 'transitions'] %}
+        {% if section.value == 'transitions' %}
+            <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+        {% endif %}
+        {% include '@NowoWorkflow/workflow_definition/_collection_manager.js.twig' %}
+    {% endif %}
+{% endblock %}

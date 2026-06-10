@@ -1,0 +1,90 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'playground.resolver.title'|trans({}, 'demo') }}{% endblock %}
+
+{% block body %}
+    <div class="mb-4">
+        <h1 class="h2 mb-2">{{ 'playground.resolver.title'|trans({}, 'demo') }}</h1>
+        <p class="text-muted mb-0">{{ 'playground.resolver.intro'|trans({}, 'demo') }}</p>
+    </div>
+
+    <form method="get" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="subject_class">{{ 'playground.resolver.subject_class'|trans({}, 'demo') }}</label>
+                    <select class="form-select" name="subject_class" id="subject_class">
+                        <option value="App\Entity\DemoOrder" {% if subject_class == 'App\\Entity\\DemoOrder' %}selected{% endif %}>DemoOrder (default)</option>
+                        <option value="App\Entity\DemoDocument" {% if subject_class == 'App\\Entity\\DemoDocument' %}selected{% endif %}>DemoDocument (1 param)</option>
+                        <option value="App\Entity\DemoExpense" {% if subject_class == 'App\\Entity\\DemoExpense' %}selected{% endif %}>DemoExpense (2 params)</option>
+                        <option value="App\Entity\DemoPurchaseOrder" {% if subject_class == 'App\\Entity\\DemoPurchaseOrder' %}selected{% endif %}>DemoPurchaseOrder (3 params)</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="document_type">document_type</label>
+                    <input class="form-control" type="text" name="document_type" id="document_type" value="{{ parameters.document_type|default('') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="tenant">tenant</label>
+                    <input class="form-control" type="text" name="tenant" id="tenant" value="{{ parameters.tenant|default('') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="department">department</label>
+                    <input class="form-control" type="text" name="department" id="department" value="{{ parameters.department|default('') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="region">region</label>
+                    <input class="form-control" type="text" name="region" id="region" value="{{ parameters.region|default('') }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="amount_tier">amount_tier</label>
+                    <input class="form-control" type="text" name="amount_tier" id="amount_tier" value="{{ parameters.amount_tier|default('') }}">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">{{ 'playground.resolver.resolve'|trans({}, 'demo') }}</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% if error %}
+        <div class="alert alert-danger" role="alert"><strong>{{ 'playground.resolver.error'|trans({}, 'demo') }}:</strong> {{ error }}</div>
+    {% endif %}
+
+    {% if resolved %}
+        <div class="card shadow-sm border-success mb-4">
+            <div class="card-body">
+                <h2 class="h5 card-title text-success">{{ 'playground.resolver.resolved'|trans({}, 'demo') }}</h2>
+                <p class="mb-1"><strong>{{ resolved.name }}</strong> (<code>{{ resolved.slug }}</code>)</p>
+                <p class="text-muted mb-0">Priority {{ resolved.priority }} · {{ resolved.matchRules|length }} rule(s)</p>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if matches %}
+        <div class="card shadow-sm">
+            <div class="card-header"><h2 class="h5 mb-0">{{ 'playground.resolver.all_matches'|trans({}, 'demo') }}</h2></div>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr><th>Slug</th><th>{{ 'playground.resolver.rules'|trans({}, 'demo') }}</th><th>Priority</th><th>{{ 'playground.resolver.specificity'|trans({}, 'demo') }}</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for match in matches %}
+                            <tr>
+                                <td><code>{{ match.slug }}</code></td>
+                                <td>
+                                    {% if match.defaultMatcher %}<em>default</em>{% else %}
+                                        {% for rule in match.matchRules %}{{ rule.parameterKey }}={{ rule.parameterValue }} {% endfor %}
+                                    {% endif %}
+                                </td>
+                                <td>{{ match.priority }}</td>
+                                <td>{{ match.matchRules|length }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,98 @@
+brand: 'Workflow Demo'
+title: 'Workflow Bundle Demo'
+lead: 'Define workflows in the database with match rules, resolve them by context, and run transitions.'
+
+nav:
+  home: Home
+  resolver: 'Resolver lab'
+  crud: 'Workflow CRUD'
+  change_requests: 'Change requests'
+  orders: Orders
+  documents: Documents
+  expenses: Expenses
+  purchase_orders: 'Purchase orders'
+  toggle: 'Toggle navigation'
+
+home:
+  branching:
+    title: 'Branching — approve / reject / request changes'
+    text: '%entity% demonstrates multiple options at review, loops (resubmit, reopen) and cancel paths. See the interactive diagram in workflow admin.'
+    playground: 'Change request playground'
+    diagram: 'View diagram'
+  resolver:
+    title: 'Resolver lab'
+    text: 'Try parameter combinations and see which workflow wins (specificity + priority).'
+    action: 'Open resolver lab'
+  orders:
+    title: '0 params — branching approval'
+    text: '%entity% — approve/reject from review, with reopen loop.'
+    action: 'Order playground'
+  documents:
+    title: '1 param — document_type'
+    text: '%entity% resolves invoice vs contract workflows.'
+    action: 'Document playground'
+  expenses:
+    title: '2 params — tenant + department'
+    text: '%entity% picks finance/HR flows for ACME, or single-param Globex flow.'
+    action: 'Expense playground'
+  purchase_orders:
+    title: '3 params — tenant + region + amount_tier'
+    text: '%entity% escalates high-value ACME EU POs to CFO review.'
+    action: 'Purchase order playground'
+  crud:
+    title: CRUD
+    text: 'Manage workflow definitions in the database.'
+    action: 'Workflow admin'
+
+playground:
+  create: Create
+  no_items: 'No items yet. Create one above.'
+  resolved: 'Workflow'
+  no_transitions: 'No transitions available (terminal state).'
+  orders:
+    title: 'Orders — branching approval (0 match rules)'
+    hint: 'From review you can approve or reject; rejected items can be reopened. The change requests playground adds a third branch: request changes → resubmit.'
+    create: 'Create order'
+    title_field: Title
+  change_requests:
+    title: 'Change requests — branching workflow'
+    intro: '%entity% uses %workflow%: multiple paths from review, plus resubmit and reopen loops.'
+    seed_warning: 'Demo workflow not loaded yet. Run %command% (or restart the Docker container to seed automatically).'
+    try_path: 'Try this path: Submit → Request changes → Resubmit → Approve. Or: Submit → Reject → Reopen. Cancel is available from draft or review.'
+    view_diagram: 'View flow diagram'
+    happy_path: 'Happy path'
+    happy_path_desc: 'draft → review → approved'
+    changes_loop: 'Changes loop'
+    changes_loop_desc: 'review → changes_needed → review → …'
+    rejection_loop: 'Rejection loop'
+    rejection_loop_desc: 'review → rejected → reopen → draft'
+    create: 'Create change request'
+  resolver:
+    title: 'Workflow resolver lab'
+    intro: 'Simulate lookup by subject class and parameters. Best match = most rules matched, then highest priority.'
+    subject_class: 'Subject class'
+    resolve: Resolve
+    error: Error
+    resolved: 'Resolved workflow'
+    all_matches: 'All matching workflows'
+    rules: Rules
+    specificity: Specificity
+  documents:
+    title: 'Documents — 1 param (document_type)'
+    type: Type
+    create: 'Create document'
+    option_invoice: 'invoice → invoice_processing'
+    option_contract: 'contract → contract_review'
+  expenses:
+    title: 'Expenses — 2 params (tenant + department)'
+    create: 'Create expense'
+    tenant: Tenant
+    department: Department
+  purchase_orders:
+    title: 'Purchase orders — 3 params (tenant + region + amount_tier)'
+    create: 'Create PO'
+    tenant: Tenant
+    region: Region
+    amount_tier: 'Amount tier'
+    option_high: 'high → CFO review'
+    option_low: 'low → standard EU flow'

@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'playground.documents.title'|trans({}, 'demo') }}{% endblock %}
+
+{% block body %}
+    <h1 class="h2 mb-4">{{ 'playground.documents.title'|trans({}, 'demo') }}</h1>
+
+    <form method="post" action="{{ path('demo_documents_new') }}" class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label" for="title">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</label>
+                    <input class="form-control" type="text" name="title" id="title" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="document_type">{{ 'playground.documents.type'|trans({}, 'demo') }}</label>
+                    <select class="form-select" name="document_type" id="document_type">
+                        <option value="invoice">{{ 'playground.documents.option_invoice'|trans({}, 'demo') }}</option>
+                        <option value="contract">{{ 'playground.documents.option_contract'|trans({}, 'demo') }}</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">{{ 'playground.documents.create'|trans({}, 'demo') }}</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% for item in documents %}
+        <div class="card shadow-sm mb-3">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <strong>#{{ item.entity.id }}</strong>
+                    <span>{{ item.entity.title }}</span>
+                    <span class="badge text-bg-secondary">{{ item.entity.documentType }}</span>
+                    <span class="badge text-bg-primary">{{ item.marking }}</span>
+                </div>
+                <p class="text-muted small mb-3">{{ 'playground.resolved'|trans({}, 'demo') }}: <code>{{ item.workflow_slug }}</code></p>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for transition in item.transitions %}
+                        <form method="post" action="{{ path('demo_documents_transition', {id: item.entity.id, transition: transition}) }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">{{ transition }}</button>
+                        </form>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <p class="text-muted">{{ 'playground.no_items'|trans({}, 'demo') }}</p>
+    {% endfor %}
+{% endblock %}

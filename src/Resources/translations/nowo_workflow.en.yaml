@@ -1,0 +1,160 @@
+brand: 'Nowo Workflow'
+title_suffix: 'Nowo Workflow'
+
+locale:
+  en: English
+  es: Spanish
+  fr: French
+  it: Italian
+
+nav:
+  dashboard: Dashboard
+  definitions: Definitions
+  new_definition: New definition
+  toggle: Toggle navigation
+
+action:
+  view: View
+  show: Show
+  edit: Edit
+  delete: Delete
+  save: Save
+  cancel: Cancel
+  apply: Apply
+  create_one: Create one
+  close: Close
+  add_place: 'Add place'
+  add_transition: 'Add transition'
+  add_match_rule: 'Add match rule'
+
+status:
+  enabled: Enabled
+  disabled: Disabled
+  default: default
+  initial: Initial
+
+workflow_type:
+  state_machine: State machine
+  workflow: Workflow
+
+page:
+  dashboard: Dashboard
+  definitions: Definitions
+  new_definition: New workflow definition
+  edit_definition: Edit workflow definition
+  edit_definition_general: 'Edit workflow — General'
+  edit_definition_match_rules: 'Edit workflow — Match rules'
+  edit_definition_places: 'Edit workflow — Places'
+  edit_definition_transitions: 'Edit workflow — Transitions'
+
+dashboard:
+  title: 'Database-driven Symfony Workflows'
+  intro: 'Manage workflow definitions stored in the database and use them at runtime via %class%.'
+  definitions: Definitions
+  empty_prefix: 'No workflow definitions yet.'
+  empty_suffix: 'or run'
+
+definition:
+  index_title: 'Workflow definitions'
+  none_found: 'No definitions found.'
+  marking: marking
+  priority: priority
+  no_places: 'This workflow has no places yet. Add states in the editor to visualize the flow.'
+  match_rules: 'Match rules'
+  match_default: 'Matches any subject of %class% when no more specific workflow matches.'
+  runtime_binding: 'Runtime binding'
+  subject_class: 'Subject class'
+  marking_property: 'Marking property'
+  initial_place: 'Initial place'
+  places_transitions: 'Places / transitions'
+  confirm_delete: 'Delete this workflow definition?'
+
+table:
+  name: Name
+  slug: Slug
+  type: Type
+  subject: Subject
+  status: Status
+  match_rules: 'Match rules'
+  priority: Priority
+  places: Places
+  transitions: Transitions
+  actions: Actions
+
+collection:
+  no_places: 'No places yet. Click “Add place” to create one.'
+  no_transitions: 'No transitions yet. Click “Add transition” to create one.'
+  no_match_rules: 'No match rules yet. Leave empty for a default workflow, or click “Add match rule”.'
+  confirm_delete: 'Remove this item? Save the form to persist changes.'
+
+modal:
+  add_place: 'Add place'
+  edit_place: 'Edit place'
+  add_transition: 'Add transition'
+  edit_transition: 'Edit transition'
+  add_match_rule: 'Add match rule'
+  edit_match_rule: 'Edit match rule'
+
+form:
+  section:
+    general: General
+    match_rules: 'Match rules'
+    places: Places
+    transitions: Transitions
+  help:
+    match_rules: 'All rules must match (AND). Leave empty for a default workflow on the subject class.'
+    match_rules_list: 'Define parameter rules to select this workflow. Leave the list empty for a default workflow.'
+    transition_places: 'Options are taken from the Places section. Configure places first if needed.'
+    places_list: 'Manage workflow states. Changes are saved when you submit the form.'
+  field:
+    name: Name
+    slug: Slug
+    type: Type
+    initial_place: 'Initial place'
+    subject_class: 'Subject class (FQCN)'
+    marking_property: 'Marking property'
+    enabled: Enabled
+    priority: 'Priority (higher wins on ties)'
+    description: Description
+    match_rules: 'Match rules (empty = default for subject class)'
+    places: Places
+    transitions: Transitions
+    parameter_key: 'Parameter key'
+    parameter_value: 'Parameter value'
+    order: Order
+    label: Label
+    from_places: 'From places'
+    to_places: 'To places'
+  placeholder:
+    select_places: 'Search and select places…'
+
+diagram:
+  title: 'Flow diagram'
+  hint: 'Click a state or transition to inspect its configuration.'
+  back_edges: 'Return / loop transitions'
+  legend:
+    initial: 'Initial state'
+    place: 'State (click for details)'
+    transition: 'Transition (click for details)'
+  modal:
+    name: Name
+    label: Label
+    sort_order: 'Sort order'
+    incoming: 'Incoming transitions'
+    outgoing: 'Outgoing transitions'
+    no_transitions: 'No transitions connected to this state.'
+    from: From
+    to: To
+    state_machine_help: 'State machine transition: moves the subject from one place to another.'
+    workflow_help: 'Workflow transition: may connect multiple source and target places.'
+  transition_from: from
+  transition_to: to
+
+flash:
+  created: 'Workflow definition created.'
+  updated: 'Workflow definition updated.'
+  deleted: 'Workflow definition deleted.'
+
+error:
+  not_found_id: 'Workflow definition #%id% not found.'
+  not_found_slug: 'Workflow definition "%slug%" not found.'

@@ -1,0 +1,23 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    Nowo\WorkflowBundle\:
+        resource: '../../'
+        exclude:
+            - '../../DependencyInjection/'
+            - '../../Entity/'
+            - '../../NowoWorkflowBundle.php'
+
+    Nowo\WorkflowBundle\Repository\:
+        resource: '../../Repository/'
+
+    Nowo\WorkflowBundle\Command\:
+        resource: '../../Command/'
+        tags: ['console.command']
+
+    Nowo\WorkflowBundle\Service\LocaleManager:
+        arguments:
+            $enabledLocales: '%nowo_workflow.ui.locales%'
+            $defaultLocale: '%nowo_workflow.ui.default_locale%'

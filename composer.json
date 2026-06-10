@@ -1,0 +1,115 @@
+{
+    "name": "nowo-tech/workflow-bundle",
+    "description": "Symfony bundle to define and run Symfony Workflow state machines from database definitions with built-in CRUD.",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": [
+        "symfony",
+        "bundle",
+        "workflow",
+        "state-machine",
+        "database",
+        "crud",
+        "doctrine"
+    ],
+    "homepage": "https://github.com/nowo-tech/WorkflowBundle",
+    "support": {
+        "issues": "https://github.com/nowo-tech/WorkflowBundle/issues",
+        "source": "https://github.com/nowo-tech/WorkflowBundle",
+        "docs": "https://github.com/nowo-tech/WorkflowBundle/tree/main/docs",
+        "changelog": "https://github.com/nowo-tech/WorkflowBundle/blob/main/docs/CHANGELOG.md"
+    },
+    "authors": [
+        {
+            "name": "Héctor Franco Aceituno",
+            "email": "hectorfranco@nowo.tech",
+            "homepage": "https://github.com/HecFranco",
+            "role": "Developer"
+        },
+        {
+            "name": "Nowo.tech",
+            "homepage": "https://nowo.tech"
+        }
+    ],
+    "require": {
+        "php": ">=8.1 <8.6",
+        "doctrine/doctrine-bundle": "^2.8 || ^3.0",
+        "doctrine/orm": "^2.13 || ^3.0",
+        "symfony/config": "^6.3 || ^7.0 || ^8.0",
+        "symfony/dependency-injection": "^6.3 || ^7.0 || ^8.0",
+        "symfony/form": "^6.3 || ^7.0 || ^8.0",
+        "symfony/http-kernel": "^6.3 || ^7.0 || ^8.0",
+        "symfony/routing": "^6.3 || ^7.0 || ^8.0",
+        "symfony/security-csrf": "^6.3 || ^7.0 || ^8.0",
+        "symfony/twig-bundle": "^6.3 || ^7.0 || ^8.0",
+        "symfony/translation": "^6.3 || ^7.0 || ^8.0",
+        "symfony/validator": "^6.3 || ^7.0 || ^8.0",
+        "symfony/workflow": "^6.3 || ^7.0 || ^8.0"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.0",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpstan/phpstan-symfony": "^2.0",
+        "phpunit/phpunit": "^10.0 || ^11.0",
+        "rector/rector": "^2.0",
+        "symfony/browser-kit": "^6.3 || ^7.0 || ^8.0",
+        "symfony/framework-bundle": "^6.3 || ^7.0 || ^8.0",
+        "symfony/yaml": "^6.3 || ^7.0 || ^8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Nowo\\WorkflowBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Nowo\\WorkflowBundle\\Tests\\": "tests/"
+        }
+    },
+    "archive": {
+        "exclude": ["/demo", "/.cursor"]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "phpstan/extension-installer": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "phpunit --colors=always",
+        "test-unit": "phpunit --testsuite=Unit",
+        "test-integration": "phpunit --testsuite=Integration",
+        "test-coverage": "phpunit --colors=always --coverage-html coverage --coverage-clover coverage.xml --coverage-text",
+        "cs-check": "php-cs-fixer fix --dry-run --diff",
+        "cs-fix": "php-cs-fixer fix",
+        "rector": "rector process",
+        "rector-dry": "rector process --dry-run --no-progress-bar",
+        "phpstan": "phpstan analyse --memory-limit=512M",
+        "update": "composer update --no-interaction",
+        "validate": "composer validate --strict",
+        "qa": [
+            "@cs-check",
+            "@test"
+        ]
+    },
+    "scripts-descriptions": {
+        "test": "Run PHPUnit tests",
+        "test-unit": "Run Unit tests only",
+        "test-coverage": "Run PHPUnit tests with code coverage",
+        "cs-check": "Check code style with PHP-CS-Fixer",
+        "cs-fix": "Fix code style with PHP-CS-Fixer",
+        "rector": "Apply Rector refactoring",
+        "rector-dry": "Run Rector in dry-run mode",
+        "phpstan": "Run PHPStan static analysis",
+        "update": "Update composer.lock (composer update)",
+        "validate": "Validate composer.json (composer validate --strict)",
+        "qa": "Run all quality assurance checks"
+    },
+    "suggest": {
+        "symfony/flex": "For automatic recipe installation"
+    }
+}

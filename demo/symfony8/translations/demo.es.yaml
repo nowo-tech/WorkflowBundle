@@ -1,0 +1,98 @@
+brand: 'Demo Workflow'
+title: 'Demo Workflow Bundle'
+lead: 'Define workflows en base de datos con reglas de coincidencia, resuélvelos por contexto y ejecuta transiciones.'
+
+nav:
+  home: Inicio
+  resolver: 'Laboratorio resolver'
+  crud: 'CRUD Workflow'
+  change_requests: 'Change requests'
+  orders: Pedidos
+  documents: Documentos
+  expenses: Gastos
+  purchase_orders: 'Órdenes de compra'
+  toggle: 'Alternar navegación'
+
+home:
+  branching:
+    title: 'Bifurcaciones — aprobar / rechazar / pedir cambios'
+    text: '%entity% demuestra varias opciones en review, bucles (resubmit, reopen) y cancelaciones. Ver el diagrama interactivo en el admin.'
+    playground: 'Playground change requests'
+    diagram: 'Ver diagrama'
+  resolver:
+    title: 'Laboratorio resolver'
+    text: 'Prueba combinaciones de parámetros y mira qué workflow gana (especificidad + prioridad).'
+    action: 'Abrir laboratorio'
+  orders:
+    title: '0 params — aprobación con bifurcaciones'
+    text: '%entity% — aprobar/rechazar desde review, con bucle reopen.'
+    action: 'Playground pedidos'
+  documents:
+    title: '1 param — document_type'
+    text: '%entity% resuelve workflows invoice vs contract.'
+    action: 'Playground documentos'
+  expenses:
+    title: '2 params — tenant + department'
+    text: '%entity% elige flujos finance/HR para ACME, o flujo Globex de un param.'
+    action: 'Playground gastos'
+  purchase_orders:
+    title: '3 params — tenant + region + amount_tier'
+    text: '%entity% escala POs ACME EU de alto valor a revisión CFO.'
+    action: 'Playground órdenes de compra'
+  crud:
+    title: CRUD
+    text: 'Gestiona definiciones de workflow en la base de datos.'
+    action: 'Admin workflow'
+
+playground:
+  create: Crear
+  no_items: 'Aún no hay elementos. Crea uno arriba.'
+  resolved: 'Workflow'
+  no_transitions: 'No hay transiciones disponibles (estado terminal).'
+  orders:
+    title: 'Pedidos — aprobación con bifurcaciones (0 reglas)'
+    hint: 'Desde review puedes aprobar o rechazar; los rechazados pueden reabrirse. El playground change requests añade request changes → resubmit.'
+    create: 'Crear pedido'
+    title_field: Título
+  change_requests:
+    title: 'Change requests — workflow con bifurcaciones'
+    intro: '%entity% usa %workflow%: varias rutas desde review, más bucles resubmit y reopen.'
+    seed_warning: 'Workflow demo no cargado. Ejecuta %command% (o reinicia el contenedor Docker para seed automático).'
+    try_path: 'Prueba: Submit → Request changes → Resubmit → Approve. O: Submit → Reject → Reopen. Cancel desde draft o review.'
+    view_diagram: 'Ver diagrama de flujo'
+    happy_path: 'Camino feliz'
+    happy_path_desc: 'draft → review → approved'
+    changes_loop: 'Bucle de cambios'
+    changes_loop_desc: 'review → changes_needed → review → …'
+    rejection_loop: 'Bucle de rechazo'
+    rejection_loop_desc: 'review → rejected → reopen → draft'
+    create: 'Crear change request'
+  resolver:
+    title: 'Laboratorio resolver de workflows'
+    intro: 'Simula búsqueda por clase de sujeto y parámetros. Mejor match = más reglas, luego mayor prioridad.'
+    subject_class: 'Clase del sujeto'
+    resolve: Resolver
+    error: Error
+    resolved: 'Workflow resuelto'
+    all_matches: 'Todos los workflows coincidentes'
+    rules: Reglas
+    specificity: Especificidad
+  documents:
+    title: 'Documentos — 1 param (document_type)'
+    type: Tipo
+    create: 'Crear documento'
+    option_invoice: 'invoice → invoice_processing'
+    option_contract: 'contract → contract_review'
+  expenses:
+    title: 'Gastos — 2 params (tenant + department)'
+    create: 'Crear gasto'
+    tenant: Tenant
+    department: Departamento
+  purchase_orders:
+    title: 'Órdenes de compra — 3 params (tenant + region + amount_tier)'
+    create: 'Crear OC'
+    tenant: Tenant
+    region: Región
+    amount_tier: 'Nivel de importe'
+    option_high: 'high → revisión CFO'
+    option_low: 'low → flujo EU estándar'

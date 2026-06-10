@@ -1,0 +1,4 @@
+nowo_workflow:
+    enabled: true
+    ui:
+        path: '/workflow'
