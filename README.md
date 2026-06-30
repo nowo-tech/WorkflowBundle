@@ -4,8 +4,8 @@
 [![Packagist Version](https://img.shields.io/packagist/v/nowo-tech/workflow-bundle.svg?style=flat)](https://packagist.org/packages/nowo-tech/workflow-bundle)
 [![Packagist Downloads](https://img.shields.io/packagist/dt/nowo-tech/workflow-bundle.svg)](https://packagist.org/packages/nowo-tech/workflow-bundle)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![PHP](https://img.shields.io/badge/PHP-8.1%2B-777BB4?logo=php)](https://php.net)
-[![Symfony](https://img.shields.io/badge/Symfony-6.3%2B%20%7C%207.4%2B%20%7C%208.0%20%7C%208.1%2B-000000?logo=symfony)](https://symfony.com)
+[![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4?logo=php)](https://php.net)
+[![Symfony](https://img.shields.io/badge/Symfony-7.0%2B%20%7C%208.0%2B-000000?logo=symfony)](https://symfony.com)
 [![GitHub stars](https://img.shields.io/github/stars/nowo-tech/WorkflowBundle.svg?style=social&label=Star)](https://github.com/nowo-tech/WorkflowBundle)
 [![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen)](#tests-and-coverage)
 
@@ -13,7 +13,7 @@
 
 Define Symfony Workflow state machines and workflows in the database, manage them with a built-in CRUD UI, and execute transitions at runtime through `DatabaseWorkflowRegistry` and `WorkflowApplicator`.
 
-> 📋 **Compatible with Symfony 6.3+, 7.x, and 8.x**
+> 📋 **Compatible with Symfony 7.x (PHP 8.2+) and 8.x (PHP 8.4+)**
 
 ## Features
 

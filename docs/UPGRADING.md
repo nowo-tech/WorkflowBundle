@@ -8,6 +8,27 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.2.0
+
+From 1.1.x:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+### Breaking: PHP and Symfony
+
+| Requirement | 1.1.x | 1.2.0 |
+|-------------|-------|-------|
+| PHP | 8.1+ | **8.2+** |
+| Symfony | 6.3, 7.x, 8.x | **7.x, 8.x only** |
+| Symfony 8 + Doctrine | — | PHP **8.4+** and `doctrine/doctrine-bundle` **^3.2.4** |
+
+If you run **Symfony 6.4** or **PHP 8.1**, stay on `1.1.x` until you upgrade the host application.
+
+For **Symfony 8**, ensure the app uses `doctrine/doctrine-bundle` ^3.2.4 (requires PHP 8.4+). Symfony 7 apps can keep `doctrine-bundle` ^2.13.
+
 ## Upgrading to 1.1.0
 
 From 1.0.x:
@@ -58,4 +79,4 @@ Override under `templates/bundles/NowoWorkflowBundle/` (see [USAGE.md](USAGE.md)
 
 | Bundle | Symfony | PHP |
 |--------|---------|-----|
-| 1.x | 6.3, 7.x, 8.x | 8.1 – 8.5 |
+| 1.x | 7.x (PHP 8.2+), 8.x (PHP 8.4+) | 8.2 – 8.5 |
