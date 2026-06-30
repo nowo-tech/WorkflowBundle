@@ -1,5 +1,7 @@
 # Installation
 
+**Requirements:** PHP 8.2+, Symfony 7.x or 8.x (Symfony 8 requires PHP 8.4+ and `doctrine/doctrine-bundle` ^3.2.4). See [UPGRADING.md](UPGRADING.md#compatibility).
+
 ```bash
 composer require nowo-tech/workflow-bundle
 ```

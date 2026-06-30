@@ -27,7 +27,7 @@ Or inside the container: `composer qa` runs cs-check + tests.
 
 ## Code standards
 
-- PHP 8.1+, `declare(strict_types=1);`
+- PHP 8.2+, `declare(strict_types=1);`
 - PSR-12 via PHP-CS-Fixer
 - PHPDoc on public classes and methods (English)
 - New behavior requires PHPUnit coverage
