@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Model;
 
+use function array_key_exists;
+
 /**
  * Runtime lookup context used to resolve which workflow definition applies.
  */
@@ -25,7 +27,7 @@ final readonly class WorkflowContext
 
     public function has(string $key): bool
     {
-        return \array_key_exists($key, $this->parameters);
+        return array_key_exists($key, $this->parameters);
     }
 
     /** @return array<string, string> */

@@ -1,4 +1,4 @@
-{% extends '@NowoWorkflow/layout.html.twig' %}
+{% extends '@NowoWorkflowBundle/layout.html.twig' %}
 
 {% block title %}{{ definition.name }}{% endblock %}
 
@@ -6,31 +6,31 @@
     <div class="mb-4">
         <h1 class="h2 mb-2">{{ definition.name }}</h1>
         <p class="text-muted mb-0">
-            <code>{{ definition.slug }}</code> · {{ ('workflow_type.' ~ definition.type.value)|trans({}, 'nowo_workflow') }} ·
-            {{ 'definition.marking'|trans({}, 'nowo_workflow') }}: <code>{{ definition.markingProperty }}</code> ·
-            {{ 'definition.priority'|trans({}, 'nowo_workflow') }}: {{ definition.priority }}
+            <code>{{ definition.slug }}</code> · {{ ('workflow_type.' ~ definition.type.value)|trans({}, 'NowoWorkflowBundle') }} ·
+            {{ 'definition.marking'|trans({}, 'NowoWorkflowBundle') }}: <code>{{ definition.markingProperty }}</code> ·
+            {{ 'definition.priority'|trans({}, 'NowoWorkflowBundle') }}: {{ definition.priority }}
             {% if definition.enabled %}
-                · <span class="badge text-bg-success">{{ 'status.enabled'|trans({}, 'nowo_workflow') }}</span>
+                · <span class="badge text-bg-success">{{ 'status.enabled'|trans({}, 'NowoWorkflowBundle') }}</span>
             {% else %}
-                · <span class="badge text-bg-secondary">{{ 'status.disabled'|trans({}, 'nowo_workflow') }}</span>
+                · <span class="badge text-bg-secondary">{{ 'status.disabled'|trans({}, 'NowoWorkflowBundle') }}</span>
             {% endif %}
         </p>
         {% if definition.description %}<p class="mt-2 mb-0">{{ definition.description }}</p>{% endif %}
     </div>
 
     {% if graph.places is empty %}
-        <div class="alert alert-warning">{{ 'definition.no_places'|trans({}, 'nowo_workflow') }}</div>
+        <div class="alert alert-warning">{{ 'definition.no_places'|trans({}, 'NowoWorkflowBundle') }}</div>
     {% else %}
-        {% include '@NowoWorkflow/workflow_definition/_flow_diagram.html.twig' %}
+        {% include '@NowoWorkflowBundle/workflow_definition/_flow_diagram.html.twig' %}
     {% endif %}
 
     <div class="row g-4">
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header"><h2 class="h5 mb-0">{{ 'definition.match_rules'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'definition.match_rules'|trans({}, 'NowoWorkflowBundle') }}</h2></div>
                 <div class="card-body">
                     {% if definition.defaultMatcher %}
-                        <p class="mb-0"><span class="badge text-bg-info">{{ 'status.default'|trans({}, 'nowo_workflow')|capitalize }}</span> {{ 'definition.match_default'|trans({'%class%': definition.subjectClass}, 'nowo_workflow') }}</p>
+                        <p class="mb-0"><span class="badge text-bg-info">{{ 'status.default'|trans({}, 'NowoWorkflowBundle')|capitalize }}</span> {{ 'definition.match_default'|trans({'%class%': definition.subjectClass}, 'NowoWorkflowBundle') }}</p>
                     {% else %}
                         <ul class="list-group list-group-flush">
                             {% for rule in definition.matchRules %}
@@ -47,16 +47,16 @@
 
         <div class="col-lg-6">
             <div class="card shadow-sm h-100">
-                <div class="card-header"><h2 class="h5 mb-0">{{ 'definition.runtime_binding'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'definition.runtime_binding'|trans({}, 'NowoWorkflowBundle') }}</h2></div>
                 <div class="card-body">
                     <dl class="row mb-0">
-                        <dt class="col-sm-5">{{ 'definition.subject_class'|trans({}, 'nowo_workflow') }}</dt>
+                        <dt class="col-sm-5">{{ 'definition.subject_class'|trans({}, 'NowoWorkflowBundle') }}</dt>
                         <dd class="col-sm-7"><code class="small">{{ definition.subjectClass }}</code></dd>
-                        <dt class="col-sm-5">{{ 'definition.marking_property'|trans({}, 'nowo_workflow') }}</dt>
+                        <dt class="col-sm-5">{{ 'definition.marking_property'|trans({}, 'NowoWorkflowBundle') }}</dt>
                         <dd class="col-sm-7"><code>{{ definition.markingProperty }}</code></dd>
-                        <dt class="col-sm-5">{{ 'definition.initial_place'|trans({}, 'nowo_workflow') }}</dt>
+                        <dt class="col-sm-5">{{ 'definition.initial_place'|trans({}, 'NowoWorkflowBundle') }}</dt>
                         <dd class="col-sm-7"><code>{{ definition.initialPlace }}</code></dd>
-                        <dt class="col-sm-5">{{ 'definition.places_transitions'|trans({}, 'nowo_workflow') }}</dt>
+                        <dt class="col-sm-5">{{ 'definition.places_transitions'|trans({}, 'NowoWorkflowBundle') }}</dt>
                         <dd class="col-sm-7">{{ definition.places|length }} / {{ definition.transitions|length }}</dd>
                     </dl>
                 </div>
@@ -65,10 +65,10 @@
     </div>
 
     <div class="d-flex gap-2 mt-4">
-        <a class="btn btn-primary" href="{{ path('nowo_workflow_definition_edit_general', {id: definition.id}) }}">{{ 'action.edit'|trans({}, 'nowo_workflow') }}</a>
-        <form method="post" action="{{ path('nowo_workflow_definition_delete', {id: definition.id}) }}" onsubmit="return confirm('{{ 'definition.confirm_delete'|trans({}, 'nowo_workflow')|e('js') }}');">
+        <a class="btn btn-primary" href="{{ path('nowo_workflow_definition_edit_general', {id: definition.id}) }}">{{ 'action.edit'|trans({}, 'NowoWorkflowBundle') }}</a>
+        <form method="post" action="{{ path('nowo_workflow_definition_delete', {id: definition.id}) }}" onsubmit="return confirm('{{ 'definition.confirm_delete'|trans({}, 'NowoWorkflowBundle')|e('js') }}');">
             <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ definition.id) }}">
-            <button type="submit" class="btn btn-danger">{{ 'action.delete'|trans({}, 'nowo_workflow') }}</button>
+            <button type="submit" class="btn btn-danger">{{ 'action.delete'|trans({}, 'NowoWorkflowBundle') }}</button>
         </form>
     </div>
 {% endblock %}

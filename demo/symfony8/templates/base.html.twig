@@ -24,7 +24,7 @@
                     <li class="nav-item"><a class="nav-link" href="{{ path('demo_documents') }}">{{ 'nav.documents'|trans({}, 'demo') }}</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ path('demo_expenses') }}">{{ 'nav.expenses'|trans({}, 'demo') }}</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ path('demo_purchase_orders') }}">{{ 'nav.purchase_orders'|trans({}, 'demo') }}</a></li>
-                    {% include '@NowoWorkflow/_locale_switcher.html.twig' with {locale_route: 'demo_locale_switch'} %}
+                    {% include '@NowoWorkflowBundle/_locale_switcher.html.twig' with {locale_route: 'demo_locale_switch'} %}
                 </ul>
             </div>
         </div>

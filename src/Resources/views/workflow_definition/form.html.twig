@@ -1,6 +1,6 @@
-{% extends '@NowoWorkflow/layout.html.twig' %}
+{% extends '@NowoWorkflowBundle/layout.html.twig' %}
 
-{% block title %}{{ title|trans({}, 'nowo_workflow') }}{% endblock %}
+{% block title %}{{ title|trans({}, 'NowoWorkflowBundle') }}{% endblock %}
 
 {% block stylesheets %}
     {% if section.value == 'transitions' %}
@@ -10,13 +10,13 @@
 
 {% block body %}
     <div class="mb-4">
-        <h1 class="h2 mb-1">{{ title|trans({}, 'nowo_workflow') }}</h1>
+        <h1 class="h2 mb-1">{{ title|trans({}, 'NowoWorkflowBundle') }}</h1>
         {% if definition is defined %}
             <p class="text-muted mb-0"><code>{{ definition.slug }}</code> · {{ definition.name }}</p>
         {% endif %}
     </div>
 
-    {% include '@NowoWorkflow/workflow_definition/_edit_nav.html.twig' %}
+    {% include '@NowoWorkflowBundle/workflow_definition/_edit_nav.html.twig' %}
 
     {{ form_start(form, {attr: {
         'id': 'workflow-definition-form',
@@ -24,7 +24,7 @@
 
         {% if section.value == 'general' %}
             <div class="card shadow-sm mb-4">
-                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.general'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.general'|trans({}, 'NowoWorkflowBundle') }}</h2></div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-6">{{ form_row(form.name) }}</div>
@@ -41,31 +41,31 @@
             </div>
         {% elseif section.value == 'match_rules' %}
             <div class="card shadow-sm mb-4">
-                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.match_rules'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.match_rules'|trans({}, 'NowoWorkflowBundle') }}</h2></div>
                 <div class="card-body">
-                    {% include '@NowoWorkflow/workflow_definition/_match_rules_section.html.twig' %}
+                    {% include '@NowoWorkflowBundle/workflow_definition/_match_rules_section.html.twig' %}
                 </div>
             </div>
         {% elseif section.value == 'places' %}
             <div class="card shadow-sm mb-4">
-                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.places'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.places'|trans({}, 'NowoWorkflowBundle') }}</h2></div>
                 <div class="card-body">
-                    {% include '@NowoWorkflow/workflow_definition/_places_section.html.twig' %}
+                    {% include '@NowoWorkflowBundle/workflow_definition/_places_section.html.twig' %}
                 </div>
             </div>
         {% elseif section.value == 'transitions' %}
             <div class="card shadow-sm mb-4">
-                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.transitions'|trans({}, 'nowo_workflow') }}</h2></div>
+                <div class="card-header"><h2 class="h5 mb-0">{{ 'form.section.transitions'|trans({}, 'NowoWorkflowBundle') }}</h2></div>
                 <div class="card-body">
-                    {% include '@NowoWorkflow/workflow_definition/_transitions_section.html.twig' %}
+                    {% include '@NowoWorkflowBundle/workflow_definition/_transitions_section.html.twig' %}
                 </div>
             </div>
         {% endif %}
 
         <div class="d-flex flex-wrap gap-2">
-            <button type="submit" class="btn btn-primary">{{ 'action.save'|trans({}, 'nowo_workflow') }}</button>
+            <button type="submit" class="btn btn-primary">{{ 'action.save'|trans({}, 'NowoWorkflowBundle') }}</button>
             {% if definition is defined %}
-                <a class="btn btn-outline-secondary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.cancel'|trans({}, 'nowo_workflow') }}</a>
+                <a class="btn btn-outline-secondary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.cancel'|trans({}, 'NowoWorkflowBundle') }}</a>
             {% endif %}
         </div>
     {{ form_end(form) }}
@@ -76,6 +76,6 @@
         {% if section.value == 'transitions' %}
             <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
         {% endif %}
-        {% include '@NowoWorkflow/workflow_definition/_collection_manager.js.twig' %}
+        {% include '@NowoWorkflowBundle/workflow_definition/_collection_manager.js.twig' %}
     {% endif %}
 {% endblock %}

@@ -5,11 +5,16 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Exception;
 
 use Nowo\WorkflowBundle\Model\WorkflowContext;
+use RuntimeException;
+
+use function sprintf;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * Thrown when multiple workflow definitions match the same context with equal specificity.
  */
-final class WorkflowAmbiguousMatchException extends \RuntimeException
+final class WorkflowAmbiguousMatchException extends RuntimeException
 {
     /**
      * @param list<string> $slugs
@@ -19,7 +24,7 @@ final class WorkflowAmbiguousMatchException extends \RuntimeException
         return new self(sprintf(
             'Ambiguous workflow match for subject "%s" and parameters %s: %s',
             $context->subjectClass ?? '(any)',
-            json_encode($context->sortedParameters(), \JSON_THROW_ON_ERROR),
+            json_encode($context->sortedParameters(), JSON_THROW_ON_ERROR),
             implode(', ', $slugs),
         ));
     }

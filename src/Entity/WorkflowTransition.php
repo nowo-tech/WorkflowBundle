@@ -44,10 +44,10 @@ class WorkflowTransition
      */
     public function __construct(string $name, array $fromPlaces, array $toPlaces, ?string $label = null)
     {
-        $this->name        = $name;
-        $this->fromPlaces  = array_values($fromPlaces);
-        $this->toPlaces    = array_values($toPlaces);
-        $this->label       = $label;
+        $this->name       = $name;
+        $this->fromPlaces = array_values($fromPlaces);
+        $this->toPlaces   = array_values($toPlaces);
+        $this->label      = $label;
     }
 
     public function getId(): ?int

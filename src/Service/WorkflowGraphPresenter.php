@@ -8,6 +8,9 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 
+use function count;
+use function in_array;
+
 /**
  * Builds graph data for the workflow detail visualization.
  */
@@ -52,7 +55,7 @@ final class WorkflowGraphPresenter
             $transitions[] = $this->presentTransition($transition);
         }
 
-        $places = [];
+        $places     = [];
         $placeIndex = 0;
         foreach ($definition->getPlaces() as $place) {
             $places[] = $this->presentPlace($place, $definition, $transitions, $placeIndex);
@@ -66,11 +69,11 @@ final class WorkflowGraphPresenter
 
         return [
             'initialPlace' => $definition->getInitialPlace(),
-            'type' => $definition->getType()->value,
-            'typeLabel' => $definition->getType()->label(),
-            'places' => $places,
-            'transitions' => $transitions,
-            'layout' => $this->buildLayout($places, $transitions, $definition->getInitialPlace(), $placeByName),
+            'type'         => $definition->getType()->value,
+            'typeLabel'    => $definition->getType()->label(),
+            'places'       => $places,
+            'transitions'  => $transitions,
+            'layout'       => $this->buildLayout($places, $transitions, $definition->getInitialPlace(), $placeByName),
         ];
     }
 
@@ -91,21 +94,21 @@ final class WorkflowGraphPresenter
         $sequence = $this->buildLinearSequence($places, $transitions, $initialPlace, $placeByName);
         if ($sequence !== null) {
             return [
-                'sequence' => $sequence,
-                'columns' => [],
-                'bridges' => [],
+                'sequence'  => $sequence,
+                'columns'   => [],
+                'bridges'   => [],
                 'backEdges' => [],
             ];
         }
 
-        $columnByPlace = $this->assignColumns($places, $transitions, $initialPlace);
-        $columns = $this->groupIntoColumns($places, $columnByPlace);
+        $columnByPlace         = $this->assignColumns($places, $transitions, $initialPlace);
+        $columns               = $this->groupIntoColumns($places, $columnByPlace);
         [$bridges, $backEdges] = $this->buildEdgeGroups($transitions, $columnByPlace);
 
         return [
-            'sequence' => null,
-            'columns' => $columns,
-            'bridges' => $bridges,
+            'sequence'  => null,
+            'columns'   => $columns,
+            'bridges'   => $bridges,
             'backEdges' => $backEdges,
         ];
     }
@@ -140,15 +143,15 @@ final class WorkflowGraphPresenter
             }
         }
 
-        foreach ($placeByName as $name => $_place) {
+        foreach (array_keys($placeByName) as $name) {
             if ($incomingCount[$name] > 1 || $outgoingCount[$name] > 1) {
                 return null;
             }
         }
 
         $sequence = [];
-        $visited = [];
-        $current = $initialPlace;
+        $visited  = [];
+        $current  = $initialPlace;
 
         while ($current !== null) {
             if (isset($visited[$current])) {
@@ -156,11 +159,11 @@ final class WorkflowGraphPresenter
             }
 
             $visited[$current] = true;
-            $sequence[] = ['type' => 'place', 'place' => $placeByName[$current]];
+            $sequence[]        = ['type' => 'place', 'place' => $placeByName[$current]];
 
             $nextTransition = null;
             foreach ($transitions as $index => $transition) {
-                if (\in_array($current, $transition['fromPlaces'], true)) {
+                if (in_array($current, $transition['fromPlaces'], true)) {
                     $nextTransition = ['index' => $index, 'data' => $transition];
                     break;
                 }
@@ -170,12 +173,12 @@ final class WorkflowGraphPresenter
                 break;
             }
 
-            if (\count($nextTransition['data']['toPlaces']) !== 1) {
+            if (count($nextTransition['data']['toPlaces']) !== 1) {
                 return null;
             }
 
             $sequence[] = [
-                'type' => 'transition',
+                'type'            => 'transition',
                 'transitionIndex' => $nextTransition['index'],
                 'transitionLabel' => $nextTransition['data']['displayLabel'],
             ];
@@ -183,7 +186,7 @@ final class WorkflowGraphPresenter
             $current = $nextTransition['data']['toPlaces'][0];
         }
 
-        return \count($visited) === \count($places) ? $sequence : null;
+        return count($visited) === count($places) ? $sequence : null;
     }
 
     /**
@@ -198,16 +201,16 @@ final class WorkflowGraphPresenter
             return [];
         }
 
-        $maxColumn = \count($places) - 1;
+        $maxColumn     = count($places) - 1;
         $columnByPlace = [$initialPlace => 0];
-        $queue = [$initialPlace];
+        $queue         = [$initialPlace];
 
         while ($queue !== []) {
-            $from = array_shift($queue);
+            $from       = array_shift($queue);
             $fromColumn = $columnByPlace[$from];
 
             foreach ($transitions as $transition) {
-                if (!\in_array($from, $transition['fromPlaces'], true)) {
+                if (!in_array($from, $transition['fromPlaces'], true)) {
                     continue;
                 }
 
@@ -217,7 +220,7 @@ final class WorkflowGraphPresenter
                     }
 
                     $columnByPlace[$to] = min($fromColumn + 1, $maxColumn);
-                    $queue[] = $to;
+                    $queue[]            = $to;
                 }
             }
         }
@@ -238,7 +241,7 @@ final class WorkflowGraphPresenter
     private function groupIntoColumns(array $places, array $columnByPlace): array
     {
         $maxColumn = $columnByPlace === [] ? 0 : max($columnByPlace);
-        $grouped = array_fill(0, $maxColumn + 1, []);
+        $grouped   = array_fill(0, $maxColumn + 1, []);
 
         foreach ($places as $place) {
             $grouped[$columnByPlace[$place['name']]][] = $place;
@@ -252,7 +255,7 @@ final class WorkflowGraphPresenter
             );
 
             $columns[] = [
-                'index' => $index,
+                'index'  => $index,
                 'places' => $columnPlaces,
             ];
         }
@@ -272,7 +275,7 @@ final class WorkflowGraphPresenter
     private function buildEdgeGroups(array $transitions, array $columnByPlace): array
     {
         $maxColumn = $columnByPlace === [] ? 0 : max($columnByPlace);
-        $bridges = array_fill(0, max(0, $maxColumn), []);
+        $bridges   = array_fill(0, max(0, $maxColumn), []);
         $backEdges = [];
 
         foreach ($transitions as $index => $transition) {
@@ -285,12 +288,12 @@ final class WorkflowGraphPresenter
                     $edge = [
                         'transitionIndex' => $index,
                         'transitionLabel' => $transition['displayLabel'],
-                        'fromPlace' => $from,
-                        'toPlace' => $to,
+                        'fromPlace'       => $from,
+                        'toPlace'         => $to,
                     ];
 
                     $fromColumn = $columnByPlace[$from];
-                    $toColumn = $columnByPlace[$to];
+                    $toColumn   = $columnByPlace[$to];
 
                     if ($toColumn <= $fromColumn) {
                         $backEdges[] = $edge;
@@ -336,6 +339,7 @@ final class WorkflowGraphPresenter
      *     label: string|null,
      *     displayLabel: string,
      *     sortOrder: int,
+     *     index: int,
      *     isInitial: bool,
      *     incoming: list<array{transitionIndex: int, transitionName: string, transitionLabel: string, fromPlaces: list<string>}>,
      *     outgoing: list<array{transitionIndex: int, transitionName: string, transitionLabel: string, toPlaces: list<string>}>
@@ -343,40 +347,40 @@ final class WorkflowGraphPresenter
      */
     private function presentPlace(WorkflowPlace $place, WorkflowDefinition $definition, array $transitions, int $placeIndex): array
     {
-        $name = $place->getName();
+        $name     = $place->getName();
         $incoming = [];
         $outgoing = [];
 
         foreach ($transitions as $transitionIndex => $transition) {
-            if (\in_array($name, $transition['toPlaces'], true)) {
+            if (in_array($name, $transition['toPlaces'], true)) {
                 $incoming[] = [
                     'transitionIndex' => $transitionIndex,
-                    'transitionName' => $transition['name'],
+                    'transitionName'  => $transition['name'],
                     'transitionLabel' => $transition['displayLabel'],
-                    'fromPlaces' => $transition['fromPlaces'],
+                    'fromPlaces'      => $transition['fromPlaces'],
                 ];
             }
 
-            if (\in_array($name, $transition['fromPlaces'], true)) {
+            if (in_array($name, $transition['fromPlaces'], true)) {
                 $outgoing[] = [
                     'transitionIndex' => $transitionIndex,
-                    'transitionName' => $transition['name'],
+                    'transitionName'  => $transition['name'],
                     'transitionLabel' => $transition['displayLabel'],
-                    'toPlaces' => $transition['toPlaces'],
+                    'toPlaces'        => $transition['toPlaces'],
                 ];
             }
         }
 
         return [
-            'id' => $place->getId(),
-            'name' => $name,
-            'label' => $place->getLabel(),
+            'id'           => $place->getId(),
+            'name'         => $name,
+            'label'        => $place->getLabel(),
             'displayLabel' => $place->getDisplayLabel(),
-            'sortOrder' => $place->getSortOrder(),
-            'index' => $placeIndex,
-            'isInitial' => $name === $definition->getInitialPlace(),
-            'incoming' => $incoming,
-            'outgoing' => $outgoing,
+            'sortOrder'    => $place->getSortOrder(),
+            'index'        => $placeIndex,
+            'isInitial'    => $name === $definition->getInitialPlace(),
+            'incoming'     => $incoming,
+            'outgoing'     => $outgoing,
         ];
     }
 
@@ -384,12 +388,12 @@ final class WorkflowGraphPresenter
     private function presentTransition(WorkflowTransition $transition): array
     {
         return [
-            'id' => $transition->getId(),
-            'name' => $transition->getName(),
-            'label' => $transition->getLabel(),
+            'id'           => $transition->getId(),
+            'name'         => $transition->getName(),
+            'label'        => $transition->getLabel(),
             'displayLabel' => $transition->getDisplayLabel(),
-            'fromPlaces' => $transition->getFromPlaces(),
-            'toPlaces' => $transition->getToPlaces(),
+            'fromPlaces'   => $transition->getFromPlaces(),
+            'toPlaces'     => $transition->getToPlaces(),
         ];
     }
 }

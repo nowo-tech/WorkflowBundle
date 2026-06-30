@@ -1,11 +1,11 @@
-{% extends '@NowoWorkflow/layout.html.twig' %}
+{% extends '@NowoWorkflowBundle/layout.html.twig' %}
 
-{% block title %}{{ 'page.definitions'|trans({}, 'nowo_workflow') }}{% endblock %}
+{% block title %}{{ 'page.definitions'|trans({}, 'NowoWorkflowBundle') }}{% endblock %}
 
 {% block body %}
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h2 mb-0">{{ 'definition.index_title'|trans({}, 'nowo_workflow') }}</h1>
-        <a class="btn btn-primary" href="{{ path('nowo_workflow_definition_new') }}">{{ 'nav.new_definition'|trans({}, 'nowo_workflow') }}</a>
+        <h1 class="h2 mb-0">{{ 'definition.index_title'|trans({}, 'NowoWorkflowBundle') }}</h1>
+        <a class="btn btn-primary" href="{{ path('nowo_workflow_definition_new') }}">{{ 'nav.new_definition'|trans({}, 'NowoWorkflowBundle') }}</a>
     </div>
 
     <div class="card shadow-sm">
@@ -13,12 +13,12 @@
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>{{ 'table.name'|trans({}, 'nowo_workflow') }}</th>
-                        <th>{{ 'table.slug'|trans({}, 'nowo_workflow') }}</th>
-                        <th>{{ 'table.match_rules'|trans({}, 'nowo_workflow') }}</th>
-                        <th>{{ 'table.priority'|trans({}, 'nowo_workflow') }}</th>
-                        <th>{{ 'table.places'|trans({}, 'nowo_workflow') }}</th>
-                        <th>{{ 'table.transitions'|trans({}, 'nowo_workflow') }}</th>
+                        <th>{{ 'table.name'|trans({}, 'NowoWorkflowBundle') }}</th>
+                        <th>{{ 'table.slug'|trans({}, 'NowoWorkflowBundle') }}</th>
+                        <th>{{ 'table.match_rules'|trans({}, 'NowoWorkflowBundle') }}</th>
+                        <th>{{ 'table.priority'|trans({}, 'NowoWorkflowBundle') }}</th>
+                        <th>{{ 'table.places'|trans({}, 'NowoWorkflowBundle') }}</th>
+                        <th>{{ 'table.transitions'|trans({}, 'NowoWorkflowBundle') }}</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -29,7 +29,7 @@
                             <td><code>{{ definition.slug }}</code></td>
                             <td>
                                 {% if definition.defaultMatcher %}
-                                    <span class="badge text-bg-info">{{ 'status.default'|trans({}, 'nowo_workflow') }}</span>
+                                    <span class="badge text-bg-info">{{ 'status.default'|trans({}, 'NowoWorkflowBundle') }}</span>
                                 {% else %}
                                     {{ definition.matchRules|length }}
                                 {% endif %}
@@ -39,13 +39,13 @@
                             <td>{{ definition.transitions|length }}</td>
                             <td class="text-end">
                                 <div class="btn-group btn-group-sm">
-                                    <a class="btn btn-outline-primary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.show'|trans({}, 'nowo_workflow') }}</a>
-                                    <a class="btn btn-outline-secondary" href="{{ path('nowo_workflow_definition_edit', {id: definition.id}) }}">{{ 'action.edit'|trans({}, 'nowo_workflow') }}</a>
+                                    <a class="btn btn-outline-primary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.show'|trans({}, 'NowoWorkflowBundle') }}</a>
+                                    <a class="btn btn-outline-secondary" href="{{ path('nowo_workflow_definition_edit', {id: definition.id}) }}">{{ 'action.edit'|trans({}, 'NowoWorkflowBundle') }}</a>
                                 </div>
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="7" class="text-muted text-center py-4">{{ 'definition.none_found'|trans({}, 'nowo_workflow') }}</td></tr>
+                        <tr><td colspan="7" class="text-muted text-center py-4">{{ 'definition.none_found'|trans({}, 'NowoWorkflowBundle') }}</td></tr>
                     {% endfor %}
                 </tbody>
             </table>

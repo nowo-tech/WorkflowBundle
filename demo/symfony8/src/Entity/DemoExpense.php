@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Nowo\WorkflowBundle\Contract\WorkflowContextAwareInterface;
@@ -31,14 +32,14 @@ class DemoExpense implements WorkflowContextAwareInterface
     private string $status = 'draft';
 
     #[ORM\Column(name: 'created_at', type: Types::DATETIME_IMMUTABLE)]
-    private \DateTimeImmutable $createdAt;
+    private DateTimeImmutable $createdAt;
 
     public function __construct(string $title, string $tenant, string $department)
     {
         $this->title      = $title;
         $this->tenant     = $tenant;
         $this->department = $department;
-        $this->createdAt  = new \DateTimeImmutable();
+        $this->createdAt  = new DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -78,7 +79,7 @@ class DemoExpense implements WorkflowContextAwareInterface
         return new WorkflowContext(
             subjectClass: self::class,
             parameters: [
-                'tenant' => $this->tenant,
+                'tenant'     => $this->tenant,
                 'department' => $this->department,
             ],
         );

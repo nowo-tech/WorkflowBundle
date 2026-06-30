@@ -7,11 +7,14 @@ namespace Nowo\WorkflowBundle\Service;
 use Doctrine\DBAL\Exception as DbalException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
+use Throwable;
+
+use function in_array;
 
 /**
- * Applies Doctrine schema create/update SQL for Uptime Monitor entities only.
+ * Applies Doctrine schema create/update SQL for Workflow Bundle entities only.
  */
-final class SchemaSyncService
+class SchemaSyncService
 {
     private const ENTITY_NAMESPACE_PREFIX = 'Nowo\\WorkflowBundle\\Entity\\';
 
@@ -31,7 +34,7 @@ final class SchemaSyncService
     }
 
     /**
-     * @return list<string> SQL statements to update schema (additive).
+     * @return list<string> SQL statements to update schema (additive)
      */
     public function getUpdateSchemaSql(): array
     {
@@ -104,15 +107,42 @@ final class SchemaSyncService
         ));
     }
 
-    public function isDuplicateSchemaObjectException(\Throwable $exception): bool
+    /**
+     * @param list<string> $statements
+     *
+     * @return array{executed: int, skipped: int}
+     */
+    public function executeStatements(\Doctrine\DBAL\Connection $connection, array $statements): array
+    {
+        $executed = 0;
+        $skipped  = 0;
+
+        foreach ($statements as $sql) {
+            try {
+                $connection->executeStatement($sql);
+                ++$executed;
+            } catch (Throwable $e) {
+                if ($this->isDuplicateSchemaObjectException($e)) {
+                    ++$skipped;
+                    continue;
+                }
+
+                throw $e;
+            }
+        }
+
+        return ['executed' => $executed, 'skipped' => $skipped];
+    }
+
+    public function isDuplicateSchemaObjectException(Throwable $exception): bool
     {
         $codes = ['42P07', '42701', '42S01', '1050'];
         $walk  = $exception;
 
-        while ($walk !== null) {
+        while ($walk instanceof Throwable) {
             if ($walk instanceof DbalException) {
                 $code = (string) $walk->getCode();
-                if (\in_array($code, $codes, true)) {
+                if (in_array($code, $codes, true)) {
                     return true;
                 }
             }
@@ -154,11 +184,10 @@ final class SchemaSyncService
         }
 
         $sequence = $this->parseCreateSequenceName($sql);
-        if ($sequence !== null && isset($sequences[$sequence])) {
-            return true;
-        }
 
-        return false;
+        return $sequence !== null && isset($sequences[$sequence])
+
+        ;
     }
 
     /**
@@ -198,7 +227,7 @@ final class SchemaSyncService
     {
         $schemaManager = $this->entityManager->getConnection()->createSchemaManager();
 
-        if (!method_exists($schemaManager, 'listSequences')) {
+        if (!$this->schemaManagerSupportsSequenceListing($schemaManager)) {
             return [];
         }
 
@@ -207,9 +236,17 @@ final class SchemaSyncService
                 static fn (string $name): string => strtolower($name),
                 $schemaManager->listSequences(),
             );
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return [];
         }
+    }
+
+    /**
+     * @internal
+     */
+    protected function schemaManagerSupportsSequenceListing(object $schemaManager): bool
+    {
+        return method_exists($schemaManager, 'listSequences');
     }
 
     private function parseCreateTableName(string $sql): ?string

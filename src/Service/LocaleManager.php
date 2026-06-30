@@ -7,6 +7,9 @@ namespace Nowo\WorkflowBundle\Service;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 
+use function in_array;
+use function is_string;
+
 /**
  * Stores and resolves the active UI locale for workflow screens.
  */
@@ -35,7 +38,7 @@ final class LocaleManager
 
     public function isEnabled(string $locale): bool
     {
-        return \in_array($locale, $this->enabledLocales, true);
+        return in_array($locale, $this->enabledLocales, true);
     }
 
     public function setLocale(string $locale): void
@@ -55,7 +58,7 @@ final class LocaleManager
         $session = $this->getSession();
         if ($session instanceof SessionInterface) {
             $stored = $session->get(self::SESSION_KEY);
-            if (\is_string($stored) && $this->isEnabled($stored)) {
+            if (is_string($stored) && $this->isEnabled($stored)) {
                 return $stored;
             }
         }
@@ -66,12 +69,10 @@ final class LocaleManager
     private function getSession(): ?SessionInterface
     {
         $request = $this->requestStack->getCurrentRequest();
-        if ($request === null || !$request->hasSession()) {
+        if (!$request instanceof \Symfony\Component\HttpFoundation\Request || !$request->hasSession()) {
             return null;
         }
 
-        $session = $request->getSession();
-
-        return $session instanceof SessionInterface ? $session : null;
+        return $request->getSession();
     }
 }

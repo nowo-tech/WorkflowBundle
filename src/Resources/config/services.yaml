@@ -21,3 +21,18 @@ services:
         arguments:
             $enabledLocales: '%nowo_workflow.ui.locales%'
             $defaultLocale: '%nowo_workflow.ui.default_locale%'
+
+    Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker: ~
+
+    Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface:
+        alias: Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker
+
+    Nowo\WorkflowBundle\Doctrine\TableNamePrefixer:
+        arguments:
+            $tablePrefix: '%nowo_workflow.table_prefix%'
+
+    Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber:
+        tags:
+            - { name: doctrine.event_subscriber }
+
+    Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface: '@Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry'

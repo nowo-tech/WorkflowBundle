@@ -15,6 +15,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 #[Route(path: '/definitions', name: 'nowo_workflow_definition_')]
 final class WorkflowDefinitionController extends AbstractController
@@ -24,13 +25,14 @@ final class WorkflowDefinitionController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly DatabaseWorkflowRegistry $registry,
         private readonly WorkflowGraphPresenter $graphPresenter,
+        private readonly TranslatorInterface $translator,
     ) {
     }
 
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(): Response
     {
-        return $this->render('@NowoWorkflow/workflow_definition/index.html.twig', [
+        return $this->render('@NowoWorkflowBundle/workflow_definition/index.html.twig', [
             'definitions' => $this->repository->findBy([], ['name' => 'ASC']),
         ]);
     }
@@ -54,9 +56,9 @@ final class WorkflowDefinitionController extends AbstractController
             return $this->redirectToRoute('nowo_workflow_definition_edit_match_rules', ['id' => $definition->getId()]);
         }
 
-        return $this->render('@NowoWorkflow/workflow_definition/form.html.twig', [
-            'form' => $form,
-            'title' => 'page.new_definition',
+        return $this->render('@NowoWorkflowBundle/workflow_definition/form.html.twig', [
+            'form'    => $form,
+            'title'   => 'page.new_definition',
             'section' => WorkflowDefinitionFormSection::General,
         ]);
     }
@@ -68,7 +70,7 @@ final class WorkflowDefinitionController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'edit', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function edit(int $id): Response
+    public function edit(int $id): \Symfony\Component\HttpFoundation\RedirectResponse
     {
         return $this->redirectToRoute('nowo_workflow_definition_edit_general', ['id' => $id]);
     }
@@ -104,7 +106,7 @@ final class WorkflowDefinitionController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function delete(Request $request, int $id): Response
+    public function delete(Request $request, int $id): \Symfony\Component\HttpFoundation\RedirectResponse
     {
         $definition = $this->requireDefinitionById($id);
 
@@ -141,19 +143,19 @@ final class WorkflowDefinitionController extends AbstractController
             return $this->redirectToRoute($section->routeName(), ['id' => $definition->getId()]);
         }
 
-        return $this->render('@NowoWorkflow/workflow_definition/form.html.twig', [
-            'form' => $form,
-            'title' => $section->titleKey(),
+        return $this->render('@NowoWorkflowBundle/workflow_definition/form.html.twig', [
+            'form'       => $form,
+            'title'      => $section->titleKey(),
             'definition' => $definition,
-            'section' => $section,
+            'section'    => $section,
         ]);
     }
 
     private function renderShow(WorkflowDefinition $definition): Response
     {
-        return $this->render('@NowoWorkflow/workflow_definition/show.html.twig', [
+        return $this->render('@NowoWorkflowBundle/workflow_definition/show.html.twig', [
             'definition' => $definition,
-            'graph' => $this->graphPresenter->present($definition),
+            'graph'      => $this->graphPresenter->present($definition),
         ]);
     }
 
@@ -161,7 +163,7 @@ final class WorkflowDefinitionController extends AbstractController
     {
         $definition = $this->repository->find($id);
         if (!$definition instanceof WorkflowDefinition) {
-            throw $this->createNotFoundException($this->trans('error.not_found_id', ['%id%' => $id], 'nowo_workflow'));
+            throw $this->createNotFoundException($this->translator->trans('error.not_found_id', ['%id%' => $id], 'NowoWorkflowBundle'));
         }
 
         return $definition;
@@ -171,7 +173,7 @@ final class WorkflowDefinitionController extends AbstractController
     {
         $definition = $this->repository->findOneBySlug($slug);
         if (!$definition instanceof WorkflowDefinition) {
-            throw $this->createNotFoundException($this->trans('error.not_found_slug', ['%slug%' => $slug], 'nowo_workflow'));
+            throw $this->createNotFoundException($this->translator->trans('error.not_found_slug', ['%slug%' => $slug], 'NowoWorkflowBundle'));
         }
 
         return $definition;

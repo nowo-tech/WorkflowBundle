@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
+use InvalidArgumentException;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Transition;
+
+use function sprintf;
 
 /**
  * Builds Symfony Workflow Definition objects from persisted entities.
@@ -18,10 +21,7 @@ final class WorkflowDefinitionBuilder
         $places = $definition->getPlaceNames();
 
         if ($places === []) {
-            throw new \InvalidArgumentException(sprintf(
-                'Workflow "%s" has no places defined.',
-                $definition->getSlug(),
-            ));
+            throw new InvalidArgumentException(sprintf('Workflow "%s" has no places defined.', $definition->getSlug()));
         }
 
         $transitions = [];

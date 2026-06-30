@@ -10,13 +10,13 @@ namespace Nowo\WorkflowBundle\Enum;
 enum WorkflowType: string
 {
     case StateMachine = 'state_machine';
-    case Workflow = 'workflow';
+    case Workflow     = 'workflow';
 
     public function label(): string
     {
         return match ($this) {
             self::StateMachine => 'State machine',
-            self::Workflow => 'Workflow',
+            self::Workflow     => 'Workflow',
         };
     }
 }

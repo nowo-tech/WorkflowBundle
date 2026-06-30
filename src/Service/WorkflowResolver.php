@@ -11,6 +11,8 @@ use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 
+use function count;
+
 /**
  * Resolves the best workflow definition for a runtime context.
  *
@@ -49,9 +51,9 @@ final class WorkflowResolver
             return $b->getPriority() <=> $a->getPriority();
         });
 
-        $best          = $matches[0];
-        $bestScore     = [$best->getMatchSpecificity(), $best->getPriority()];
-        $equallyBest   = array_filter(
+        $best        = $matches[0];
+        $bestScore   = [$best->getMatchSpecificity(), $best->getPriority()];
+        $equallyBest = array_filter(
             $matches,
             static fn (WorkflowDefinition $definition): bool => [
                 $definition->getMatchSpecificity(),
@@ -59,11 +61,8 @@ final class WorkflowResolver
             ] === $bestScore,
         );
 
-        if (\count($equallyBest) > 1) {
-            throw WorkflowAmbiguousMatchException::forContext(
-                $context,
-                array_values(array_map(static fn (WorkflowDefinition $d): string => $d->getSlug(), $equallyBest)),
-            );
+        if (count($equallyBest) > 1) {
+            throw WorkflowAmbiguousMatchException::forContext($context, array_values(array_map(static fn (WorkflowDefinition $d): string => $d->getSlug(), $equallyBest)));
         }
 
         return $best;

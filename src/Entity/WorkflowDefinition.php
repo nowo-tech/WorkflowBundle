@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Entity;
 
+use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
@@ -87,10 +88,10 @@ class WorkflowDefinition
     private Collection $transitions;
 
     #[ORM\Column(name: 'created_at', type: Types::DATETIME_IMMUTABLE)]
-    private \DateTimeImmutable $createdAt;
+    private DateTimeImmutable $createdAt;
 
     #[ORM\Column(name: 'updated_at', type: Types::DATETIME_IMMUTABLE)]
-    private \DateTimeImmutable $updatedAt;
+    private DateTimeImmutable $updatedAt;
 
     public function __construct(
         string $name,
@@ -107,8 +108,8 @@ class WorkflowDefinition
         $this->places       = new ArrayCollection();
         $this->transitions  = new ArrayCollection();
         $this->matchRules   = new ArrayCollection();
-        $this->createdAt    = new \DateTimeImmutable();
-        $this->updatedAt    = new \DateTimeImmutable();
+        $this->createdAt    = new DateTimeImmutable();
+        $this->updatedAt    = new DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -351,12 +352,12 @@ class WorkflowDefinition
         return $this->touch();
     }
 
-    public function getCreatedAt(): \DateTimeImmutable
+    public function getCreatedAt(): DateTimeImmutable
     {
         return $this->createdAt;
     }
 
-    public function getUpdatedAt(): \DateTimeImmutable
+    public function getUpdatedAt(): DateTimeImmutable
     {
         return $this->updatedAt;
     }
@@ -372,7 +373,7 @@ class WorkflowDefinition
 
     private function touch(): self
     {
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->updatedAt = new DateTimeImmutable();
 
         return $this;
     }

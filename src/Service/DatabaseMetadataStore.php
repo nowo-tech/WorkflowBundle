@@ -8,6 +8,8 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Symfony\Component\Workflow\Metadata\MetadataStoreInterface;
 use Symfony\Component\Workflow\Transition;
 
+use function is_string;
+
 /**
  * Exposes persisted workflow metadata to Symfony Workflow.
  */
@@ -62,7 +64,7 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
             return $this->getWorkflowMetadata()[$key] ?? null;
         }
 
-        if (\is_string($subject)) {
+        if (is_string($subject)) {
             return $this->getPlaceMetadata($subject)[$key] ?? null;
         }
 

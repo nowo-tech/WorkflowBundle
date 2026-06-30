@@ -56,7 +56,11 @@ link-bundle: ensure-up
 	docker-compose exec php sh -c "rm -rf vendor/nowo-tech/workflow-bundle && ln -s /var/workflow-bundle vendor/nowo-tech/workflow-bundle && php bin/console cache:clear"
 
 update-bundle: ensure-up
-	docker-compose exec php composer update nowo-tech/workflow-bundle --no-interaction
+	docker-compose exec php composer update nowo-tech/workflow-bundle -W --no-interaction
 	docker-compose exec php sh -c "php bin/console cache:clear --env=dev"
 
-release-check: ensure-up update-bundle test test-coverage
+release-check: ensure-up link-bundle test test-coverage
+
+# REQ-MAKE-008: update-deps (REQ-MAKE-008)
+DEMO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+include $(abspath $(DEMO_ROOT)/../../../.scripts/Makefile.demo-update-deps.mk)

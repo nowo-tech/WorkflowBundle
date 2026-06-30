@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
-use Nowo\WorkflowBundle\Contract\WorkflowContextAwareInterface;
+use InvalidArgumentException;
+use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+
+use function sprintf;
 
 /**
  * Applies database-backed workflow transitions to domain subjects.
@@ -17,7 +20,7 @@ use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 final class WorkflowApplicator
 {
     public function __construct(
-        private readonly DatabaseWorkflowRegistry $registry,
+        private readonly WorkflowRegistryInterface $registry,
         private readonly WorkflowDefinitionRepository $definitionRepository,
         private readonly WorkflowResolver $resolver,
         private readonly EntityManagerInterface $entityManager,
@@ -90,11 +93,7 @@ final class WorkflowApplicator
         $workflow = $this->registry->get($definition->getSlug());
 
         if (!$workflow->can($subject, $transitionName)) {
-            throw new \InvalidArgumentException(sprintf(
-                'Transition "%s" is not enabled for the current marking on workflow "%s".',
-                $transitionName,
-                $definition->getSlug(),
-            ));
+            throw new InvalidArgumentException(sprintf('Transition "%s" is not enabled for the current marking on workflow "%s".', $transitionName, $definition->getSlug()));
         }
 
         $workflow->apply($subject, $transitionName);
@@ -108,7 +107,7 @@ final class WorkflowApplicator
         $workflow = $this->registry->get($definition->getSlug());
 
         return array_values(array_map(
-            static fn ($transition): string => $transition->getName(),
+            static fn (\Symfony\Component\Workflow\Transition $transition): string => $transition->getName(),
             $workflow->getEnabledTransitions($subject),
         ));
     }
@@ -132,7 +131,7 @@ final class WorkflowApplicator
     {
         $definition = $this->definitionRepository->findOneBySlug($workflowSlug);
 
-        if ($definition === null || !$definition->isEnabled()) {
+        if (!$definition instanceof WorkflowDefinition || !$definition->isEnabled()) {
             throw WorkflowNotFoundException::forSlug($workflowSlug);
         }
 
@@ -142,12 +141,7 @@ final class WorkflowApplicator
     private function assertSubjectSupported(object $subject, WorkflowDefinition $definition): void
     {
         if (!is_a($subject, $definition->getSubjectClass())) {
-            throw new \InvalidArgumentException(sprintf(
-                'Subject of type "%s" is not supported by workflow "%s" (expects "%s").',
-                $subject::class,
-                $definition->getSlug(),
-                $definition->getSubjectClass(),
-            ));
+            throw new InvalidArgumentException(sprintf('Subject of type "%s" is not supported by workflow "%s" (expects "%s").', $subject::class, $definition->getSlug(), $definition->getSubjectClass()));
         }
     }
 }

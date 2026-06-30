@@ -27,8 +27,9 @@ final class WorkflowMatchRuleType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class' => WorkflowMatchRule::class,
-            'translation_domain' => 'nowo_workflow',
+            'data_class'         => WorkflowMatchRule::class,
+            'empty_data'         => static fn (): WorkflowMatchRule => new WorkflowMatchRule('', ''),
+            'translation_domain' => 'NowoWorkflowBundle',
         ]);
     }
 }

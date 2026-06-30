@@ -10,6 +10,9 @@ use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
+
+use function count;
 
 final class WorkflowGraphPresenterTest extends TestCase
 {
@@ -90,9 +93,9 @@ final class WorkflowGraphPresenterTest extends TestCase
         $graph = (new WorkflowGraphPresenter())->present($definition);
 
         self::assertNull($graph['layout']['sequence']);
-        self::assertGreaterThanOrEqual(3, \count($graph['layout']['columns']));
-        self::assertGreaterThanOrEqual(2, \count($graph['layout']['bridges'][1]));
-        self::assertGreaterThanOrEqual(2, \count($graph['layout']['backEdges']));
+        self::assertGreaterThanOrEqual(3, count($graph['layout']['columns']));
+        self::assertGreaterThanOrEqual(2, count($graph['layout']['bridges'][1]));
+        self::assertGreaterThanOrEqual(2, count($graph['layout']['backEdges']));
     }
 
     public function testAssignColumnsTerminatesForCyclicWorkflows(): void
@@ -109,5 +112,87 @@ final class WorkflowGraphPresenterTest extends TestCase
 
         self::assertSame(0, $graph['layout']['columns'][0]['places'][0]['index']);
         self::assertNotEmpty($graph['layout']['backEdges']);
+    }
+
+    public function testPresentReturnsEmptyLayoutForDefinitionWithoutPlaces(): void
+    {
+        $definition = new WorkflowDefinition('Empty', 'empty', 'missing', 'App\\Entity\\X', WorkflowType::StateMachine);
+
+        $graph = (new WorkflowGraphPresenter())->present($definition);
+
+        self::assertSame('missing', $graph['initialPlace']);
+        self::assertSame([], $graph['places']);
+        self::assertNull($graph['layout']['sequence']);
+        self::assertCount(1, $graph['layout']['columns']);
+        self::assertSame([], $graph['layout']['columns'][0]['places']);
+    }
+
+    public function testLinearSequenceReturnsNullWhenInitialPlaceMissing(): void
+    {
+        $definition = new WorkflowDefinition('Broken', 'broken', 'missing', 'App\\Entity\\X', WorkflowType::StateMachine);
+        $definition->addPlace(new WorkflowPlace('draft', 'Draft', 0));
+
+        $graph = (new WorkflowGraphPresenter())->present($definition);
+
+        self::assertNull($graph['layout']['sequence']);
+    }
+
+    public function testLinearSequenceReturnsNullForBranchingOutgoing(): void
+    {
+        $definition = new WorkflowDefinition('Branch', 'branch', 'draft', 'App\\Entity\\X', WorkflowType::StateMachine);
+        $definition->addPlace(new WorkflowPlace('draft', 'Draft', 0));
+        $definition->addPlace(new WorkflowPlace('a', 'A', 1));
+        $definition->addPlace(new WorkflowPlace('b', 'B', 2));
+        $definition->addTransition(new WorkflowTransition('split', ['draft'], ['a', 'b'], 'Split'));
+
+        $graph = (new WorkflowGraphPresenter())->present($definition);
+
+        self::assertNull($graph['layout']['sequence']);
+    }
+
+    public function testBuildEdgeGroupsIgnoresUnknownPlaces(): void
+    {
+        $definition = new WorkflowDefinition('Ghost', 'ghost', 'draft', 'App\\Entity\\X', WorkflowType::StateMachine);
+        $definition->addPlace(new WorkflowPlace('draft', 'Draft', 0));
+        $definition->addTransition(new WorkflowTransition('jump', ['ghost'], ['draft'], 'Jump'));
+
+        $graph = (new WorkflowGraphPresenter())->present($definition);
+
+        self::assertCount(1, $graph['places']);
+        self::assertSame([], $graph['layout']['backEdges']);
+    }
+
+    public function testBuildEdgeGroupsIgnoresPartiallyUnknownPlacesInBranchingFlow(): void
+    {
+        $definition = new WorkflowDefinition('Branch', 'branch', 'draft', 'App\\Entity\\X', WorkflowType::StateMachine);
+        $definition->addPlace(new WorkflowPlace('draft', 'Draft', 0));
+        $definition->addPlace(new WorkflowPlace('review', 'Review', 1));
+        $definition->addPlace(new WorkflowPlace('approved', 'Approved', 2));
+        $definition->addTransition(new WorkflowTransition('submit', ['draft'], ['review'], 'Submit'));
+        $definition->addTransition(new WorkflowTransition('approve', ['review'], ['approved'], 'Approve'));
+        $definition->addTransition(new WorkflowTransition('external', ['review'], ['missing'], 'External'));
+
+        $graph = (new WorkflowGraphPresenter())->present($definition);
+
+        self::assertNull($graph['layout']['sequence']);
+        self::assertSame([], $graph['layout']['backEdges']);
+    }
+
+    public function testBuildEdgeGroupsSkipsEdgesWithUnknownColumns(): void
+    {
+        $presenter = new WorkflowGraphPresenter();
+        $method    = new ReflectionMethod(WorkflowGraphPresenter::class, 'buildEdgeGroups');
+        $method->setAccessible(true);
+
+        [$bridges, $backEdges] = $method->invoke($presenter, [
+            [
+                'displayLabel' => 'External',
+                'fromPlaces'   => ['review'],
+                'toPlaces'     => ['missing'],
+            ],
+        ], ['review' => 1]);
+
+        self::assertSame([], $bridges[0] ?? []);
+        self::assertSame([], $backEdges);
     }
 }
