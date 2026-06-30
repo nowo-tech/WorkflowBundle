@@ -22,9 +22,9 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
                 'orm' => [
                     'mappings' => [
                         'NowoWorkflowBundle' => [
-                            'type' => 'attribute',
-                            'dir' => __DIR__ . '/../Entity',
-                            'prefix' => 'Nowo\\WorkflowBundle\\Entity',
+                            'type'      => 'attribute',
+                            'dir'       => __DIR__ . '/../Entity',
+                            'prefix'    => 'Nowo\\WorkflowBundle\\Entity',
                             'is_bundle' => false,
                         ],
                     ],
@@ -34,9 +34,6 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
 
         if ($container->hasExtension('twig')) {
             $container->prependExtensionConfig('twig', [
-                'paths' => [
-                    __DIR__ . '/../Resources/views' => 'NowoWorkflow',
-                ],
                 'form_themes' => ['bootstrap_5_layout.html.twig'],
             ]);
         }

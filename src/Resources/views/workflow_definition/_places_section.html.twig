@@ -10,9 +10,9 @@
     data-place-names="[]"
 >
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <p class="text-muted small mb-0">{{ 'form.help.places_list'|trans({}, 'nowo_workflow') }}</p>
+        <p class="text-muted small mb-0">{{ 'form.help.places_list'|trans({}, 'NowoWorkflowBundle') }}</p>
         <button type="button" class="btn btn-sm btn-primary" data-collection-add>
-            {{ 'action.add_place'|trans({}, 'nowo_workflow') }}
+            {{ 'action.add_place'|trans({}, 'NowoWorkflowBundle') }}
         </button>
     </div>
 
@@ -20,15 +20,15 @@
         <table class="table table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th>{{ 'table.name'|trans({}, 'nowo_workflow') }}</th>
-                    <th>{{ 'form.field.label'|trans({}, 'nowo_workflow') }}</th>
-                    <th>{{ 'form.field.order'|trans({}, 'nowo_workflow') }}</th>
-                    <th class="text-end">{{ 'table.actions'|trans({}, 'nowo_workflow') }}</th>
+                    <th>{{ 'table.name'|trans({}, 'NowoWorkflowBundle') }}</th>
+                    <th>{{ 'form.field.label'|trans({}, 'NowoWorkflowBundle') }}</th>
+                    <th>{{ 'form.field.order'|trans({}, 'NowoWorkflowBundle') }}</th>
+                    <th class="text-end">{{ 'table.actions'|trans({}, 'NowoWorkflowBundle') }}</th>
                 </tr>
             </thead>
             <tbody data-collection-table></tbody>
         </table>
-        <p class="text-muted text-center py-4 mb-0 d-none" data-collection-empty>{{ 'collection.no_places'|trans({}, 'nowo_workflow') }}</p>
+        <p class="text-muted text-center py-4 mb-0 d-none" data-collection-empty>{{ 'collection.no_places'|trans({}, 'NowoWorkflowBundle') }}</p>
     </div>
 
     <div class="d-none" data-collection-entries>
@@ -42,13 +42,13 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title h5" id="place-editor-modal-label" data-modal-title-add="{{ 'modal.add_place'|trans({}, 'nowo_workflow') }}" data-modal-title-edit="{{ 'modal.edit_place'|trans({}, 'nowo_workflow') }}"></h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ 'action.close'|trans({}, 'nowo_workflow') }}"></button>
+                <h2 class="modal-title h5" id="place-editor-modal-label" data-modal-title-add="{{ 'modal.add_place'|trans({}, 'NowoWorkflowBundle') }}" data-modal-title-edit="{{ 'modal.edit_place'|trans({}, 'NowoWorkflowBundle') }}"></h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ 'action.close'|trans({}, 'NowoWorkflowBundle') }}"></button>
             </div>
             <div class="modal-body" data-modal-body></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-modal-cancel>{{ 'action.cancel'|trans({}, 'nowo_workflow') }}</button>
-                <button type="button" class="btn btn-primary" data-modal-apply>{{ 'action.apply'|trans({}, 'nowo_workflow') }}</button>
+                <button type="button" class="btn btn-outline-secondary" data-modal-cancel>{{ 'action.cancel'|trans({}, 'NowoWorkflowBundle') }}</button>
+                <button type="button" class="btn btn-primary" data-modal-apply>{{ 'action.apply'|trans({}, 'NowoWorkflowBundle') }}</button>
             </div>
         </div>
     </div>

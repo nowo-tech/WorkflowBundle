@@ -41,4 +41,35 @@ $slug = $resolver->resolveSlugForSubject($expense);
 - Subclass entities in your app (Doctrine inheritance) if you need extra columns.
 - Implement `WorkflowContextAwareInterface` on domain subjects to expose lookup parameters.
 
+## Protecting the CRUD UI
+
+By default every request to `nowo_workflow_*` routes is allowed. Implement `WorkflowUiAccessCheckerInterface` and alias it in the container to enforce your own access policy (roles, IP allowlist, etc.). See [SECURITY.md](SECURITY.md#protecting-the-crud-ui).
+
+## Custom workflow registry
+
+`WorkflowRegistryInterface` is the extension point for resolving Symfony `WorkflowInterface` instances. The default implementation is `DatabaseWorkflowRegistry`; `WorkflowApplicator` depends on the interface.
+
 See demo playgrounds: 0-param orders, 1-param documents, 2-param expenses, 3-param purchase orders, plus `/playground/resolver`.
+
+## Overriding Twig templates (REQ-TWIG-001)
+
+Place files under `templates/bundles/NowoWorkflowBundle/` with the same relative path as in `src/Resources/views/`:
+
+```
+templates/bundles/NowoWorkflowBundle/layout.html.twig
+templates/bundles/NowoWorkflowBundle/dashboard/index.html.twig
+templates/bundles/NowoWorkflowBundle/workflow_definition/index.html.twig
+```
+
+Application overrides always win. Render using `@NowoWorkflowBundle/...` logical names.
+
+## Overriding translations (REQ-I18N-001)
+
+Translation domain: **`NowoWorkflowBundle`**. Override in the application:
+
+```
+translations/NowoWorkflowBundle.en.yaml
+translations/NowoWorkflowBundle.es.yaml
+```
+
+Clear cache after adding overrides: `php bin/console cache:clear`.

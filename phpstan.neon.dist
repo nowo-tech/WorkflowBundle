@@ -14,3 +14,7 @@ parameters:
         - '~Parameter #1 \$callback of function array_map~'
         - '#Call to static method .*assertInstanceOf\(\) with .* will always evaluate to true#'
         - '#Cannot call method getAlias\(\) on Symfony\\Component\\DependencyInjection\\Extension\\ExtensionInterface\|null#'
+        -
+            identifier: missingType.generics
+            paths:
+                - src/Form/*

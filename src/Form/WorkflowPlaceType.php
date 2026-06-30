@@ -27,8 +27,9 @@ final class WorkflowPlaceType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class' => WorkflowPlace::class,
-            'translation_domain' => 'nowo_workflow',
+            'data_class'         => WorkflowPlace::class,
+            'empty_data'         => static fn (): WorkflowPlace => new WorkflowPlace(''),
+            'translation_domain' => 'NowoWorkflowBundle',
         ]);
     }
 }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Form;
 
+use function is_array;
+use function is_string;
+
 /**
  * Builds place choice lists for transition multiselect fields.
  */
@@ -37,12 +40,12 @@ final class PlaceChoiceHelper
         $names = [];
 
         foreach ($places as $place) {
-            if (!\is_array($place)) {
+            if (!is_array($place)) {
                 continue;
             }
 
             $name = $place['name'] ?? '';
-            if (!\is_string($name)) {
+            if (!is_string($name)) {
                 continue;
             }
 

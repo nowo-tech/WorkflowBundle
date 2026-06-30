@@ -18,6 +18,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Throwable;
 
 class DemoController extends AbstractController
 {
@@ -42,10 +43,10 @@ class DemoController extends AbstractController
     {
         $subjectClass = (string) $request->query->get('subject_class', DemoPurchaseOrder::class);
         $parameters   = array_filter([
-            'tenant' => $request->query->get('tenant'),
-            'department' => $request->query->get('department'),
-            'region' => $request->query->get('region'),
-            'amount_tier' => $request->query->get('amount_tier'),
+            'tenant'        => $request->query->get('tenant'),
+            'department'    => $request->query->get('department'),
+            'region'        => $request->query->get('region'),
+            'amount_tier'   => $request->query->get('amount_tier'),
             'document_type' => $request->query->get('document_type'),
         ], static fn ($value): bool => $value !== null && $value !== '');
 
@@ -58,7 +59,7 @@ class DemoController extends AbstractController
                 $context  = new WorkflowContext($subjectClass, $parameters);
                 $resolved = $this->workflowResolver->resolve($context);
                 $matches  = $this->workflowResolver->findMatching($context);
-            } catch (\Throwable $exception) {
+            } catch (Throwable $exception) {
                 $error = $exception->getMessage();
                 if ($parameters !== []) {
                     $matches = $this->workflowResolver->findMatching(new WorkflowContext($subjectClass, $parameters));
@@ -68,10 +69,10 @@ class DemoController extends AbstractController
 
         return $this->render('demo/resolver.html.twig', [
             'subject_class' => $subjectClass,
-            'parameters' => $parameters,
-            'resolved' => $resolved,
-            'matches' => $matches,
-            'error' => $error,
+            'parameters'    => $parameters,
+            'resolved'      => $resolved,
+            'matches'       => $matches,
+            'error'         => $error,
         ]);
     }
 
@@ -105,7 +106,7 @@ class DemoController extends AbstractController
     #[Route('/playground/change-requests/new', name: 'demo_change_requests_new', methods: ['POST'])]
     public function createChangeRequest(Request $request): Response
     {
-        $title = trim((string) $request->request->get('title', 'Database migration plan'));
+        $title         = trim((string) $request->request->get('title', 'Database migration plan'));
         $changeRequest = new DemoChangeRequest($title !== '' ? $title : 'Database migration plan');
         $this->entityManager->persist($changeRequest);
         $this->entityManager->flush();
@@ -154,8 +155,8 @@ class DemoController extends AbstractController
     #[Route('/playground/documents/new', name: 'demo_documents_new', methods: ['POST'])]
     public function createDocument(Request $request): Response
     {
-        $title = trim((string) $request->request->get('title', 'Demo document'));
-        $type  = (string) $request->request->get('document_type', 'invoice');
+        $title    = trim((string) $request->request->get('title', 'Demo document'));
+        $type     = (string) $request->request->get('document_type', 'invoice');
         $document = new DemoDocument($title !== '' ? $title : 'Demo document', $type);
         $this->entityManager->persist($document);
         $this->entityManager->flush();
@@ -254,19 +255,19 @@ class DemoController extends AbstractController
         foreach ($subjects as $subject) {
             $definition = $this->workflowApplicator->resolveForSubject($subject);
             $items[]    = [
-                'entity' => $subject,
-                'workflow_slug' => $definition->getSlug(),
-                'workflow_name' => $definition->getName(),
+                'entity'           => $subject,
+                'workflow_slug'    => $definition->getSlug(),
+                'workflow_name'    => $definition->getName(),
                 'match_parameters' => $definition->getMatchParameters(),
-                'transitions' => $this->workflowApplicator->getEnabledTransitionsForSubject($subject),
-                'marking' => $arrayMarking && method_exists($subject, 'getStatus')
+                'transitions'      => $this->workflowApplicator->getEnabledTransitionsForSubject($subject),
+                'marking'          => $arrayMarking && method_exists($subject, 'getStatus')
                     ? implode(', ', $subject->getStatus())
                     : (method_exists($subject, 'getStatus') ? $subject->getStatus() : ''),
             ];
         }
 
         return $this->render($template, array_merge([
-            $variable => $items,
+            $variable       => $items,
             'workflow_slug' => $workflowSlug,
         ], $extra));
     }

@@ -19,6 +19,8 @@ use Symfony\Component\Form\FormEvents;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
+use function is_array;
+
 /**
  * CRUD form for persisted workflow definitions (full or single-section).
  */
@@ -51,8 +53,8 @@ final class WorkflowDefinitionFormType extends AbstractType
             ->add('name', TextType::class, ['label' => 'form.field.name'])
             ->add('slug', TextType::class, ['label' => 'form.field.slug'])
             ->add('type', EnumType::class, [
-                'class' => WorkflowType::class,
-                'label' => 'form.field.type',
+                'class'        => WorkflowType::class,
+                'label'        => 'form.field.type',
                 'choice_label' => static fn (WorkflowType $type): string => 'workflow_type.' . $type->value,
             ])
             ->add('initialPlace', TextType::class, ['label' => 'form.field.initial_place'])
@@ -66,12 +68,12 @@ final class WorkflowDefinitionFormType extends AbstractType
     private function addMatchRulesFields(FormBuilderInterface $builder): void
     {
         $builder->add('matchRules', CollectionType::class, [
-            'entry_type' => WorkflowMatchRuleType::class,
-            'allow_add' => true,
-            'allow_delete' => true,
-            'by_reference' => false,
-            'label' => false,
-            'prototype' => true,
+            'entry_type'     => WorkflowMatchRuleType::class,
+            'allow_add'      => true,
+            'allow_delete'   => true,
+            'by_reference'   => false,
+            'label'          => false,
+            'prototype'      => true,
             'prototype_name' => '__name__',
         ]);
     }
@@ -79,12 +81,12 @@ final class WorkflowDefinitionFormType extends AbstractType
     private function addPlacesFields(FormBuilderInterface $builder): void
     {
         $builder->add('places', CollectionType::class, [
-            'entry_type' => WorkflowPlaceType::class,
-            'allow_add' => true,
-            'allow_delete' => true,
-            'by_reference' => false,
-            'label' => false,
-            'prototype' => true,
+            'entry_type'     => WorkflowPlaceType::class,
+            'allow_add'      => true,
+            'allow_delete'   => true,
+            'by_reference'   => false,
+            'label'          => false,
+            'prototype'      => true,
             'prototype_name' => '__name__',
         ]);
     }
@@ -102,7 +104,7 @@ final class WorkflowDefinitionFormType extends AbstractType
             $definition = $event->getForm()->getData();
             $submitted  = $event->getData();
 
-            $placeNames = \is_array($submitted) && isset($submitted['places'])
+            $placeNames = is_array($submitted) && isset($submitted['places'])
                 ? PlaceChoiceHelper::extractNamesFromSubmittedPlaces($submitted['places'])
                 : ($definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : []);
 
@@ -120,13 +122,13 @@ final class WorkflowDefinitionFormType extends AbstractType
         }
 
         $form->add('transitions', CollectionType::class, [
-            'entry_type' => WorkflowTransitionType::class,
-            'entry_options' => ['place_choices' => $placeNames],
-            'allow_add' => true,
-            'allow_delete' => true,
-            'by_reference' => false,
-            'label' => false,
-            'prototype' => true,
+            'entry_type'     => WorkflowTransitionType::class,
+            'entry_options'  => ['place_choices' => $placeNames],
+            'allow_add'      => true,
+            'allow_delete'   => true,
+            'by_reference'   => false,
+            'label'          => false,
+            'prototype'      => true,
             'prototype_name' => '__name__',
         ]);
     }
@@ -134,9 +136,9 @@ final class WorkflowDefinitionFormType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class' => WorkflowDefinition::class,
-            'translation_domain' => 'nowo_workflow',
-            'section' => WorkflowDefinitionFormSection::General,
+            'data_class'         => WorkflowDefinition::class,
+            'translation_domain' => 'NowoWorkflowBundle',
+            'section'            => WorkflowDefinitionFormSection::General,
         ]);
         $resolver->setAllowedTypes('section', WorkflowDefinitionFormSection::class);
     }

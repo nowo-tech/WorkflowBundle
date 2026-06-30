@@ -36,9 +36,10 @@ final class WorkflowTransitionType extends AbstractType
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
-            'data_class' => WorkflowTransition::class,
-            'translation_domain' => 'nowo_workflow',
-            'place_choices' => [],
+            'data_class'         => WorkflowTransition::class,
+            'empty_data'         => static fn (): WorkflowTransition => new WorkflowTransition('', [], []),
+            'translation_domain' => 'NowoWorkflowBundle',
+            'place_choices'      => [],
         ]);
         $resolver->setAllowedTypes('place_choices', 'array');
     }
@@ -59,7 +60,7 @@ final class WorkflowTransitionType extends AbstractType
         }
 
         $form->add($field, PlaceMultiSelectType::class, [
-            'label' => $label,
+            'label'   => $label,
             'choices' => PlaceChoiceHelper::buildChoices($placeChoices, $selected),
         ]);
     }

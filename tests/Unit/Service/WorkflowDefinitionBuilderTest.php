@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 
+use InvalidArgumentException;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
@@ -33,7 +34,7 @@ final class WorkflowDefinitionBuilderTest extends TestCase
     {
         $entity = new WorkflowDefinition('Empty', 'empty', 'draft', 'App\\Entity\\X', WorkflowType::StateMachine);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         (new WorkflowDefinitionBuilder())->build($entity);
     }
 }

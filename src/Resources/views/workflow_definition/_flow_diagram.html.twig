@@ -2,10 +2,10 @@
 <div class="card shadow-sm mb-4">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
-            <h2 class="h5 mb-0">{{ 'diagram.title'|trans({}, 'nowo_workflow') }}</h2>
-            <small class="text-muted">{{ 'diagram.hint'|trans({}, 'nowo_workflow') }}</small>
+            <h2 class="h5 mb-0">{{ 'diagram.title'|trans({}, 'NowoWorkflowBundle') }}</h2>
+            <small class="text-muted">{{ 'diagram.hint'|trans({}, 'NowoWorkflowBundle') }}</small>
         </div>
-        <span class="badge text-bg-secondary">{{ ('workflow_type.' ~ graph.type)|trans({}, 'nowo_workflow') }}</span>
+        <span class="badge text-bg-secondary">{{ ('workflow_type.' ~ graph.type)|trans({}, 'NowoWorkflowBundle') }}</span>
     </div>
     <div class="card-body">
         <div class="workflow-diagram-viewport">
@@ -82,7 +82,7 @@
 
                 {% if graph.layout.backEdges %}
                     <div class="workflow-diagram-back-edges mt-4 pt-3 border-top">
-                        <div class="small text-muted mb-2">{{ 'diagram.back_edges'|trans({}, 'nowo_workflow') }}</div>
+                        <div class="small text-muted mb-2">{{ 'diagram.back_edges'|trans({}, 'NowoWorkflowBundle') }}</div>
                         <div class="d-flex flex-wrap gap-2">
                             {% for edge in graph.layout.backEdges %}
                                 <button
@@ -105,9 +105,9 @@
         </div>
 
         <div class="d-flex flex-wrap gap-3 small text-muted mt-3 pt-3 border-top">
-            <span><span class="workflow-flow-legend-dot workflow-flow-legend-dot--initial"></span> {{ 'diagram.legend.initial'|trans({}, 'nowo_workflow') }}</span>
-            <span><span class="workflow-flow-legend-dot workflow-flow-legend-dot--place"></span> {{ 'diagram.legend.place'|trans({}, 'nowo_workflow') }}</span>
-            <span><span class="workflow-flow-legend-dot workflow-flow-legend-dot--transition"></span> {{ 'diagram.legend.transition'|trans({}, 'nowo_workflow') }}</span>
+            <span><span class="workflow-flow-legend-dot workflow-flow-legend-dot--initial"></span> {{ 'diagram.legend.initial'|trans({}, 'NowoWorkflowBundle') }}</span>
+            <span><span class="workflow-flow-legend-dot workflow-flow-legend-dot--place"></span> {{ 'diagram.legend.place'|trans({}, 'NowoWorkflowBundle') }}</span>
+            <span><span class="workflow-flow-legend-dot workflow-flow-legend-dot--transition"></span> {{ 'diagram.legend.transition'|trans({}, 'NowoWorkflowBundle') }}</span>
         </div>
     </div>
 </div>
@@ -119,32 +119,32 @@
                 <div class="modal-header">
                     <h3 class="modal-title h5" id="place-modal-label-{{ loop.index0 }}">
                         {{ place.displayLabel }}
-                        {% if place.isInitial %}<span class="badge text-bg-success ms-2">{{ 'status.initial'|trans({}, 'nowo_workflow') }}</span>{% endif %}
+                        {% if place.isInitial %}<span class="badge text-bg-success ms-2">{{ 'status.initial'|trans({}, 'NowoWorkflowBundle') }}</span>{% endif %}
                     </h3>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ 'action.close'|trans({}, 'nowo_workflow') }}"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ 'action.close'|trans({}, 'NowoWorkflowBundle') }}"></button>
                 </div>
                 <div class="modal-body">
                     <dl class="row mb-0">
-                        <dt class="col-sm-4">{{ 'diagram.modal.name'|trans({}, 'nowo_workflow') }}</dt>
+                        <dt class="col-sm-4">{{ 'diagram.modal.name'|trans({}, 'NowoWorkflowBundle') }}</dt>
                         <dd class="col-sm-8"><code>{{ place.name }}</code></dd>
                         {% if place.label %}
-                            <dt class="col-sm-4">{{ 'diagram.modal.label'|trans({}, 'nowo_workflow') }}</dt>
+                            <dt class="col-sm-4">{{ 'diagram.modal.label'|trans({}, 'NowoWorkflowBundle') }}</dt>
                             <dd class="col-sm-8">{{ place.label }}</dd>
                         {% endif %}
-                        <dt class="col-sm-4">{{ 'diagram.modal.sort_order'|trans({}, 'nowo_workflow') }}</dt>
+                        <dt class="col-sm-4">{{ 'diagram.modal.sort_order'|trans({}, 'NowoWorkflowBundle') }}</dt>
                         <dd class="col-sm-8">{{ place.sortOrder }}</dd>
                     </dl>
 
                     {% if place.incoming %}
                         <hr>
-                        <h4 class="h6">{{ 'diagram.modal.incoming'|trans({}, 'nowo_workflow') }}</h4>
+                        <h4 class="h6">{{ 'diagram.modal.incoming'|trans({}, 'NowoWorkflowBundle') }}</h4>
                         <ul class="list-group list-group-flush mb-0">
                             {% for transition in place.incoming %}
                                 <li class="list-group-item px-0">
                                     <button type="button" class="btn btn-link p-0 align-baseline workflow-open-transition" data-transition-index="{{ transition.transitionIndex }}">
                                         {{ transition.transitionLabel }}
                                     </button>
-                                    <span class="text-muted small">{{ 'diagram.transition_from'|trans({}, 'nowo_workflow') }} {% for from in transition.fromPlaces %}<code>{{ from }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                                    <span class="text-muted small">{{ 'diagram.transition_from'|trans({}, 'NowoWorkflowBundle') }} {% for from in transition.fromPlaces %}<code>{{ from }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span>
                                 </li>
                             {% endfor %}
                         </ul>
@@ -152,21 +152,21 @@
 
                     {% if place.outgoing %}
                         <hr>
-                        <h4 class="h6">{{ 'diagram.modal.outgoing'|trans({}, 'nowo_workflow') }}</h4>
+                        <h4 class="h6">{{ 'diagram.modal.outgoing'|trans({}, 'NowoWorkflowBundle') }}</h4>
                         <ul class="list-group list-group-flush mb-0">
                             {% for transition in place.outgoing %}
                                 <li class="list-group-item px-0">
                                     <button type="button" class="btn btn-link p-0 align-baseline workflow-open-transition" data-transition-index="{{ transition.transitionIndex }}">
                                         {{ transition.transitionLabel }}
                                     </button>
-                                    <span class="text-muted small">{{ 'diagram.transition_to'|trans({}, 'nowo_workflow') }} {% for to in transition.toPlaces %}<code>{{ to }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                                    <span class="text-muted small">{{ 'diagram.transition_to'|trans({}, 'NowoWorkflowBundle') }} {% for to in transition.toPlaces %}<code>{{ to }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</span>
                                 </li>
                             {% endfor %}
                         </ul>
                     {% endif %}
 
                     {% if place.incoming is empty and place.outgoing is empty %}
-                        <p class="text-muted mb-0 mt-3">{{ 'diagram.modal.no_transitions'|trans({}, 'nowo_workflow') }}</p>
+                        <p class="text-muted mb-0 mt-3">{{ 'diagram.modal.no_transitions'|trans({}, 'NowoWorkflowBundle') }}</p>
                     {% endif %}
                 </div>
             </div>
@@ -180,21 +180,21 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 class="modal-title h5" id="transition-modal-label-{{ loop.index0 }}">{{ transition.displayLabel }}</h3>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ 'action.close'|trans({}, 'nowo_workflow') }}"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ 'action.close'|trans({}, 'NowoWorkflowBundle') }}"></button>
                 </div>
                 <div class="modal-body">
                     <dl class="row mb-3">
-                        <dt class="col-sm-4">{{ 'diagram.modal.name'|trans({}, 'nowo_workflow') }}</dt>
+                        <dt class="col-sm-4">{{ 'diagram.modal.name'|trans({}, 'NowoWorkflowBundle') }}</dt>
                         <dd class="col-sm-8"><code>{{ transition.name }}</code></dd>
                         {% if transition.label %}
-                            <dt class="col-sm-4">{{ 'diagram.modal.label'|trans({}, 'nowo_workflow') }}</dt>
+                            <dt class="col-sm-4">{{ 'diagram.modal.label'|trans({}, 'NowoWorkflowBundle') }}</dt>
                             <dd class="col-sm-8">{{ transition.label }}</dd>
                         {% endif %}
                     </dl>
 
                     <div class="d-flex align-items-center flex-wrap gap-2">
                         <div class="flex-grow-1">
-                            <div class="text-muted small mb-1">{{ 'diagram.modal.from'|trans({}, 'nowo_workflow') }}</div>
+                            <div class="text-muted small mb-1">{{ 'diagram.modal.from'|trans({}, 'NowoWorkflowBundle') }}</div>
                             <div>
                                 {% for from in transition.fromPlaces %}
                                     <span class="badge text-bg-light border"><code>{{ from }}</code></span>
@@ -203,7 +203,7 @@
                         </div>
                         <div class="text-primary fs-4 px-2">→</div>
                         <div class="flex-grow-1">
-                            <div class="text-muted small mb-1">{{ 'diagram.modal.to'|trans({}, 'nowo_workflow') }}</div>
+                            <div class="text-muted small mb-1">{{ 'diagram.modal.to'|trans({}, 'NowoWorkflowBundle') }}</div>
                             <div>
                                 {% for to in transition.toPlaces %}
                                     <span class="badge text-bg-light border"><code>{{ to }}</code></span>
@@ -214,9 +214,9 @@
 
                     <p class="text-muted small mt-3 mb-0">
                         {% if graph.type == 'state_machine' %}
-                            {{ 'diagram.modal.state_machine_help'|trans({}, 'nowo_workflow') }}
+                            {{ 'diagram.modal.state_machine_help'|trans({}, 'NowoWorkflowBundle') }}
                         {% else %}
-                            {{ 'diagram.modal.workflow_help'|trans({}, 'nowo_workflow') }}
+                            {{ 'diagram.modal.workflow_help'|trans({}, 'NowoWorkflowBundle') }}
                         {% endif %}
                     </p>
                 </div>

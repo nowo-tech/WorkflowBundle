@@ -20,7 +20,7 @@ final class DashboardController extends AbstractController
     #[Route('', name: 'dashboard', methods: ['GET'])]
     public function index(): Response
     {
-        return $this->render('@NowoWorkflow/dashboard/index.html.twig', [
+        return $this->render('@NowoWorkflowBundle/dashboard/index.html.twig', [
             'definitions' => $this->repository->findBy([], ['name' => 'ASC']),
         ]);
     }

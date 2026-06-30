@@ -7,12 +7,15 @@ namespace Nowo\WorkflowBundle\Command;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Service\SchemaSyncService;
+use RuntimeException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+
+use function sprintf;
 
 #[AsCommand(
     name: 'nowo:workflow:sync-schema',
@@ -33,28 +36,13 @@ final class SyncSchemaCommand extends Command
         $io      = new SymfonyStyle($input, $output);
         $manager = $this->registry->getManager($this->connectionName);
         if (!$manager instanceof EntityManagerInterface) {
-            throw new \RuntimeException(sprintf('Connection "%s" is not an ORM entity manager.', $this->connectionName));
+            throw new RuntimeException(sprintf('Connection "%s" is not an ORM entity manager.', $this->connectionName));
         }
 
-        $syncService = new SchemaSyncService($manager);
-        $connection  = $manager->getConnection();
-        $statements  = $syncService->getSyncSchemaSql();
-        $executed    = 0;
-        $skipped     = 0;
-
-        foreach ($statements as $sql) {
-            try {
-                $connection->executeStatement($sql);
-                ++$executed;
-            } catch (\Throwable $e) {
-                if ($syncService->isDuplicateSchemaObjectException($e)) {
-                    ++$skipped;
-                    continue;
-                }
-
-                throw $e;
-            }
-        }
+        $syncService                                     = new SchemaSyncService($manager);
+        $connection                                      = $manager->getConnection();
+        $statements                                      = $syncService->getSyncSchemaSql();
+        ['executed' => $executed, 'skipped' => $skipped] = $syncService->executeStatements($connection, $statements);
 
         if ($executed === 0 && $skipped === 0) {
             $io->success('Database schema is already up to date.');

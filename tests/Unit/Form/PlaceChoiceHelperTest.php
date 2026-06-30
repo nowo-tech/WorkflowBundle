@@ -15,8 +15,8 @@ final class PlaceChoiceHelperTest extends TestCase
 
         self::assertSame([
             'approved' => 'approved',
-            'draft' => 'draft',
-            'review' => 'review',
+            'draft'    => 'draft',
+            'review'   => 'review',
         ], $choices);
     }
 
@@ -27,14 +27,23 @@ final class PlaceChoiceHelperTest extends TestCase
 
     public function testExtractNamesFromSubmittedPlaces(): void
     {
-        $names = PlaceChoiceHelper::extractNamesFromSubmittedPlaces([
+        $names = PlaceChoiceHelper::extractNamesFromSubmittedPlaces([ // @phpstan-ignore argument.type
             ['name' => ' draft '],
-            ['name' => 'review'],
+            ['name'  => 'review'],
             ['label' => 'ignored'],
-            ['name' => ''],
+            ['name'  => ''],
             'invalid',
         ]);
 
         self::assertSame(['draft', 'review'], $names);
+    }
+
+    public function testExtractNamesIgnoresNonStringNameValues(): void
+    {
+        $names = PlaceChoiceHelper::extractNamesFromSubmittedPlaces([
+            ['name' => 123],
+        ]);
+
+        self::assertSame([], $names);
     }
 }

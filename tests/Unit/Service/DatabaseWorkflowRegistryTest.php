@@ -55,4 +55,105 @@ final class DatabaseWorkflowRegistryTest extends TestCase
         self::assertSame('document_review', $workflow->getName());
         self::assertNotInstanceOf(StateMachine::class, $workflow);
     }
+
+    public function testCachesWorkflowInstances(): void
+    {
+        $definition = new WorkflowDefinition('Order', 'order_approval', 'draft', 'App\\Entity\\DemoOrder');
+        $definition->addPlace(new WorkflowPlace('draft', null, 0));
+        $definition->addTransition(new WorkflowTransition('noop', ['draft'], ['draft']));
+
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->expects(self::once())->method('findOneBySlug')->willReturn($definition);
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder());
+        $registry->get('order_approval');
+        $registry->get('order_approval');
+    }
+
+    public function testHasReturnsFalseForMissingSlug(): void
+    {
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn(null);
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder());
+
+        self::assertFalse($registry->has('missing'));
+    }
+
+    public function testHasReturnsTrueForExistingSlug(): void
+    {
+        $definition = new WorkflowDefinition('Order', 'order_approval', 'draft', 'App\\Entity\\DemoOrder');
+        $definition->addPlace(new WorkflowPlace('draft', null, 0));
+        $definition->addTransition(new WorkflowTransition('noop', ['draft'], ['draft']));
+
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn($definition);
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder());
+
+        self::assertTrue($registry->has('order_approval'));
+    }
+
+    public function testInvalidateClearsCache(): void
+    {
+        $definition = new WorkflowDefinition('Order', 'order_approval', 'draft', 'App\\Entity\\DemoOrder');
+        $definition->addPlace(new WorkflowPlace('draft', null, 0));
+
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->expects(self::exactly(2))->method('findOneBySlug')->willReturn($definition);
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder());
+        $registry->get('order_approval');
+        $registry->invalidate('order_approval');
+        $registry->get('order_approval');
+    }
+
+    public function testGetThrowsWhenDefinitionDisabled(): void
+    {
+        $definition = new WorkflowDefinition('Order', 'order_approval', 'draft', 'App\\Entity\\DemoOrder');
+        $definition->setEnabled(false);
+
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn($definition);
+
+        $this->expectException(\Nowo\WorkflowBundle\Exception\WorkflowNotFoundException::class);
+        (new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder()))->get('order_approval');
+    }
+
+    public function testGetThrowsWhenDefinitionMissing(): void
+    {
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn(null);
+
+        $this->expectException(\Nowo\WorkflowBundle\Exception\WorkflowNotFoundException::class);
+        (new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder()))->get('missing');
+    }
+
+    public function testInvalidateWithoutSlugClearsAllCachedWorkflows(): void
+    {
+        $definition = new WorkflowDefinition('Order', 'order_approval', 'draft', 'App\\Entity\\DemoOrder');
+        $definition->addPlace(new WorkflowPlace('draft', null, 0));
+
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->expects(self::exactly(2))->method('findOneBySlug')->willReturn($definition);
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder());
+        $registry->get('order_approval');
+        $registry->invalidate();
+        $registry->get('order_approval');
+    }
+
+    public function testCreateWorkflowIsPublic(): void
+    {
+        $definition = new WorkflowDefinition('Order', 'order_approval', 'draft', 'App\\Entity\\DemoOrder');
+        $definition->addPlace(new WorkflowPlace('draft', null, 0));
+        $definition->addTransition(new WorkflowTransition('noop', ['draft'], ['draft']));
+
+        $registry = new DatabaseWorkflowRegistry(
+            $this->createMock(WorkflowDefinitionRepository::class),
+            new WorkflowDefinitionBuilder(),
+        );
+
+        self::assertSame('order_approval', $registry->createWorkflow($definition)->getName());
+    }
 }

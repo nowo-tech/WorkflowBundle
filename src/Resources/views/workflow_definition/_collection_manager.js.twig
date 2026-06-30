@@ -200,8 +200,8 @@
                 <td>${escapeHtml(sortOrder)}</td>
                 <td class="text-end">
                     <div class="btn-group btn-group-sm">
-                        <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'nowo_workflow')|e('js') }}</button>
-                        <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                        <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'NowoWorkflowBundle')|e('js') }}</button>
+                        <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'NowoWorkflowBundle')|e('js') }}</button>
                     </div>
                 </td>
             `;
@@ -218,8 +218,8 @@
                 <td>${escapeHtml(sortOrder)}</td>
                 <td class="text-end">
                     <div class="btn-group btn-group-sm">
-                        <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'nowo_workflow')|e('js') }}</button>
-                        <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                        <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'NowoWorkflowBundle')|e('js') }}</button>
+                        <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'NowoWorkflowBundle')|e('js') }}</button>
                     </div>
                 </td>
             `;
@@ -235,8 +235,8 @@
             <td>${formatList(readMultiSelect(entry, 'toPlaces'))}</td>
             <td class="text-end">
                 <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'nowo_workflow')|e('js') }}</button>
-                    <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'nowo_workflow')|e('js') }}</button>
+                    <button type="button" class="btn btn-outline-primary" data-row-edit="${index}">{{ 'action.edit'|trans({}, 'NowoWorkflowBundle')|e('js') }}</button>
+                    <button type="button" class="btn btn-outline-danger" data-row-delete="${index}">{{ 'action.delete'|trans({}, 'NowoWorkflowBundle')|e('js') }}</button>
                 </div>
             </td>
         `;
@@ -348,7 +348,7 @@
             }
 
             if (deleteIndex !== undefined) {
-                if (!window.confirm('{{ 'collection.confirm_delete'|trans({}, 'nowo_workflow')|e('js') }}')) {
+                if (!window.confirm('{{ 'collection.confirm_delete'|trans({}, 'NowoWorkflowBundle')|e('js') }}')) {
                     return;
                 }
 

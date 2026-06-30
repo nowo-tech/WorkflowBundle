@@ -1,24 +1,24 @@
-{% extends '@NowoWorkflow/layout.html.twig' %}
+{% extends '@NowoWorkflowBundle/layout.html.twig' %}
 
-{% block title %}{{ 'page.dashboard'|trans({}, 'nowo_workflow') }}{% endblock %}
+{% block title %}{{ 'page.dashboard'|trans({}, 'NowoWorkflowBundle') }}{% endblock %}
 
 {% block body %}
     <div class="mb-4">
-        <h1 class="h2 mb-2">{{ 'dashboard.title'|trans({}, 'nowo_workflow') }}</h1>
-        <p class="text-muted mb-0">{{ 'dashboard.intro'|trans({'%class%': '<code>DatabaseWorkflowRegistry</code>'}, 'nowo_workflow')|raw }}</p>
+        <h1 class="h2 mb-2">{{ 'dashboard.title'|trans({}, 'NowoWorkflowBundle') }}</h1>
+        <p class="text-muted mb-0">{{ 'dashboard.intro'|trans({'%class%': '<code>DatabaseWorkflowRegistry</code>'}, 'NowoWorkflowBundle')|raw }}</p>
     </div>
 
     <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h2 class="h5 mb-0">{{ 'dashboard.definitions'|trans({}, 'nowo_workflow') }}</h2>
-            <a class="btn btn-sm btn-primary" href="{{ path('nowo_workflow_definition_new') }}">{{ 'nav.new_definition'|trans({}, 'nowo_workflow') }}</a>
+            <h2 class="h5 mb-0">{{ 'dashboard.definitions'|trans({}, 'NowoWorkflowBundle') }}</h2>
+            <a class="btn btn-sm btn-primary" href="{{ path('nowo_workflow_definition_new') }}">{{ 'nav.new_definition'|trans({}, 'NowoWorkflowBundle') }}</a>
         </div>
         <div class="card-body">
             {% if definitions is empty %}
                 <p class="text-muted mb-0">
-                    {{ 'dashboard.empty_prefix'|trans({}, 'nowo_workflow') }}
-                    <a href="{{ path('nowo_workflow_definition_new') }}">{{ 'action.create_one'|trans({}, 'nowo_workflow') }}</a>
-                    {{ 'dashboard.empty_suffix'|trans({}, 'nowo_workflow') }}
+                    {{ 'dashboard.empty_prefix'|trans({}, 'NowoWorkflowBundle') }}
+                    <a href="{{ path('nowo_workflow_definition_new') }}">{{ 'action.create_one'|trans({}, 'NowoWorkflowBundle') }}</a>
+                    {{ 'dashboard.empty_suffix'|trans({}, 'NowoWorkflowBundle') }}
                     <code>php bin/console nowo:workflow:seed-demo</code>.
                 </p>
             {% else %}
@@ -26,11 +26,11 @@
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>{{ 'table.name'|trans({}, 'nowo_workflow') }}</th>
-                                <th>{{ 'table.slug'|trans({}, 'nowo_workflow') }}</th>
-                                <th>{{ 'table.type'|trans({}, 'nowo_workflow') }}</th>
-                                <th>{{ 'table.subject'|trans({}, 'nowo_workflow') }}</th>
-                                <th>{{ 'table.status'|trans({}, 'nowo_workflow') }}</th>
+                                <th>{{ 'table.name'|trans({}, 'NowoWorkflowBundle') }}</th>
+                                <th>{{ 'table.slug'|trans({}, 'NowoWorkflowBundle') }}</th>
+                                <th>{{ 'table.type'|trans({}, 'NowoWorkflowBundle') }}</th>
+                                <th>{{ 'table.subject'|trans({}, 'NowoWorkflowBundle') }}</th>
+                                <th>{{ 'table.status'|trans({}, 'NowoWorkflowBundle') }}</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -39,17 +39,17 @@
                                 <tr>
                                     <td class="fw-semibold">{{ definition.name }}</td>
                                     <td><code>{{ definition.slug }}</code></td>
-                                    <td>{{ ('workflow_type.' ~ definition.type.value)|trans({}, 'nowo_workflow') }}</td>
+                                    <td>{{ ('workflow_type.' ~ definition.type.value)|trans({}, 'NowoWorkflowBundle') }}</td>
                                     <td><code class="small">{{ definition.subjectClass }}</code></td>
                                     <td>
                                         {% if definition.enabled %}
-                                            <span class="badge text-bg-success">{{ 'status.enabled'|trans({}, 'nowo_workflow') }}</span>
+                                            <span class="badge text-bg-success">{{ 'status.enabled'|trans({}, 'NowoWorkflowBundle') }}</span>
                                         {% else %}
-                                            <span class="badge text-bg-secondary">{{ 'status.disabled'|trans({}, 'nowo_workflow') }}</span>
+                                            <span class="badge text-bg-secondary">{{ 'status.disabled'|trans({}, 'NowoWorkflowBundle') }}</span>
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.view'|trans({}, 'nowo_workflow') }}</a>
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.view'|trans({}, 'NowoWorkflowBundle') }}</a>
                                     </td>
                                 </tr>
                             {% endfor %}

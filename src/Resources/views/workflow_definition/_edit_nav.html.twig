@@ -13,13 +13,13 @@
                     {% if section is defined and section == editSection %}aria-current="page"{% endif %}
                     href="{{ path(editSection.routeName(), {id: definition.id}) }}"
                 >
-                    {{ ('form.section.' ~ editSection.value)|trans({}, 'nowo_workflow') }}
+                    {{ ('form.section.' ~ editSection.value)|trans({}, 'NowoWorkflowBundle') }}
                 </a>
             </li>
         {% endfor %}
         <li class="nav-item ms-lg-auto">
             <a class="nav-link text-muted" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">
-                {{ 'action.view'|trans({}, 'nowo_workflow') }}
+                {{ 'action.view'|trans({}, 'NowoWorkflowBundle') }}
             </a>
         </li>
     </ul>

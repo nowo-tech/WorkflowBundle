@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
+use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
@@ -16,7 +17,7 @@ use Symfony\Component\Workflow\WorkflowInterface;
 /**
  * Resolves Symfony Workflow instances from database definitions.
  */
-final class DatabaseWorkflowRegistry
+final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface
 {
     /** @var array<string, WorkflowInterface> */
     private array $cache = [];
@@ -34,7 +35,7 @@ final class DatabaseWorkflowRegistry
         }
 
         $definition = $this->repository->findOneBySlug($slug);
-        if ($definition === null || !$definition->isEnabled()) {
+        if (!$definition instanceof WorkflowDefinition || !$definition->isEnabled()) {
             throw WorkflowNotFoundException::forSlug($slug);
         }
 

@@ -19,10 +19,10 @@ final class WorkflowResolverTest extends TestCase
 
     public function testResolvesDefaultWhenNoParameters(): void
     {
-        $default = $this->definition('default_po', self::SUBJECT, []);
+        $default  = $this->definition('default_po', self::SUBJECT, []);
         $specific = $this->definition('acme_eu_high_po', self::SUBJECT, [
-            'tenant' => 'acme',
-            'region' => 'eu',
+            'tenant'      => 'acme',
+            'region'      => 'eu',
             'amount_tier' => 'high',
         ]);
 
@@ -38,7 +38,7 @@ final class WorkflowResolverTest extends TestCase
 
         $resolver = $this->resolver($globex);
         $resolved = $resolver->resolve(new WorkflowContext('App\\Entity\\DemoExpense', [
-            'tenant' => 'globex',
+            'tenant'     => 'globex',
             'department' => 'finance',
         ]));
 
@@ -48,14 +48,14 @@ final class WorkflowResolverTest extends TestCase
     public function testResolvesTwoParameterMatch(): void
     {
         $finance = $this->definition('acme_finance_expense', 'App\\Entity\\DemoExpense', [
-            'tenant' => 'acme',
+            'tenant'     => 'acme',
             'department' => 'finance',
         ], priority: 20);
         $globex = $this->definition('globex_expense', 'App\\Entity\\DemoExpense', ['tenant' => 'globex'], priority: 5);
 
         $resolver = $this->resolver($finance, $globex);
         $resolved = $resolver->resolve(new WorkflowContext('App\\Entity\\DemoExpense', [
-            'tenant' => 'acme',
+            'tenant'     => 'acme',
             'department' => 'finance',
         ]));
 
@@ -65,8 +65,8 @@ final class WorkflowResolverTest extends TestCase
     public function testThreeParameterMatchWinsOverTwoParameterFallback(): void
     {
         $high = $this->definition('acme_eu_high_po', self::SUBJECT, [
-            'tenant' => 'acme',
-            'region' => 'eu',
+            'tenant'      => 'acme',
+            'region'      => 'eu',
             'amount_tier' => 'high',
         ], priority: 100);
         $eu = $this->definition('acme_eu_po', self::SUBJECT, [
@@ -76,8 +76,8 @@ final class WorkflowResolverTest extends TestCase
 
         $resolver = $this->resolver($high, $eu);
         $resolved = $resolver->resolve(new WorkflowContext(self::SUBJECT, [
-            'tenant' => 'acme',
-            'region' => 'eu',
+            'tenant'      => 'acme',
+            'region'      => 'eu',
             'amount_tier' => 'high',
         ]));
 
@@ -87,8 +87,8 @@ final class WorkflowResolverTest extends TestCase
     public function testTwoParameterFallbackWhenThirdDoesNotMatch(): void
     {
         $high = $this->definition('acme_eu_high_po', self::SUBJECT, [
-            'tenant' => 'acme',
-            'region' => 'eu',
+            'tenant'      => 'acme',
+            'region'      => 'eu',
             'amount_tier' => 'high',
         ]);
         $eu = $this->definition('acme_eu_po', self::SUBJECT, [
@@ -98,8 +98,8 @@ final class WorkflowResolverTest extends TestCase
 
         $resolver = $this->resolver($high, $eu);
         $resolved = $resolver->resolve(new WorkflowContext(self::SUBJECT, [
-            'tenant' => 'acme',
-            'region' => 'eu',
+            'tenant'      => 'acme',
+            'region'      => 'eu',
             'amount_tier' => 'low',
         ]));
 
@@ -108,7 +108,7 @@ final class WorkflowResolverTest extends TestCase
 
     public function testPriorityBreaksEqualSpecificityTie(): void
     {
-        $low = $this->definition('po_low', self::SUBJECT, ['tenant' => 'acme'], priority: 10);
+        $low  = $this->definition('po_low', self::SUBJECT, ['tenant' => 'acme'], priority: 10);
         $high = $this->definition('po_high', self::SUBJECT, ['tenant' => 'acme'], priority: 90);
 
         $resolver = $this->resolver($low, $high);
@@ -131,6 +131,54 @@ final class WorkflowResolverTest extends TestCase
         $b = $this->definition('po_b', self::SUBJECT, ['tenant' => 'acme'], priority: 10);
 
         $this->resolver($a, $b)->resolve(new WorkflowContext(self::SUBJECT, ['tenant' => 'acme']));
+    }
+
+    public function testResolveSlugAndFindMatching(): void
+    {
+        $definition = $this->definition('only', self::SUBJECT, []);
+        $resolver   = $this->resolver($definition);
+
+        self::assertSame('only', $resolver->resolveSlug(new WorkflowContext(self::SUBJECT, [])));
+        self::assertSame([$definition], $resolver->findMatching(new WorkflowContext(self::SUBJECT, [])));
+    }
+
+    public function testResolveForSubjectWithDefaultContext(): void
+    {
+        $this->definition('only', self::SUBJECT, []);
+        $subject = new class {
+        };
+        $subjectClass = $subject::class;
+
+        $def      = $this->definition('only', $subjectClass, []);
+        $resolved = $this->resolver($def)->resolveForSubject($subject);
+
+        self::assertSame('only', $resolved->getSlug());
+    }
+
+    public function testResolveSlugForSubject(): void
+    {
+        $subjectClass = WorkflowResolverAnonymousSubject::class;
+        $definition   = $this->definition('only', $subjectClass, []);
+
+        self::assertSame('only', $this->resolver($definition)->resolveSlugForSubject(new WorkflowResolverAnonymousSubject()));
+    }
+
+    public function testResolveSlug(): void
+    {
+        $definition = $this->definition('only', self::SUBJECT, []);
+
+        self::assertSame('only', $this->resolver($definition)->resolveSlug(new WorkflowContext(self::SUBJECT, [])));
+    }
+
+    public function testResolveForSubjectWithWorkflowContextAwareInterface(): void
+    {
+        $subjectClass = WorkflowResolverContextAwareSubject::class;
+        $definition   = $this->definition('ctx', $subjectClass, ['tenant' => 'acme']);
+        $subject      = new WorkflowResolverContextAwareSubject(['tenant' => 'acme']);
+
+        $resolved = $this->resolver($definition)->resolveForSubject($subject);
+
+        self::assertSame('ctx', $resolved->getSlug());
     }
 
     /** @param array<string, string> $rules */
@@ -161,4 +209,22 @@ final class WorkflowResolverTest extends TestCase
 
         return new WorkflowResolver($repository);
     }
+}
+
+final class WorkflowResolverContextAwareSubject implements \Nowo\WorkflowBundle\Contract\WorkflowContextAwareInterface
+{
+    /** @param array<string, string> $parameters */
+    public function __construct(
+        private readonly array $parameters,
+    ) {
+    }
+
+    public function getWorkflowContext(): WorkflowContext
+    {
+        return new WorkflowContext(self::class, $this->parameters);
+    }
+}
+
+final class WorkflowResolverAnonymousSubject
+{
 }

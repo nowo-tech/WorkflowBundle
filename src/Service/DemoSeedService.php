@@ -46,7 +46,7 @@ final class DemoSeedService
 
     private function seedDefaultOrderApproval(): void
     {
-        if ($this->repository->findOneBySlug('order_approval_default') !== null) {
+        if ($this->repository->findOneBySlug('order_approval_default') instanceof WorkflowDefinition) {
             return;
         }
 
@@ -65,7 +65,7 @@ final class DemoSeedService
 
     private function seedChangeRequestWorkflow(): void
     {
-        if ($this->repository->findOneBySlug('change_request_review') !== null) {
+        if ($this->repository->findOneBySlug('change_request_review') instanceof WorkflowDefinition) {
             return;
         }
 
@@ -101,7 +101,7 @@ final class DemoSeedService
 
     private function seedDocumentTypeWorkflows(): void
     {
-        if ($this->repository->findOneBySlug('invoice_processing') === null) {
+        if (!$this->repository->findOneBySlug('invoice_processing') instanceof WorkflowDefinition) {
             $invoice = $this->createStateMachine(
                 name: 'Invoice processing',
                 slug: 'invoice_processing',
@@ -117,7 +117,7 @@ final class DemoSeedService
             $this->entityManager->persist($invoice);
         }
 
-        if ($this->repository->findOneBySlug('contract_review') === null) {
+        if (!$this->repository->findOneBySlug('contract_review') instanceof WorkflowDefinition) {
             $contract = $this->createWorkflow(
                 name: 'Contract review',
                 slug: 'contract_review',
@@ -136,7 +136,7 @@ final class DemoSeedService
 
     private function seedExpenseWorkflows(): void
     {
-        if ($this->repository->findOneBySlug('acme_finance_expense') === null) {
+        if (!$this->repository->findOneBySlug('acme_finance_expense') instanceof WorkflowDefinition) {
             $finance = $this->createStateMachine(
                 name: 'ACME finance expense',
                 slug: 'acme_finance_expense',
@@ -151,7 +151,7 @@ final class DemoSeedService
             $this->entityManager->persist($finance);
         }
 
-        if ($this->repository->findOneBySlug('acme_hr_expense') === null) {
+        if (!$this->repository->findOneBySlug('acme_hr_expense') instanceof WorkflowDefinition) {
             $hr = $this->createStateMachine(
                 name: 'ACME HR expense',
                 slug: 'acme_hr_expense',
@@ -168,7 +168,7 @@ final class DemoSeedService
             $this->entityManager->persist($hr);
         }
 
-        if ($this->repository->findOneBySlug('globex_expense') === null) {
+        if (!$this->repository->findOneBySlug('globex_expense') instanceof WorkflowDefinition) {
             $globex = $this->createStateMachine(
                 name: 'Globex expense (single param)',
                 slug: 'globex_expense',
@@ -186,7 +186,7 @@ final class DemoSeedService
 
     private function seedPurchaseOrderWorkflows(): void
     {
-        if ($this->repository->findOneBySlug('acme_eu_high_po') === null) {
+        if (!$this->repository->findOneBySlug('acme_eu_high_po') instanceof WorkflowDefinition) {
             $high = $this->createStateMachine(
                 name: 'ACME EU high-value PO',
                 slug: 'acme_eu_high_po',
@@ -204,7 +204,7 @@ final class DemoSeedService
             $this->entityManager->persist($high);
         }
 
-        if ($this->repository->findOneBySlug('acme_eu_po') === null) {
+        if (!$this->repository->findOneBySlug('acme_eu_po') instanceof WorkflowDefinition) {
             $eu = $this->createStateMachine(
                 name: 'ACME EU standard PO',
                 slug: 'acme_eu_po',
@@ -219,7 +219,7 @@ final class DemoSeedService
             $this->entityManager->persist($eu);
         }
 
-        if ($this->repository->findOneBySlug('default_purchase_order') === null) {
+        if (!$this->repository->findOneBySlug('default_purchase_order') instanceof WorkflowDefinition) {
             $default = $this->createStateMachine(
                 name: 'Default purchase order',
                 slug: 'default_purchase_order',

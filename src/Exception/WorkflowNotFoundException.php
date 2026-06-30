@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Exception;
 
+use RuntimeException;
+
+use function sprintf;
+
+use const JSON_THROW_ON_ERROR;
+
 /**
  * Thrown when a workflow slug cannot be resolved from the database.
  */
-final class WorkflowNotFoundException extends \RuntimeException
+final class WorkflowNotFoundException extends RuntimeException
 {
     public static function forSlug(string $slug): self
     {
@@ -19,7 +25,7 @@ final class WorkflowNotFoundException extends \RuntimeException
         return new self(sprintf(
             'No enabled workflow definition matches subject "%s" with parameters %s.',
             $context->subjectClass ?? '(any)',
-            json_encode($context->sortedParameters(), \JSON_THROW_ON_ERROR),
+            json_encode($context->sortedParameters(), JSON_THROW_ON_ERROR),
         ));
     }
 }
