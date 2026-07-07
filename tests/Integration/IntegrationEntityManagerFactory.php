@@ -16,12 +16,14 @@ use Throwable;
 
 use function dirname;
 
+use const PHP_VERSION_ID;
+
 final class IntegrationEntityManagerFactory
 {
     public static function createInMemory(?string $tablePrefix = null): EntityManagerInterface
     {
         $entityPath = dirname(__DIR__, 2) . '/src/Entity';
-        $config       = ORMSetup::createAttributeMetadataConfiguration([$entityPath], true);
+        $config     = ORMSetup::createAttributeMetadataConfiguration([$entityPath], true);
 
         if (PHP_VERSION_ID >= 80400) {
             $config->enableNativeLazyObjects(true);
