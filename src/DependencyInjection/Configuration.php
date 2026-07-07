@@ -51,6 +51,12 @@ final class Configuration implements ConfigurationInterface
                             ->scalarPrototype()->end()
                             ->defaultValue(['en', 'es', 'fr', 'it'])
                         ->end()
+                        ->arrayNode('required_roles')
+                            ->info('When set, Flex/recipe should alias RoleBasedWorkflowUiAccessChecker with these roles.')
+                            ->scalarPrototype()->end()
+                            ->defaultValue(['ROLE_ADMIN'])
+                            ->example(['ROLE_ADMIN'])
+                        ->end()
                     ->end()
                 ->end()
             ->end();

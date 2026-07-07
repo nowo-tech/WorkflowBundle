@@ -8,6 +8,43 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.3.0
+
+From 1.2.x:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+No database migration is required.
+
+### Optional: role-based CRUD UI protection
+
+If you use **Symfony Security**, you can alias the built-in checker instead of writing a custom class:
+
+```yaml
+# config/services/nowo_workflow_security.yaml
+services:
+    Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface:
+        class: Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker
+        arguments:
+            $requiredRoles: ['ROLE_ADMIN']
+            $authorizationChecker: '@security.authorization_checker'
+```
+
+New Flex installs receive this file from the recipe (commented until `symfony/security-bundle` is installed). The `ui.required_roles` config key documents the intended roles but does **not** auto-register the checker — you must alias the service (or use `access_control`).
+
+### Optional: enable new UI locales
+
+Catalogs for `de`, `nl`, and `pt` ship with the bundle. Add them to `ui.locales` to show them in the locale switcher:
+
+```yaml
+nowo_workflow:
+    ui:
+        locales: [en, es, fr, it, de, nl, pt]
+```
+
 ## Upgrading to 1.2.0
 
 From 1.1.x:

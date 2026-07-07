@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-07
+
+### Added
+
+- `RoleBasedWorkflowUiAccessChecker` — built-in `WorkflowUiAccessCheckerInterface` using Symfony `AuthorizationCheckerInterface` (grant if the user has any configured role)
+- Translation catalogs for **German** (`de`), **Dutch** (`nl`), and **Portuguese** (`pt`)
+- Configuration key `ui.required_roles` (default `ROLE_ADMIN`) — documents expected roles for Flex/recipe wiring
+- Flex recipe snippet `config/services/nowo_workflow_security.yaml` (commented) to alias the role-based checker when `symfony/security-bundle` is installed
+
+### Changed
+
+- French UI translations refined (labels for workflow type, transitions, and form fields)
+
+### Fixed
+
+- Demo `symfony8` Makefile: define `COMPOSE` and `SERVICE_PHP` so `make update-deps` resolves the correct Docker Compose service
+
+### Documentation
+
+- [CONFIGURATION.md](CONFIGURATION.md): `ui.required_roles` and shipped locale catalogs
+- [SECURITY.md](SECURITY.md): built-in `RoleBasedWorkflowUiAccessChecker` and Flex recipe wiring
+- [UPGRADING.md](UPGRADING.md): notes for upgrading to 1.3.0
+
 ## [1.2.0] - 2026-06-30
 
 ### Changed

@@ -1,0 +1,160 @@
+brand: 'Nowo Workflow'
+title_suffix: 'Nowo Workflow'
+
+locale:
+  en: Engels
+  es: Spaans
+  fr: Frans
+  it: Italiaans
+
+nav:
+  dashboard: Dashboard
+  definitions: Definities
+  new_definition: 'Nieuwe definitie'
+  toggle: 'Navigatie wisselen'
+
+action:
+  view: Bekijken
+  show: Detail
+  edit: Bewerken
+  delete: Verwijderen
+  save: Opslaan
+  cancel: Annuleren
+  apply: Toepassen
+  create_one: 'Een aanmaken'
+  close: Sluiten
+  add_place: 'Status toevoegen'
+  add_transition: 'Overgang toevoegen'
+  add_match_rule: 'Regel toevoegen'
+
+status:
+  enabled: Actief
+  disabled: Inactief
+  default: standaard
+  initial: Initieel
+
+workflow_type:
+  state_machine: 'Toestandsmachine'
+  workflow: Workflow
+
+page:
+  dashboard: Dashboard
+  definitions: Definities
+  new_definition: 'Nieuwe workflowdefinitie'
+  edit_definition: 'Workflowdefinitie bewerken'
+  edit_definition_general: 'Workflow bewerken — Algemeen'
+  edit_definition_match_rules: 'Workflow bewerken — Overeenkomstregels'
+  edit_definition_places: 'Workflow bewerken — Statussen'
+  edit_definition_transitions: 'Workflow bewerken — Overgangen'
+
+dashboard:
+  title: 'Databasegestuurde Symfony-workflows'
+  intro: 'Beheer workflowdefinities in de database en gebruik ze tijdens runtime via %class%.'
+  definitions: Definities
+  empty_prefix: 'Nog geen workflowdefinities.'
+  empty_suffix: 'of voer uit'
+
+definition:
+  index_title: 'Workflowdefinities'
+  none_found: 'Geen definities gevonden.'
+  marking: markering
+  priority: prioriteit
+  no_places: 'Deze workflow heeft nog geen statussen. Voeg ze toe in de editor om de flow te visualiseren.'
+  match_rules: 'Overeenkomstregels'
+  match_default: 'Komt overeen met elk subject van %class% wanneer geen specifiekere workflow past.'
+  runtime_binding: 'Runtime-koppeling'
+  subject_class: 'Subjectklasse'
+  marking_property: 'Markeringseigenschap'
+  initial_place: 'Initiële status'
+  places_transitions: 'Statussen / overgangen'
+  confirm_delete: 'Deze workflowdefinitie verwijderen?'
+
+table:
+  name: Naam
+  slug: Slug
+  type: Soort
+  subject: Onderwerp
+  status: Staat
+  match_rules: 'Overeenkomstregels'
+  priority: Prioriteit
+  places: Statussen
+  transitions: Overgangen
+  actions: Acties
+
+collection:
+  no_places: 'Nog geen statussen. Klik op «Status toevoegen» om er een te maken.'
+  no_transitions: 'Nog geen overgangen. Klik op «Overgang toevoegen» om er een te maken.'
+  no_match_rules: 'Nog geen regels. Laat leeg voor standaardworkflow, of klik op «Regel toevoegen».'
+  confirm_delete: 'Dit item verwijderen? Sla het formulier op om wijzigingen te bewaren.'
+
+modal:
+  add_place: 'Status toevoegen'
+  edit_place: 'Status bewerken'
+  add_transition: 'Overgang toevoegen'
+  edit_transition: 'Overgang bewerken'
+  add_match_rule: 'Regel toevoegen'
+  edit_match_rule: 'Regel bewerken'
+
+form:
+  section:
+    general: Algemeen
+    match_rules: 'Overeenkomstregels'
+    places: Statussen
+    transitions: Overgangen
+  help:
+    match_rules: 'Alle regels moeten overeenkomen (EN). Laat leeg voor een standaardworkflow op de subjectklasse.'
+    match_rules_list: 'Definieer parameterregels om deze workflow te selecteren. Laat leeg voor een standaardworkflow.'
+    transition_places: 'Opties komen uit de sectie Places. Configureer indien nodig eerst de statussen.'
+    places_list: 'Beheer workflowstatussen. Wijzigingen worden opgeslagen bij het verzenden van het formulier.'
+  field:
+    name: Naam
+    slug: Slug
+    type: Soort
+    initial_place: 'Initiële status'
+    subject_class: 'Subjectklasse (FQCN)'
+    marking_property: 'Markeringseigenschap'
+    enabled: Actief
+    priority: 'Prioriteit (hoger wint bij gelijke stand)'
+    description: Beschrijving
+    match_rules: 'Overeenkomstregels (leeg = standaard voor klasse)'
+    places: Statussen
+    transitions: Overgangen
+    parameter_key: 'Parametersleutel'
+    parameter_value: 'Parameterwaarde'
+    order: Volgorde
+    label: Etiket
+    from_places: 'Bronstatussen'
+    to_places: 'Doelstatussen'
+  placeholder:
+    select_places: 'Statussen zoeken en selecteren…'
+
+diagram:
+  title: 'Stroomdiagram'
+  hint: 'Klik op een status of overgang om de configuratie te bekijken.'
+  back_edges: 'Terugkeer- / lusovergangen'
+  legend:
+    initial: 'Initiële status'
+    place: 'Status (klik voor details)'
+    transition: 'Overgang (klik voor details)'
+  modal:
+    name: Naam
+    label: Etiket
+    sort_order: Volgorde
+    incoming: 'Inkomende overgangen'
+    outgoing: 'Uitgaande overgangen'
+    no_transitions: 'Geen overgangen verbonden met deze status.'
+    from: Van
+    to: Naar
+    state_machine_help: 'Toestandsmachine-overgang: verplaatst het subject van de ene status naar de andere.'
+    workflow_help: 'Workflow-overgang: kan meerdere bron- en doelstatussen verbinden.'
+  transition_from: van
+  transition_to: naar
+
+flash:
+  created: 'Workflowdefinitie aangemaakt.'
+  updated: 'Workflowdefinitie bijgewerkt.'
+  deleted: 'Workflowdefinitie verwijderd.'
+
+error:
+  not_found_id: 'Workflowdefinitie #%id% niet gevonden.'
+  not_found_slug: 'Workflowdefinitie "%slug%" niet gevonden.'

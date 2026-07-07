@@ -19,7 +19,8 @@ Define Symfony Workflow state machines and workflows in the database, manage the
 
 - Persist workflow definitions (places, transitions, subject class, marking property) in Doctrine
 - Configurable Doctrine `table_prefix` for table and constraint names
-- Built-in admin UI at `/workflow` (configurable path), optionally protected via `WorkflowUiAccessCheckerInterface`
+- Built-in admin UI at `/workflow` (configurable path), optionally protected via `WorkflowUiAccessCheckerInterface` or `RoleBasedWorkflowUiAccessChecker`
+- UI translations for `en`, `es`, `fr`, `it`, `de`, `nl`, `pt` (enable extra locales in `ui.locales`)
 - Runtime resolution via `DatabaseWorkflowRegistry` (Symfony Workflow component)
 - `WorkflowApplicator` helper to apply transitions and flush subjects
 - Demo with order approval (state machine) and document review (parallel workflow)

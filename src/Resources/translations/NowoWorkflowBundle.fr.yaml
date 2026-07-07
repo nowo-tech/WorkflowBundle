@@ -31,7 +31,7 @@ status:
   enabled: Activé
   disabled: Désactivé
   default: par défaut
-  initial: Initial
+  initial: État initial
 
 workflow_type:
   state_machine: 'Machine à états'
@@ -72,14 +72,14 @@ definition:
 table:
   name: Nom
   slug: Slug
-  type: Type
+  type: Type de workflow
   subject: Sujet
   status: Statut
   match_rules: 'Règles de correspondance'
   priority: Priorité
   places: États
-  transitions: Transitions
-  actions: Actions
+  transitions: Transitions du flux
+  actions: Actions disponibles
 
 collection:
   no_places: 'Aucun état pour le moment. Cliquez sur « Ajouter un état ».'
@@ -100,7 +100,7 @@ form:
     general: Général
     match_rules: 'Règles de correspondance'
     places: États
-    transitions: Transitions
+    transitions: Transitions du flux
   help:
     match_rules: 'Toutes les règles doivent correspondre (ET). Laissez vide pour un workflow par défaut sur la classe du sujet.'
     match_rules_list: 'Définissez des règles de paramètres pour sélectionner ce workflow. Laissez vide pour un workflow par défaut.'
@@ -109,16 +109,16 @@ form:
   field:
     name: Nom
     slug: Slug
-    type: Type
+    type: Type de workflow
     initial_place: 'État initial'
     subject_class: 'Classe du sujet (FQCN)'
     marking_property: 'Propriété de marquage'
     enabled: Activé
     priority: 'Priorité (la plus élevée l''emporte en cas d''égalité)'
-    description: Description
+    description: Descriptif
     match_rules: 'Règles de correspondance (vide = défaut pour la classe)'
     places: États
-    transitions: Transitions
+    transitions: Transitions du flux
     parameter_key: 'Clé du paramètre'
     parameter_value: 'Valeur du paramètre'
     order: Ordre
