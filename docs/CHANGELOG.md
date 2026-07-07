@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-07-07
+
+### Fixed
+
+- Integration tests on PHP 8.4+: enable Doctrine native lazy objects in `IntegrationEntityManagerFactory`
+
 ## [1.3.0] - 2026-07-07
 
 ### Added
