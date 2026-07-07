@@ -63,6 +63,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.ui.path', $config['ui']['path']);
         $container->setParameter(Configuration::ALIAS . '.ui.default_locale', $config['ui']['default_locale']);
         $container->setParameter(Configuration::ALIAS . '.ui.locales', $config['ui']['locales']);
+        $container->setParameter(Configuration::ALIAS . '.ui.required_roles', $config['ui']['required_roles']);
     }
 
     public function getAlias(): string

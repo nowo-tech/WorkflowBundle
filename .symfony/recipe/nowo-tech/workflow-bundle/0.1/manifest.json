@@ -2,7 +2,8 @@
     "manifests": {
         "nowo-tech/workflow-bundle": {
             "copy": [
-                "config/packages/nowo_workflow.yaml"
+                "config/packages/nowo_workflow.yaml",
+                "config/services/nowo_workflow_security.yaml"
             ],
             "bundles": {
                 "Nowo\\WorkflowBundle\\NowoWorkflowBundle": ["all"]

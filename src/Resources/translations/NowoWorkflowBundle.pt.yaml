@@ -1,0 +1,160 @@
+brand: 'Nowo Workflow'
+title_suffix: 'Nowo Workflow'
+
+locale:
+  en: Inglês
+  es: Espanhol
+  fr: Francês
+  it: Italiano
+
+nav:
+  dashboard: Painel
+  definitions: Definições
+  new_definition: 'Nova definição'
+  toggle: 'Alternar navegação'
+
+action:
+  view: Ver
+  show: Detalhe
+  edit: Editar
+  delete: Eliminar
+  save: Guardar
+  cancel: Cancelar
+  apply: Aplicar
+  create_one: 'Criar uma'
+  close: Fechar
+  add_place: 'Adicionar estado'
+  add_transition: 'Adicionar transição'
+  add_match_rule: 'Adicionar regra'
+
+status:
+  enabled: Ativo
+  disabled: Inativo
+  default: predefinido
+  initial: Inicial
+
+workflow_type:
+  state_machine: 'Máquina de estados'
+  workflow: Workflow
+
+page:
+  dashboard: Painel
+  definitions: Definições
+  new_definition: 'Nova definição de workflow'
+  edit_definition: 'Editar definição de workflow'
+  edit_definition_general: 'Editar workflow — Geral'
+  edit_definition_match_rules: 'Editar workflow — Regras de correspondência'
+  edit_definition_places: 'Editar workflow — Estados'
+  edit_definition_transitions: 'Editar workflow — Transições'
+
+dashboard:
+  title: 'Workflows Symfony baseados na base de dados'
+  intro: 'Gira definições de workflow na base de dados e utilize-as em runtime via %class%.'
+  definitions: Definições
+  empty_prefix: 'Ainda não há definições de workflow.'
+  empty_suffix: 'ou execute'
+
+definition:
+  index_title: 'Definições de workflow'
+  none_found: 'Nenhuma definição encontrada.'
+  marking: marcação
+  priority: prioridade
+  no_places: 'Este workflow ainda não tem estados. Adicione-os no editor para visualizar o fluxo.'
+  match_rules: 'Regras de correspondência'
+  match_default: 'Corresponde a qualquer sujeito de %class% quando não há um workflow mais específico.'
+  runtime_binding: 'Ligação em runtime'
+  subject_class: 'Classe do sujeito'
+  marking_property: 'Propriedade de marcação'
+  initial_place: 'Estado inicial'
+  places_transitions: 'Estados / transições'
+  confirm_delete: 'Eliminar esta definição de workflow?'
+
+table:
+  name: Nome
+  slug: Slug
+  type: Tipo
+  subject: Sujeito
+  status: Estado
+  match_rules: 'Regras de correspondência'
+  priority: Prioridade
+  places: Estados
+  transitions: Transições
+  actions: Ações
+
+collection:
+  no_places: 'Ainda não há estados. Clique em «Adicionar estado» para criar um.'
+  no_transitions: 'Ainda não há transições. Clique em «Adicionar transição» para criar uma.'
+  no_match_rules: 'Sem regras ainda. Deixe vazio para workflow predefinido, ou clique em «Adicionar regra».'
+  confirm_delete: 'Remover este item? Guarde o formulário para persistir as alterações.'
+
+modal:
+  add_place: 'Adicionar estado'
+  edit_place: 'Editar estado'
+  add_transition: 'Adicionar transição'
+  edit_transition: 'Editar transição'
+  add_match_rule: 'Adicionar regra'
+  edit_match_rule: 'Editar regra'
+
+form:
+  section:
+    general: Geral
+    match_rules: 'Regras de correspondência'
+    places: Estados
+    transitions: Transições
+  help:
+    match_rules: 'Todas as regras devem corresponder (AND). Deixe vazio para um workflow predefinido na classe do sujeito.'
+    match_rules_list: 'Defina regras de parâmetros para selecionar este workflow. Deixe vazio para um workflow predefinido.'
+    transition_places: 'As opções provêm da secção Places. Configure os estados primeiro se necessário.'
+    places_list: 'Gira os estados do workflow. As alterações são guardadas ao submeter o formulário.'
+  field:
+    name: Nome
+    slug: Slug
+    type: Tipo
+    initial_place: 'Estado inicial'
+    subject_class: 'Classe do sujeito (FQCN)'
+    marking_property: 'Propriedade de marcação'
+    enabled: Ativo
+    priority: 'Prioridade (maior vence em empates)'
+    description: Descrição
+    match_rules: 'Regras de correspondência (vazio = predefinido para a classe)'
+    places: Estados
+    transitions: Transições
+    parameter_key: 'Chave do parâmetro'
+    parameter_value: 'Valor do parâmetro'
+    order: Ordem
+    label: Etiqueta
+    from_places: 'Estados de origem'
+    to_places: 'Estados de destino'
+  placeholder:
+    select_places: 'Pesquisar e selecionar estados…'
+
+diagram:
+  title: 'Diagrama de fluxo'
+  hint: 'Clique num estado ou transição para ver a sua configuração.'
+  back_edges: 'Transições de retorno / ciclo'
+  legend:
+    initial: 'Estado inicial'
+    place: 'Estado (clique para detalhes)'
+    transition: 'Transição (clique para detalhes)'
+  modal:
+    name: Nome
+    label: Etiqueta
+    sort_order: Ordem
+    incoming: 'Transições entrantes'
+    outgoing: 'Transições saídas'
+    no_transitions: 'Nenhuma transição ligada a este estado.'
+    from: De
+    to: Para
+    state_machine_help: 'Transição de máquina de estados: move o sujeito de um estado para outro.'
+    workflow_help: 'Transição de workflow: pode ligar vários estados de origem e destino.'
+  transition_from: de
+  transition_to: para
+
+flash:
+  created: 'Definição de workflow criada.'
+  updated: 'Definição de workflow atualizada.'
+  deleted: 'Definição de workflow eliminada.'
+
+error:
+  not_found_id: 'Definição de workflow #%id% não encontrada.'
+  not_found_slug: 'Definição de workflow "%slug%" não encontrada.'

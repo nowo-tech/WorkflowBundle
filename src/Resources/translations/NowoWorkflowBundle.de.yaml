@@ -1,0 +1,160 @@
+brand: 'Nowo Workflow'
+title_suffix: 'Nowo Workflow'
+
+locale:
+  en: Englisch
+  es: Spanisch
+  fr: Französisch
+  it: Italienisch
+
+nav:
+  dashboard: Dashboard
+  definitions: Definitionen
+  new_definition: 'Neue Definition'
+  toggle: 'Navigation umschalten'
+
+action:
+  view: Anzeigen
+  show: Details
+  edit: Bearbeiten
+  delete: Löschen
+  save: Speichern
+  cancel: Abbrechen
+  apply: Anwenden
+  create_one: 'Eine erstellen'
+  close: Schließen
+  add_place: 'Zustand hinzufügen'
+  add_transition: 'Übergang hinzufügen'
+  add_match_rule: 'Regel hinzufügen'
+
+status:
+  enabled: Aktiv
+  disabled: Inaktiv
+  default: Standard
+  initial: Ausgangszustand
+
+workflow_type:
+  state_machine: Zustandsautomat
+  workflow: Workflow
+
+page:
+  dashboard: Dashboard
+  definitions: Definitionen
+  new_definition: 'Neue Workflow-Definition'
+  edit_definition: 'Workflow-Definition bearbeiten'
+  edit_definition_general: 'Workflow bearbeiten — Allgemein'
+  edit_definition_match_rules: 'Workflow bearbeiten — Übereinstimmungsregeln'
+  edit_definition_places: 'Workflow bearbeiten — Zustände'
+  edit_definition_transitions: 'Workflow bearbeiten — Übergänge'
+
+dashboard:
+  title: 'Datenbankgesteuerte Symfony-Workflows'
+  intro: 'Verwalten Sie Workflow-Definitionen in der Datenbank und nutzen Sie sie zur Laufzeit über %class%.'
+  definitions: Definitionen
+  empty_prefix: 'Noch keine Workflow-Definitionen.'
+  empty_suffix: 'oder ausführen'
+
+definition:
+  index_title: 'Workflow-Definitionen'
+  none_found: 'Keine Definitionen gefunden.'
+  marking: Markierung
+  priority: Priorität
+  no_places: 'Dieser Workflow hat noch keine Zustände. Fügen Sie welche im Editor hinzu, um den Ablauf zu visualisieren.'
+  match_rules: 'Übereinstimmungsregeln'
+  match_default: 'Entspricht jedem Subjekt von %class%, wenn kein spezifischerer Workflow passt.'
+  runtime_binding: 'Laufzeitbindung'
+  subject_class: 'Subjektklasse'
+  marking_property: 'Markierungseigenschaft'
+  initial_place: 'Anfangszustand'
+  places_transitions: 'Zustände / Übergänge'
+  confirm_delete: 'Diese Workflow-Definition löschen?'
+
+table:
+  name: Bezeichnung
+  slug: Slug
+  type: Typ
+  subject: Subjekt
+  status: Zustand
+  match_rules: 'Übereinstimmungsregeln'
+  priority: Priorität
+  places: Zustände
+  transitions: Übergänge
+  actions: Aktionen
+
+collection:
+  no_places: 'Noch keine Zustände. Klicken Sie auf „Zustand hinzufügen“, um einen zu erstellen.'
+  no_transitions: 'Noch keine Übergänge. Klicken Sie auf „Übergang hinzufügen“, um einen zu erstellen.'
+  no_match_rules: 'Noch keine Regeln. Leer lassen für Standard-Workflow, oder klicken Sie auf „Regel hinzufügen“.'
+  confirm_delete: 'Dieses Element entfernen? Speichern Sie das Formular, um die Änderungen zu übernehmen.'
+
+modal:
+  add_place: 'Zustand hinzufügen'
+  edit_place: 'Zustand bearbeiten'
+  add_transition: 'Übergang hinzufügen'
+  edit_transition: 'Übergang bearbeiten'
+  add_match_rule: 'Regel hinzufügen'
+  edit_match_rule: 'Regel bearbeiten'
+
+form:
+  section:
+    general: Allgemein
+    match_rules: 'Übereinstimmungsregeln'
+    places: Zustände
+    transitions: Übergänge
+  help:
+    match_rules: 'Alle Regeln müssen übereinstimmen (UND). Leer lassen für einen Standard-Workflow auf der Subjektklasse.'
+    match_rules_list: 'Definieren Sie Parameterregeln zur Auswahl dieses Workflows. Leer lassen für einen Standard-Workflow.'
+    transition_places: 'Optionen stammen aus dem Bereich Places. Konfigurieren Sie bei Bedarf zuerst die Zustände.'
+    places_list: 'Verwalten Sie Workflow-Zustände. Änderungen werden beim Absenden des Formulars gespeichert.'
+  field:
+    name: Bezeichnung
+    slug: Slug
+    type: Typ
+    initial_place: 'Anfangszustand'
+    subject_class: 'Subjektklasse (FQCN)'
+    marking_property: 'Markierungseigenschaft'
+    enabled: Aktiv
+    priority: 'Priorität (höher gewinnt bei Gleichstand)'
+    description: Beschreibung
+    match_rules: 'Übereinstimmungsregeln (leer = Standard für Klasse)'
+    places: Zustände
+    transitions: Übergänge
+    parameter_key: 'Parameterschlüssel'
+    parameter_value: 'Parameterwert'
+    order: Reihenfolge
+    label: Bezeichnung
+    from_places: 'Quellzustände'
+    to_places: 'Zielzustände'
+  placeholder:
+    select_places: 'Zustände suchen und auswählen…'
+
+diagram:
+  title: 'Flussdiagramm'
+  hint: 'Klicken Sie auf einen Zustand oder Übergang, um die Konfiguration anzuzeigen.'
+  back_edges: 'Rückkehr- / Schleifenübergänge'
+  legend:
+    initial: 'Anfangszustand'
+    place: 'Zustand (Klick für Details)'
+    transition: 'Übergang (Klick für Details)'
+  modal:
+    name: Bezeichnung
+    label: Bezeichnung
+    sort_order: Reihenfolge
+    incoming: 'Eingehende Übergänge'
+    outgoing: 'Ausgehende Übergänge'
+    no_transitions: 'Keine Übergänge mit diesem Zustand verbunden.'
+    from: Von
+    to: Nach
+    state_machine_help: 'Zustandsautomat-Übergang: verschiebt das Subjekt von einem Zustand in einen anderen.'
+    workflow_help: 'Workflow-Übergang: kann mehrere Quell- und Zielzustände verbinden.'
+  transition_from: von
+  transition_to: nach
+
+flash:
+  created: 'Workflow-Definition erstellt.'
+  updated: 'Workflow-Definition aktualisiert.'
+  deleted: 'Workflow-Definition gelöscht.'
+
+error:
+  not_found_id: 'Workflow-Definition #%id% nicht gefunden.'
+  not_found_slug: 'Workflow-Definition "%slug%" nicht gefunden.'

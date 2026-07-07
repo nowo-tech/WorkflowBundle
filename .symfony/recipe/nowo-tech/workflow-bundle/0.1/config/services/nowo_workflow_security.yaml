@@ -1,0 +1,7 @@
+# Protect Workflow CRUD UI — uncomment after installing symfony/security-bundle
+# services:
+#     Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface:
+#         class: Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker
+#         arguments:
+#             $requiredRoles: ['ROLE_ADMIN']
+#             $authorizationChecker: '@security.authorization_checker'

@@ -50,7 +50,27 @@ Record confirmation in the release PR or tag notes.
 
 ## Protecting the CRUD UI
 
-By default the bundle allows all requests to routes named `nowo_workflow_*`. To protect the UI without configuring `access_control`, register a custom checker:
+By default the bundle allows all requests to routes named `nowo_workflow_*`. To protect the UI without configuring `access_control`, register a checker aliased to `WorkflowUiAccessCheckerInterface`.
+
+### Built-in role-based checker (1.3.0+)
+
+When **Symfony Security** is installed, alias `RoleBasedWorkflowUiAccessChecker` (grants access if the user has **any** of the configured roles):
+
+```yaml
+# config/services/nowo_workflow_security.yaml
+services:
+    Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface:
+        class: Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker
+        arguments:
+            $requiredRoles: ['ROLE_ADMIN']
+            $authorizationChecker: '@security.authorization_checker'
+```
+
+The Flex recipe copies this file commented out; uncomment it after installing `symfony/security-bundle`. Configure intended roles under `nowo_workflow.ui.required_roles` for documentation — the checker is **not** registered automatically from that key.
+
+### Custom checker
+
+Alternatively, implement the interface in your application:
 
 ```php
 // src/Security/WorkflowUiAccessChecker.php
