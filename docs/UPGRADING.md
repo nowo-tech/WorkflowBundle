@@ -8,6 +8,17 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.4.0
+
+From 1.3.x:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+No database migration, configuration change, or code update is required. This release adds maintainer-only Spec Kit scaffolding and baseline documentation; Symfony integrators are unaffected.
+
 ## Upgrading to 1.3.0
 
 From 1.2.x:

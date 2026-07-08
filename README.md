@@ -64,6 +64,7 @@ Open http://localhost:8022 — try the CRUD at `/workflow` and playgrounds for o
 - [Security](docs/SECURITY.md)
 - [Engram](docs/ENGRAM.md)
 - [Spec-driven development](docs/SPEC-DRIVEN-DEVELOPMENT.md)
+- [GitHub Spec Kit](docs/SPEC-KIT.md)
 
 ### Additional documentation
 
