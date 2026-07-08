@@ -932,7 +932,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/workflow-bundle",
-                "reference": "87fa35d48f431c0d7a81d036591b9f55de168b8e"
+                "reference": "f3d9c4ac9d976b9e9522c65f4b4ad5c7599c3c2a"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.13 || ^3.2.4",
@@ -5229,16 +5229,16 @@
         },
         {
             "name": "nowo-tech/twig-inspector-bundle",
-            "version": "v1.0.33",
+            "version": "v1.0.34",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/TwigInspectorBundle.git",
-                "reference": "4c681ef6f8d17e50cd1b6417b63f6a6bbbf7032b"
+                "reference": "e926c092b6df59edaded71ec011075e67190c783"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/TwigInspectorBundle/zipball/4c681ef6f8d17e50cd1b6417b63f6a6bbbf7032b",
-                "reference": "4c681ef6f8d17e50cd1b6417b63f6a6bbbf7032b",
+                "url": "https://api.github.com/repos/nowo-tech/TwigInspectorBundle/zipball/e926c092b6df59edaded71ec011075e67190c783",
+                "reference": "e926c092b6df59edaded71ec011075e67190c783",
                 "shasum": ""
             },
             "require": {
@@ -5327,7 +5327,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-06-30T09:51:13+00:00"
+            "time": "2026-07-07T14:45:27+00:00"
         },
         {
             "name": "phar-io/manifest",

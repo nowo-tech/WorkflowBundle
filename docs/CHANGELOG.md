@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-08
+
+### Added
+
+- GitHub Spec Kit integration (`.specify/`, Cursor Agent skills in `.cursor/skills/speckit-*`)
+- Baseline specification and code inventory under `specs/001-baseline/` (100% coverage of production code in `src/`)
+- [SPEC-KIT.md](SPEC-KIT.md) — operator manual for Spec Kit install, initialization, and maintainer workflow
+
+### Documentation
+
+- [SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md): three-layer SDD model (Spec Kit baseline, product behavior, `REQ-*` traceability) and contributor workflow
+- [README.md](../README.md): link to Spec Kit documentation
+
 ## [1.3.1] - 2026-07-07
 
 ### Fixed
