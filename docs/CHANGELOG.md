@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-07-15
+
+### Added
+
+- Contributor Covenant Code of Conduct (`CODE_OF_CONDUCT.md`)
+- REQ-GIT-001: verification script, history cleanup script, and `commit-msg` hook to block Cursor `Co-authored-by` trailers
+- CI job `git-hygiene` enforcing REQ-GIT-001 on push and pull requests
+- Makefile targets `check-no-cursor-coauthor` and `strip-cursor-coauthor-from-history`; `release-check` now includes co-author verification
+
+### Changed
+
+- GitHub Actions: `actions/cache` v5 → v6
+- Dev lockfiles synced (`friendsofphp/php-cs-fixer`, `rector/rector`)
+
+### Documentation
+
+- [GITLAB_CI.md](GITLAB_CI.md): CI requirements for GitLab mirrors (REQ-GIT-001 and parity with GitHub Actions)
+- [CONTRIBUTING.md](CONTRIBUTING.md): Code of Conduct reference and git hooks workflow
+- [RELEASE.md](RELEASE.md): post-tag co-author check reminder before push
+- [README.md](../README.md): links to Code of Conduct and GitLab CI requirements
+- `.gitignore`: ignore `.cursor/sandbox.json` (machine-specific local file)
+
 ## [1.4.0] - 2026-07-08
 
 ### Added

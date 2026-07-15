@@ -2,6 +2,11 @@
 
 Thank you for contributing to Workflow Bundle.
 
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant Code of Conduct](../CODE_OF_CONDUCT.md). By participating, you are expected to uphold it. Please report unacceptable behavior to **hectorfranco@nowo.tech**.
+
 ## Development setup
 
 ```bash
@@ -45,3 +50,16 @@ See [SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md) for product scope a
 ## Questions
 
 Open an [issue](https://github.com/nowo-tech/WorkflowBundle/issues) or contact hectorfranco@nowo.tech.
+
+## Git hooks (REQ-GIT-001)
+
+Do **not** add `Co-authored-by: Cursor` or `cursoragent@cursor.com` trailers to commit messages.
+
+```bash
+make setup-hooks
+make check-no-cursor-coauthor
+```
+
+`make setup-hooks` installs `.githooks/commit-msg` (or sets `core.hooksPath` to `.githooks`). Run it once per clone before your first commit.
+
+If CI fails because trailers are already on the remote, see [GITLAB_CI.md](GITLAB_CI.md) (REQ-GIT-001) and run `make strip-cursor-coauthor-from-history` before `git push --force-with-lease`.

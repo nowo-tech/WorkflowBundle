@@ -19,3 +19,5 @@ Pipeline: Composer validate/sync → cs-fix → cs-check → rector-dry → phps
 
 - Verify Packagist metadata
 - Smoke-test in a clean Symfony app: `composer require nowo-tech/workflow-bundle`
+
+After creating the release commit and tag, run `make check-no-cursor-coauthor` again **before** `git push` (REQ-GIT-001). The release commit itself is not covered by an earlier `release-check` run.
