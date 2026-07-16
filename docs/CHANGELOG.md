@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-07-16
+
+### Changed
+
+- Renamed CI requirements doc `docs/GITLAB_CI.md` → `docs/GITHUB_CI.md` and aligned content with GitHub Actions (REQ-GIT-001)
+
+### Documentation
+
+- [GITHUB_CI.md](GITHUB_CI.md): GitHub Actions CI requirements for REQ-GIT-001
+- [README.md](../README.md), [CONTRIBUTING.md](CONTRIBUTING.md): updated links to `GITHUB_CI.md`
+
 ## [1.4.1] - 2026-07-15
 
 ### Added
@@ -23,10 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- [GITLAB_CI.md](GITLAB_CI.md): CI requirements for GitLab mirrors (REQ-GIT-001 and parity with GitHub Actions)
+- CI requirements doc for REQ-GIT-001 (shipped as `GITLAB_CI.md`; renamed to `GITHUB_CI.md` in 1.4.2)
 - [CONTRIBUTING.md](CONTRIBUTING.md): Code of Conduct reference and git hooks workflow
 - [RELEASE.md](RELEASE.md): post-tag co-author check reminder before push
-- [README.md](../README.md): links to Code of Conduct and GitLab CI requirements
+- [README.md](../README.md): links to Code of Conduct and CI requirements
 - `.gitignore`: ignore `.cursor/sandbox.json` (machine-specific local file)
 
 ## [1.4.0] - 2026-07-08

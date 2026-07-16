@@ -8,6 +8,17 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.4.2
+
+From 1.4.1:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+No database migration, configuration change, or code update is required. This release only renames and refines maintainer CI documentation (`GITHUB_CI.md`); Symfony integrators are unaffected.
+
 ## Upgrading to 1.4.1
 
 From 1.4.0:

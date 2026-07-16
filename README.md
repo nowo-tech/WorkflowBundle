@@ -54,7 +54,7 @@ Open http://localhost:8022 — try the CRUD at `/workflow` and playgrounds for o
 
 ## Documentation
 
-- [GitLab CI requirements](docs/GITLAB_CI.md)
+- [GitHub Actions CI requirements](docs/GITHUB_CI.md)
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
 - [Usage](docs/USAGE.md)
