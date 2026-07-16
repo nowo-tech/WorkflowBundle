@@ -36,7 +36,7 @@ make setup-hooks    # once per clone
 make check-no-cursor-coauthor
 ```
 
-On failure, the script lists affected commits.
+On failure, the script lists affected commits. Verification uses `git --no-replace-objects` so local `git replace` refs cannot hide dirty history that CI would still see.
 
 #### Clean already-published history
 
