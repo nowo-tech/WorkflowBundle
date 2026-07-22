@@ -12,6 +12,7 @@ use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -70,7 +71,7 @@ final class WorkflowDefinitionController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'edit', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function edit(int $id): \Symfony\Component\HttpFoundation\RedirectResponse
+    public function edit(int $id): RedirectResponse
     {
         return $this->redirectToRoute('nowo_workflow_definition_edit_general', ['id' => $id]);
     }
@@ -106,7 +107,7 @@ final class WorkflowDefinitionController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'delete', requirements: ['id' => '\d+'], methods: ['POST'])]
-    public function delete(Request $request, int $id): \Symfony\Component\HttpFoundation\RedirectResponse
+    public function delete(Request $request, int $id): RedirectResponse
     {
         $definition = $this->requireDefinitionById($id);
 

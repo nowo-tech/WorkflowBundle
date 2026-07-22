@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 
+use Nowo\WorkflowBundle\Contract\WorkflowContextAwareInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowMatchRule;
 use Nowo\WorkflowBundle\Exception\WorkflowAmbiguousMatchException;
@@ -211,7 +212,7 @@ final class WorkflowResolverTest extends TestCase
     }
 }
 
-final class WorkflowResolverContextAwareSubject implements \Nowo\WorkflowBundle\Contract\WorkflowContextAwareInterface
+final class WorkflowResolverContextAwareSubject implements WorkflowContextAwareInterface
 {
     /** @param array<string, string> $parameters */
     public function __construct(

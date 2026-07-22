@@ -8,6 +8,7 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
+use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
@@ -116,7 +117,7 @@ final class DatabaseWorkflowRegistryTest extends TestCase
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('findOneBySlug')->willReturn($definition);
 
-        $this->expectException(\Nowo\WorkflowBundle\Exception\WorkflowNotFoundException::class);
+        $this->expectException(WorkflowNotFoundException::class);
         (new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder()))->get('order_approval');
     }
 
@@ -125,7 +126,7 @@ final class DatabaseWorkflowRegistryTest extends TestCase
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('findOneBySlug')->willReturn(null);
 
-        $this->expectException(\Nowo\WorkflowBundle\Exception\WorkflowNotFoundException::class);
+        $this->expectException(WorkflowNotFoundException::class);
         (new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder()))->get('missing');
     }
 

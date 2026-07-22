@@ -21,11 +21,12 @@ The demo uses:
 - **FrankenPHP** (Caddy + PHP) in a single PHP container plus **PostgreSQL** on the Docker network (no host port exposed).
 - **Docker Compose** with the app and parent bundle mounted (`../..` → `/var/workflow-bundle`).
 - **Two Caddyfiles**: production (`docker/frankenphp/Caddyfile` with worker) and development (`docker/frankenphp/Caddyfile.dev`, no worker).
-- An **entrypoint** that copies `Caddyfile.dev` when `APP_ENV=dev`.
+- An **entrypoint** that selects classic vs worker Caddyfile from **`FRANKENPHP_MODE`** (`classic` \| `worker`, default **`worker`** in `.env.example`)
 
 | Aspect | Development | Production |
 |--------|-------------|------------|
-| FrankenPHP worker mode | **Off** | **On** |
+| `FRANKENPHP_MODE` | Prefer **`classic`** (hot-reload) | **`worker`** (default in `.env.example`) |
+| FrankenPHP worker mode | **Off** (`classic`) | **On** (`worker`) |
 | Twig cache | **Off** (`config/packages/dev/twig.yaml`) | **On** (default) |
 | OPcache revalidation | Every request (`docker/php-dev.ini`) | Default |
 | `APP_ENV` / `APP_DEBUG` | `dev` / `1` | `prod` / `0` |
@@ -55,14 +56,22 @@ Example `config/bundles.php`:
 ```php
 <?php
 
+declare(strict_types=1);
+
+use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
+use Nowo\TwigInspectorBundle\NowoTwigInspectorBundle;
+use Nowo\WorkflowBundle\NowoWorkflowBundle;
+use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
+use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Bundle\WebProfilerBundle\WebProfilerBundle;
+
 return [
-    Symfony\Bundle\FrameworkBundle\FrameworkBundle::class => ['all' => true],
-    Symfony\Bundle\TwigBundle\TwigBundle::class => ['all' => true],
-    Symfony\Bundle\DebugBundle\DebugBundle::class => ['dev' => true, 'test' => true],
-    Symfony\Bundle\WebProfilerBundle\WebProfilerBundle::class => ['dev' => true, 'test' => true],
-    Doctrine\Bundle\DoctrineBundle\DoctrineBundle::class => ['all' => true],
-    Nowo\WorkflowBundle\NowoWorkflowBundle::class => ['all' => true],
-    Nowo\TwigInspectorBundle\NowoTwigInspectorBundle::class => ['dev' => true, 'test' => true],
+    FrameworkBundle::class         => ['all' => true],
+    TwigBundle::class              => ['all' => true],
+    WebProfilerBundle::class       => ['dev' => true, 'test' => true],
+    DoctrineBundle::class          => ['all' => true],
+    NowoWorkflowBundle::class      => ['all' => true],
+    NowoTwigInspectorBundle::class => ['dev' => true, 'test' => true],
 ];
 ```
 
@@ -70,9 +79,11 @@ return [
 
 ## Development configuration
 
-- **Caddyfile.dev** — plain `php_server` (no `worker` directive).
+- **`FRANKENPHP_MODE=classic`** — entrypoint copies `Caddyfile.dev` (plain `php_server`, no worker).
 - **php-dev.ini** — `opcache.revalidate_freq=0`.
-- **docker-compose.yml** — `dns:` for Packagist, bundle path repo, `APP_ENV=dev`.
+- **docker-compose.yml** — `dns:` for Packagist, bundle path repo, `APP_ENV=dev`, passes `FRANKENPHP_MODE`.
+
+After changing `FRANKENPHP_MODE` in `.env`, recreate with `docker compose up -d`.
 
 See also [IconSelectorBundle DEMO-FRANKENPHP.md](https://github.com/nowo-tech/IconSelectorBundle/blob/main/docs/DEMO-FRANKENPHP.md) for the full FrankenPHP pattern used across Nowo bundles.
 
@@ -80,7 +91,7 @@ See also [IconSelectorBundle DEMO-FRANKENPHP.md](https://github.com/nowo-tech/Ic
 
 ## Production configuration
 
-Use the default Caddyfile with FrankenPHP **worker mode**, set `APP_ENV=prod` and `APP_DEBUG=0`, and do not mount `php-dev.ini`. Warm up Symfony cache after deploy.
+Set **`FRANKENPHP_MODE=worker`** (default), `APP_ENV=prod` and `APP_DEBUG=0`, and do not mount `php-dev.ini`. Warm up Symfony cache after deploy.
 
 ---
 
@@ -89,5 +100,5 @@ Use the default Caddyfile with FrankenPHP **worker mode**, set `APP_ENV=prod` an
 | Problem | Check |
 |---------|--------|
 | Composer cannot reach Packagist | Ensure `dns: 8.8.8.8 / 8.8.4.4` is set on the PHP service (REQ-DEMO-009). |
-| Twig changes not visible | Confirm `APP_ENV=dev`, no worker in Caddyfile.dev, and `twig.cache: false` in dev config. |
+| Twig / PHP changes not visible | Set `FRANKENPHP_MODE=classic`, confirm `APP_ENV=dev`, and `twig.cache: false` in dev config; recreate the container after changing mode. |
 | Database connection errors | Use `database` as hostname inside Docker (not `localhost`). |

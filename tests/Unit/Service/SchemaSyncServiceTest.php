@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\Index;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,7 +23,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableNames')->willReturn(['workflow_definition']);
         $schemaManager->method('listTableIndexes')->willReturn([]);
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -71,7 +72,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableNames')->willReturn(['workflow_definition']);
         $schemaManager->method('listTableIndexes')->willReturn(['uniq_workflow_definition_slug' => $index]);
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -99,7 +100,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableIndexes')->willReturn([]);
         $schemaManager->method('listSequences')->willReturn(['workflow_definition_id_seq']);
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -127,7 +128,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableIndexes')->willReturn([]);
         $schemaManager->method('listSequences')->willThrowException(new RuntimeException('unsupported'));
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -154,7 +155,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableNames')->willReturn([]);
         $schemaManager->method('listTableIndexes')->willReturn([]);
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -176,7 +177,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableNames')->willReturn(['workflow_definition']);
         $schemaManager->method('listTableIndexes')->willReturn([]);
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -202,7 +203,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableIndexes')->willReturn([]);
         $schemaManager->method('listSequences')->willReturn(['workflow_definition_id_seq']);
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -240,7 +241,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableNames')->willReturn([]);
         $schemaManager->method('listTableIndexes')->willReturn([]);
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -260,7 +261,7 @@ final class SchemaSyncServiceTest extends TestCase
         $schemaManager->method('listTableIndexes')->willReturn([]);
         $schemaManager->method('listSequences')->willThrowException(new RuntimeException('sequences unsupported'));
 
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 
         $em = $this->createMock(EntityManagerInterface::class);
@@ -284,7 +285,7 @@ final class SchemaSyncServiceTest extends TestCase
 
     public function testExecuteStatementsCountsExecutedAndSkipped(): void
     {
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->expects(self::exactly(2))
             ->method('executeStatement')
             ->willReturnOnConsecutiveCalls(
@@ -303,7 +304,7 @@ final class SchemaSyncServiceTest extends TestCase
 
     public function testExecuteStatementsRethrowsNonDuplicateErrors(): void
     {
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->expects(self::once())
             ->method('executeStatement')
             ->willThrowException(new RuntimeException('permission denied'));
