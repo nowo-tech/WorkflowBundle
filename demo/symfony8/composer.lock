@@ -934,7 +934,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/workflow-bundle",
-                "reference": "65136810de8fe511d594909c10eb377f853cabf9"
+                "reference": "8cd3d3c5626f9c48d64def840223f1dd526d6618"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.13 || ^3.2.4",
