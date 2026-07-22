@@ -11,6 +11,7 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Symfony\Component\Workflow\Transition;
 
 use function sprintf;
 
@@ -107,7 +108,7 @@ final class WorkflowApplicator
         $workflow = $this->registry->get($definition->getSlug());
 
         return array_values(array_map(
-            static fn (\Symfony\Component\Workflow\Transition $transition): string => $transition->getName(),
+            static fn (Transition $transition): string => $transition->getName(),
             $workflow->getEnabledTransitions($subject),
         ));
     }

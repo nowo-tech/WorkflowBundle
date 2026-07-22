@@ -11,6 +11,7 @@ use Nowo\WorkflowBundle\Form\WorkflowMatchRuleType;
 use Nowo\WorkflowBundle\Form\WorkflowPlaceType;
 use Nowo\WorkflowBundle\Form\WorkflowTransitionType;
 use ReflectionMethod;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Test\TypeTestCase;
 
 final class WorkflowFormTypesTest extends TypeTestCase
@@ -98,7 +99,7 @@ final class WorkflowFormTypesTest extends TypeTestCase
     public function testWorkflowTransitionTypeRemovesExistingPlaceFieldBeforeReAdding(): void
     {
         $form = $this->factory->createNamedBuilder('transition')->getForm();
-        $form->add('fromPlaces', \Symfony\Component\Form\Extension\Core\Type\TextType::class);
+        $form->add('fromPlaces', TextType::class);
 
         $method = new ReflectionMethod(WorkflowTransitionType::class, 'configurePlaceField');
         $method->setAccessible(true);

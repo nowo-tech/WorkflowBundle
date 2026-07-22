@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\Doctrine;
 
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
@@ -16,7 +17,7 @@ final class TablePrefixSubscriberTest extends TestCase
 {
     public function testLoadClassMetadataAppliesPrefixToBundleEntities(): void
     {
-        $entityManager = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
         /** @var ClassMetadata<object> $metadata */
         $metadata = new ClassMetadata(WorkflowDefinition::class);
         $metadata->setPrimaryTable(['name' => 'workflow_definition']);
@@ -29,7 +30,7 @@ final class TablePrefixSubscriberTest extends TestCase
 
     public function testLoadClassMetadataIgnoresForeignEntities(): void
     {
-        $entityManager = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
         /** @var ClassMetadata<object> $metadata */
         $metadata = new ClassMetadata(stdClass::class);
         $metadata->setPrimaryTable(['name' => 'workflow_definition']);

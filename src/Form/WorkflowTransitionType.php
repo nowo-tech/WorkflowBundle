@@ -10,6 +10,7 @@ use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
@@ -49,7 +50,7 @@ final class WorkflowTransitionType extends AbstractType
      * @param list<string> $selected
      */
     private static function configurePlaceField(
-        \Symfony\Component\Form\FormInterface $form,
+        FormInterface $form,
         string $field,
         string $label,
         array $placeChoices,

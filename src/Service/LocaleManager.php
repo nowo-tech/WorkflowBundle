@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 
@@ -69,7 +70,7 @@ final class LocaleManager
     private function getSession(): ?SessionInterface
     {
         $request = $this->requestStack->getCurrentRequest();
-        if (!$request instanceof \Symfony\Component\HttpFoundation\Request || !$request->hasSession()) {
+        if (!$request instanceof Request || !$request->hasSession()) {
             return null;
         }
 

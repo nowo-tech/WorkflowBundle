@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Support;
 
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
@@ -24,7 +25,7 @@ final class TestManagerRegistry implements ManagerRegistry
         return 'default';
     }
 
-    public function getConnection(?string $name = null): \Doctrine\DBAL\Connection
+    public function getConnection(?string $name = null): Connection
     {
         return $this->entityManager->getConnection();
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Exception;
 
+use Nowo\WorkflowBundle\Model\WorkflowContext;
 use RuntimeException;
 
 use function sprintf;
@@ -20,7 +21,7 @@ final class WorkflowNotFoundException extends RuntimeException
         return new self(sprintf('Workflow definition "%s" was not found or is disabled.', $slug));
     }
 
-    public static function forContext(\Nowo\WorkflowBundle\Model\WorkflowContext $context): self
+    public static function forContext(WorkflowContext $context): self
     {
         return new self(sprintf(
             'No enabled workflow definition matches subject "%s" with parameters %s.',

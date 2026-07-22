@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-07-22
+
+### Changed
+
+- Demo FrankenPHP entrypoint extracted to `demo/symfony8/docker/entrypoint.sh`; runtime mode selected via `FRANKENPHP_MODE` (`classic` \| `worker`, default `worker`)
+- PHP-CS-Fixer: `fully_qualified_strict_types.import_symbols` enabled (FQCN → `use` imports)
+- GitHub Actions: `actions/checkout` v6 → v7
+- Lockfile synced (`doctrine/dbal`, `doctrine/doctrine-bundle`)
+
+### Fixed
+
+- REQ-GIT-001 verification uses `git --no-replace-objects` so local `git replace` refs cannot hide Cursor co-author trailers from CI
+- History rewrite script refuses a dirty working tree before rewriting
+- REQ-GITIGNORE-002: ignore `.php-cs-fixer.cache` as a file (stop tracking the cache)
+
+### Documentation
+
+- [GITHUB_CI.md](GITHUB_CI.md): expanded REQ-GIT-001 operator guide (scope, why CI enforces it, replace-refs pitfall)
+- [DEMO-FRANKENPHP.md](DEMO-FRANKENPHP.md): document `FRANKENPHP_MODE` and standalone entrypoint
+
 ## [1.4.2] - 2026-07-16
 
 ### Changed

@@ -19,6 +19,8 @@ use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use PHPUnit\Framework\TestCase;
 use stdClass;
+use Symfony\Component\Workflow\Marking;
+use Symfony\Component\Workflow\WorkflowInterface;
 
 final class WorkflowApplicatorTest extends TestCase
 {
@@ -139,8 +141,8 @@ final class WorkflowApplicatorTest extends TestCase
         $definition = $this->orderDefinition();
         $subject    = new WorkflowApplicatorTestSubject('draft');
 
-        $workflow = $this->createMock(\Symfony\Component\Workflow\WorkflowInterface::class);
-        $workflow->method('getMarking')->willReturn(new \Symfony\Component\Workflow\Marking([]));
+        $workflow = $this->createMock(WorkflowInterface::class);
+        $workflow->method('getMarking')->willReturn(new Marking([]));
 
         $registry = $this->createMock(WorkflowRegistryInterface::class);
         $registry->method('get')->with('order_approval')->willReturn($workflow);

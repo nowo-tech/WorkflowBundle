@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\Command;
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\ClassMetadataFactory;
 use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use Nowo\WorkflowBundle\Command\SyncSchemaCommand;
@@ -30,11 +33,11 @@ final class SyncSchemaCommandTest extends TestCase
 
     public function testExecuteReportsUpToDateWhenNoStatements(): void
     {
-        $connection      = $this->createMock(\Doctrine\DBAL\Connection::class);
-        $metadataFactory = $this->createMock(\Doctrine\ORM\Mapping\ClassMetadataFactory::class);
+        $connection      = $this->createMock(Connection::class);
+        $metadataFactory = $this->createMock(ClassMetadataFactory::class);
         $metadataFactory->method('getAllMetadata')->willReturn([]);
 
-        $schemaManager = $this->createMock(\Doctrine\DBAL\Schema\AbstractSchemaManager::class);
+        $schemaManager = $this->createMock(AbstractSchemaManager::class);
         $schemaManager->method('listTableNames')->willReturn([]);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
 

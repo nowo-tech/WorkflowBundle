@@ -6,6 +6,7 @@ namespace Nowo\WorkflowBundle\Controller;
 
 use Nowo\WorkflowBundle\Service\LocaleManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -18,7 +19,7 @@ final class LocaleController extends AbstractController
     }
 
     #[Route('/locale/{_locale}', name: 'locale_switch', requirements: ['_locale' => 'en|es|fr|it'], methods: ['GET'])]
-    public function switch(string $_locale, Request $request): \Symfony\Component\HttpFoundation\RedirectResponse
+    public function switch(string $_locale, Request $request): RedirectResponse
     {
         $this->localeManager->setLocale($_locale);
 

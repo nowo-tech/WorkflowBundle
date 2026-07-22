@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection;
 
+use Doctrine\Bundle\DoctrineBundle\DependencyInjection\DoctrineExtension;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use PHPUnit\Framework\TestCase;
+use Symfony\Bundle\FrameworkBundle\DependencyInjection\FrameworkExtension;
+use Symfony\Bundle\TwigBundle\DependencyInjection\TwigExtension;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 final class NowoWorkflowExtensionTest extends TestCase
@@ -39,7 +42,7 @@ final class NowoWorkflowExtensionTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->registerExtension(new NowoWorkflowExtension());
-        $container->registerExtension(new \Symfony\Bundle\TwigBundle\DependencyInjection\TwigExtension());
+        $container->registerExtension(new TwigExtension());
 
         $extension = $container->getExtension('nowo_workflow');
         self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
@@ -54,7 +57,7 @@ final class NowoWorkflowExtensionTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->registerExtension(new NowoWorkflowExtension());
-        $container->registerExtension(new \Doctrine\Bundle\DoctrineBundle\DependencyInjection\DoctrineExtension());
+        $container->registerExtension(new DoctrineExtension());
 
         $extension = $container->getExtension('nowo_workflow');
         self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
@@ -69,7 +72,7 @@ final class NowoWorkflowExtensionTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->registerExtension(new NowoWorkflowExtension());
-        $container->registerExtension(new \Symfony\Bundle\FrameworkBundle\DependencyInjection\FrameworkExtension());
+        $container->registerExtension(new FrameworkExtension());
 
         $extension = $container->getExtension('nowo_workflow');
         self::assertInstanceOf(NowoWorkflowExtension::class, $extension);

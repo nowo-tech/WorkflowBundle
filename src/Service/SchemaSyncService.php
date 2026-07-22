@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DbalException;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Tools\SchemaTool;
 use Throwable;
 
@@ -112,7 +114,7 @@ class SchemaSyncService
      *
      * @return array{executed: int, skipped: int}
      */
-    public function executeStatements(\Doctrine\DBAL\Connection $connection, array $statements): array
+    public function executeStatements(Connection $connection, array $statements): array
     {
         $executed = 0;
         $skipped  = 0;
@@ -277,7 +279,7 @@ class SchemaSyncService
     }
 
     /**
-     * @return list<\Doctrine\ORM\Mapping\ClassMetadata<object>>
+     * @return list<ClassMetadata<object>>
      */
     private function getBundleMetadata(): array
     {
@@ -285,7 +287,7 @@ class SchemaSyncService
 
         return array_values(array_filter(
             $metadata,
-            static fn (\Doctrine\ORM\Mapping\ClassMetadata $classMetadata): bool => str_starts_with(
+            static fn (ClassMetadata $classMetadata): bool => str_starts_with(
                 $classMetadata->getName(),
                 self::ENTITY_NAMESPACE_PREFIX,
             ),

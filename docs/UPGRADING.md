@@ -8,6 +8,19 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.4.3
+
+From 1.4.2:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+No database migration, configuration change, or code update is required for Symfony integrators. This release improves maintainer CI/git hygiene, PHP-CS-Fixer import rules, and the FrankenPHP demo (`FRANKENPHP_MODE`). Bundle consumers who do not run `demo/` are unaffected.
+
+If you maintain a local clone of the demo, set `FRANKENPHP_MODE=classic` (or `worker`) in `demo/symfony8/.env` and recreate containers after pulling.
+
 ## Upgrading to 1.4.2
 
 From 1.4.1:
