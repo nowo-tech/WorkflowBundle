@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "74a5b9b4535c07000b93ceeba060e0ac",
+    "content-hash": "ae2d0b8345b8fe9941db7ba3a2818cb6",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -248,16 +248,16 @@
         },
         {
             "name": "doctrine/doctrine-bundle",
-            "version": "3.3.0",
+            "version": "3.3.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/DoctrineBundle.git",
-                "reference": "88ad38467d03e30b676069493fa96663ffa0a32b"
+                "reference": "9b231f957020de52d6ac94fd72f0cbe8cf1eaad5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/DoctrineBundle/zipball/88ad38467d03e30b676069493fa96663ffa0a32b",
-                "reference": "88ad38467d03e30b676069493fa96663ffa0a32b",
+                "url": "https://api.github.com/repos/doctrine/DoctrineBundle/zipball/9b231f957020de52d6ac94fd72f0cbe8cf1eaad5",
+                "reference": "9b231f957020de52d6ac94fd72f0cbe8cf1eaad5",
                 "shasum": ""
             },
             "require": {
@@ -346,7 +346,7 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/DoctrineBundle/issues",
-                "source": "https://github.com/doctrine/DoctrineBundle/tree/3.3.0"
+                "source": "https://github.com/doctrine/DoctrineBundle/tree/3.3.1"
             },
             "funding": [
                 {
@@ -362,7 +362,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-07-22T11:49:24+00:00"
+            "time": "2026-07-23T10:37:01+00:00"
         },
         {
             "name": "doctrine/event-manager",
@@ -934,7 +934,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/workflow-bundle",
-                "reference": "8cd3d3c5626f9c48d64def840223f1dd526d6618"
+                "reference": "82feee099438342b3c3a0e8b51015fd521ee5dc6"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.13 || ^3.2.4",
@@ -953,6 +953,7 @@
             },
             "require-dev": {
                 "friendsofphp/php-cs-fixer": "^3.0",
+                "nowo-tech/phpstan-frankenphp": "^1.0",
                 "phpstan/extension-installer": "^1.4",
                 "phpstan/phpstan": "^2.0",
                 "phpstan/phpstan-phpunit": "^2.0",
@@ -961,10 +962,12 @@
                 "rector/rector": "^2.0",
                 "symfony/browser-kit": "^7.0 || ^8.0",
                 "symfony/framework-bundle": "^7.0 || ^8.0",
+                "symfony/security-core": "^7.0 || ^8.0",
                 "symfony/yaml": "^7.0 || ^8.0"
             },
             "suggest": {
-                "symfony/flex": "For automatic recipe installation"
+                "symfony/flex": "For automatic recipe installation",
+                "symfony/security-bundle": "Required for the private Workflow CRUD UI (or set security.allow_unauthenticated for local demos only)"
             },
             "type": "symfony-bundle",
             "autoload": {
@@ -5231,16 +5234,16 @@
         },
         {
             "name": "nowo-tech/twig-inspector-bundle",
-            "version": "v1.0.37",
+            "version": "v1.0.40",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/TwigInspectorBundle.git",
-                "reference": "87f257751802989a5fbe3e61da3cff3737edc928"
+                "reference": "38b44a33602670c6f4f44786dd529472be1aee3b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/TwigInspectorBundle/zipball/87f257751802989a5fbe3e61da3cff3737edc928",
-                "reference": "87f257751802989a5fbe3e61da3cff3737edc928",
+                "url": "https://api.github.com/repos/nowo-tech/TwigInspectorBundle/zipball/38b44a33602670c6f4f44786dd529472be1aee3b",
+                "reference": "38b44a33602670c6f4f44786dd529472be1aee3b",
                 "shasum": ""
             },
             "require": {
@@ -5258,6 +5261,7 @@
             },
             "require-dev": {
                 "friendsofphp/php-cs-fixer": "^3.0",
+                "nowo-tech/phpstan-frankenphp": "^1.0",
                 "phpstan/extension-installer": "^1.4",
                 "phpstan/phpstan": "^2.0",
                 "phpstan/phpstan-symfony": "^2.0",
@@ -5329,7 +5333,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-07-20T08:48:35+00:00"
+            "time": "2026-07-22T16:18:15+00:00"
         },
         {
             "name": "phar-io/manifest",
@@ -7048,6 +7052,81 @@
             "homepage": "https://symfony.com",
             "support": {
                 "source": "https://github.com/symfony/css-selector/tree/v8.1.0"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/nicolas-grekas",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2026-05-29T05:06:50+00:00"
+        },
+        {
+            "name": "symfony/debug-bundle",
+            "version": "v8.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/debug-bundle.git",
+                "reference": "2da1f202b38f646dbee032529cfd8e727cd12cd1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/debug-bundle/zipball/2da1f202b38f646dbee032529cfd8e727cd12cd1",
+                "reference": "2da1f202b38f646dbee032529cfd8e727cd12cd1",
+                "shasum": ""
+            },
+            "require": {
+                "composer-runtime-api": ">=2.1",
+                "ext-xml": "*",
+                "php": ">=8.4.1",
+                "symfony/config": "^7.4|^8.0",
+                "symfony/dependency-injection": "^7.4|^8.0",
+                "symfony/http-kernel": "^7.4|^8.0",
+                "symfony/twig-bridge": "^7.4|^8.0",
+                "symfony/var-dumper": "^7.4|^8.0"
+            },
+            "require-dev": {
+                "symfony/web-profiler-bundle": "^7.4|^8.0"
+            },
+            "type": "symfony-bundle",
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Bundle\\DebugBundle\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabien Potencier",
+                    "email": "fabien@symfony.com"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Provides a tight integration of the Symfony VarDumper component and the ServerLogCommand from MonologBridge into the Symfony full-stack framework",
+            "homepage": "https://symfony.com",
+            "support": {
+                "source": "https://github.com/symfony/debug-bundle/tree/v8.1.0"
             },
             "funding": [
                 {

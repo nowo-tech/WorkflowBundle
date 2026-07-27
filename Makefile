@@ -4,7 +4,7 @@ COMPOSE_FILE := docker-compose.yml
 COMPOSE     := docker-compose -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down build shell install assets test test-coverage cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan update validate validate-translations setup-hooks check-no-cursor-coauthor strip-cursor-coauthor-from-history demo-smoke down-dev
+.PHONY: help up down build shell install assets test test-coverage cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan update validate validate-translations setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke down-dev
 
 help:
 	@echo "Usage: make <target>"
@@ -21,6 +21,7 @@ help:
 	@echo "  cs-check cs-fix rector rector-dry phpstan qa validate-translations"
 	@echo "Release:"
 	@echo "  release-check composer-sync"
+	@echo "  check-open-prs Fail if unresolved open GitHub PRs remain (REQ-REL-003)"
 	@echo "Git hooks:"
 	@echo "  setup-hooks"
 	@echo "Cleanup:"
@@ -94,7 +95,7 @@ update: ensure-up
 validate: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer validate --strict
 
-release-check: check-no-cursor-coauthor ensure-up composer-sync cs-fix cs-check rector-dry phpstan test-coverage validate-translations release-check-demos
+release-check: check-no-cursor-coauthor check-open-prs ensure-up composer-sync cs-fix cs-check rector-dry phpstan test-coverage validate-translations release-check-demos
 
 release-check-demos:
 	@$(MAKE) -C demo release-verify
@@ -119,6 +120,10 @@ clean: ensure-up
 check-no-cursor-coauthor:
 	@chmod +x .scripts/check-no-cursor-coauthor.sh
 	@./.scripts/check-no-cursor-coauthor.sh HEAD
+
+check-open-prs:
+	@chmod +x .scripts/check-open-prs.sh
+	@bash .scripts/check-open-prs.sh
 
 setup-hooks:
 	@chmod +x .githooks/pre-commit 2>/dev/null || true

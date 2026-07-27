@@ -8,6 +8,17 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.5.1
+
+From 1.5.0:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+No database migration, configuration change, or consumer code update is required. This patch completes maintainer/demo standards: demo Makefile aliases (`make -C demo up`), open-PR gate in `release-check`, Symfony DebugBundle in the FrankenPHP demo, and HTTP smoke in `demo release-verify`.
+
 ## Upgrading to 1.5.0
 
 From 1.4.x:

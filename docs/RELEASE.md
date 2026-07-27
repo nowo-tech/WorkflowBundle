@@ -6,7 +6,7 @@
 make release-check
 ```
 
-Pipeline: Composer validate/sync → cs-fix → cs-check → rector-dry → phpstan → test-coverage → validate-translations → demo verification.
+Pipeline: open-PR check (REQ-REL-003) → Composer validate/sync → cs-fix → cs-check → rector-dry → phpstan → test-coverage → validate-translations → demo verification (HTTP smoke).
 
 ## Tag and publish
 

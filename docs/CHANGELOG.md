@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-07-27
+
+### Added
+
+- REQ-MAKE-003: demo aggregate Makefile aliases `up` / `down` / `update-bundle`
+- REQ-REL-003: `make check-open-prs` (included in `release-check`)
+- REQ-DEMO-001: Symfony DebugBundle in the FrankenPHP demo (`require-dev`)
+- Demo `release-verify` HTTP smoke (boot → HTTP 2xx/3xx → down)
+
+### Documentation
+
+- [RELEASE.md](RELEASE.md): open-PR gate and demo smoke in the pre-release pipeline
+- [UPGRADING.md](UPGRADING.md): notes for 1.5.1
+
 ## [1.5.0] - 2026-07-27
 
 ### Breaking

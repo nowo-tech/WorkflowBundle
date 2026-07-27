@@ -733,6 +733,13 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         html_to_text_converter?: scalar|Param|null, // A service implementing the "Symfony\Component\Mime\HtmlToTextConverter\HtmlToTextConverterInterface". // Default: null
  *     },
  * }
+ * @psalm-type DebugConfig = array{
+ *     max_items?: int|Param, // Max number of displayed items past the first level, -1 means no limit. // Default: 2500
+ *     min_depth?: int|Param, // Minimum tree depth to clone all the items, 1 is default. // Default: 1
+ *     max_string_length?: int|Param, // Max length of displayed strings, -1 means no limit. // Default: -1
+ *     dump_destination?: scalar|Param|null, // A stream URL where dumps should be written to. // Default: null
+ *     theme?: "dark"|"light"|Param, // Changes the color of the dump() output when rendered directly on the templating. "dark" (default) or "light". // Default: "dark"
+ * }
  * @psalm-type WebProfilerConfig = array{
  *     toolbar?: bool|array{ // Profiler toolbar configuration
  *         enabled?: bool|Param, // Default: false
@@ -932,9 +939,18 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     table_prefix?: scalar|Param|null, // Default: "workflow_"
  *     ui?: array{
  *         path?: scalar|Param|null, // Default: "/workflow"
+ *         layout_template?: scalar|Param|null, // Twig layout extended by Workflow UI pages (global nowo_workflow_layout_template). Host apps should set this to the project layout. // Default: "@NowoWorkflowBundle/layout.html.twig"
+ *         css_framework?: "bootstrap"|"bootstrap4"|"bootstrap5"|"tailwind"|"foundation"|"custom"|"tabler"|"none"|Param, // CSS stack for Workflow UI markup. bootstrap is an alias of bootstrap5. // Default: "bootstrap5"
+ *         icon_set?: "bootstrap-icons"|"tabler-icons"|"ux_icon"|"svg_inline"|"none"|Param, // Icon rendering for row actions and toolbars. // Default: "bootstrap-icons"
+ *         list_page_size?: int|Param, // Definitions shown per page on dashboard/index lists (REQ-PERF-001). Use 0 to load all (not recommended in production). // Default: 20
  *         default_locale?: scalar|Param|null, // Default: "en"
  *         locales?: list<scalar|Param|null>,
  *         required_roles?: list<scalar|Param|null>,
+ *     },
+ *     security?: array{
+ *         access_roles?: list<scalar|Param|null>,
+ *         access_checker?: scalar|Param|null, // Service id implementing WorkflowUiAccessCheckerInterface. null = RoleBasedWorkflowUiAccessChecker. // Default: null
+ *         allow_unauthenticated?: bool|Param, // DEV/DEMO ONLY. When true, UI may load without SecurityBundle. Never true in production. // Default: false
  *     },
  * }
  * @psalm-type NowoTwigInspectorConfig = array{
@@ -967,6 +983,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         services?: ServicesConfig,
  *         framework?: FrameworkConfig,
  *         twig?: TwigConfig,
+ *         debug?: DebugConfig,
  *         web_profiler?: WebProfilerConfig,
  *         doctrine?: DoctrineConfig,
  *         nowo_workflow?: NowoWorkflowConfig,
@@ -987,6 +1004,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         services?: ServicesConfig,
  *         framework?: FrameworkConfig,
  *         twig?: TwigConfig,
+ *         debug?: DebugConfig,
  *         web_profiler?: WebProfilerConfig,
  *         doctrine?: DoctrineConfig,
  *         nowo_workflow?: NowoWorkflowConfig,
