@@ -5,29 +5,34 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit;
 
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\TwigPathsPass;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\NowoWorkflowBundle;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 final class NowoWorkflowBundleTest extends TestCase
 {
-    public function testBuildRegistersTwigPathsPass(): void
+    public function testBuildRegistersCompilerPasses(): void
     {
         $container = new ContainerBuilder();
         $bundle    = new NowoWorkflowBundle();
         $bundle->build($container);
 
-        $passes = $container->getCompilerPassConfig()->getPasses();
-        $found  = false;
+        $passes    = $container->getCompilerPassConfig()->getPasses();
+        $foundTwig = false;
+        $foundSec  = false;
 
         foreach ($passes as $pass) {
             if ($pass instanceof TwigPathsPass) {
-                $found = true;
-                break;
+                $foundTwig = true;
+            }
+            if ($pass instanceof WorkflowUiSecurityPass) {
+                $foundSec = true;
             }
         }
 
-        self::assertTrue($found);
+        self::assertTrue($foundTwig);
+        self::assertTrue($foundSec);
     }
 
     public function testGetContainerExtensionReturnsSameInstance(): void

@@ -65,4 +65,30 @@ final class WorkflowDefinitionRepositoryIntegrationTest extends TestCase
     {
         self::assertCount(2, $this->repository->findEnabledCandidates(null));
     }
+
+    public function testPaginateByNameRespectsPageSize(): void
+    {
+        $page = $this->repository->paginateByName(1, 2);
+
+        self::assertSame(3, $page['total']);
+        self::assertSame(2, $page['page_size']);
+        self::assertSame(2, $page['pages']);
+        self::assertSame(1, $page['page']);
+        self::assertCount(2, $page['items']);
+        self::assertSame('Disabled doc', $page['items'][0]->getName());
+        self::assertSame('Enabled order', $page['items'][1]->getName());
+
+        $page2 = $this->repository->paginateByName(2, 2);
+        self::assertCount(1, $page2['items']);
+        self::assertSame('Invoice', $page2['items'][0]->getName());
+    }
+
+    public function testPaginateByNameWithZeroPageSizeReturnsAll(): void
+    {
+        $page = $this->repository->paginateByName(1, 0);
+
+        self::assertSame(0, $page['page_size']);
+        self::assertSame(1, $page['pages']);
+        self::assertCount(3, $page['items']);
+    }
 }

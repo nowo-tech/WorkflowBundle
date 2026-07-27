@@ -28,10 +28,10 @@ class WorkflowPlace
     private string $name;
 
     #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
-    private ?string $label = null;
+    private ?string $label;
 
     #[ORM\Column(name: 'sort_order', type: Types::INTEGER)]
-    private int $sortOrder = 0;
+    private int $sortOrder;
 
     public function __construct(string $name, ?string $label = null, int $sortOrder = 0)
     {

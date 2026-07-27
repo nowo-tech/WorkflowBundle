@@ -2,7 +2,7 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/workflow-bundle`  
-**Last audited**: 2026-07-07
+**Last audited**: 2026-07-27
 
 This file proves that **every production source artifact** under `src/` is referenced by the baseline specification. Test-only files under `tests/` and `*.test.ts` under `src/` are out of Packagist scope. Built assets under `Resources/public/` are documented as Vite/build outputs.
 
@@ -11,7 +11,8 @@ This file proves that **every production source artifact** under `src/` is refer
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
 | `DependencyInjection/Compiler/TwigPathsPass.php` | Compiler pass | FR-DI-002 |
-| `DependencyInjection/Configuration.php` | Config tree | FR-CFG-001 |
+| `DependencyInjection/Compiler/WorkflowUiSecurityPass.php` | UI security wiring | FR-SEC-007 |
+| `DependencyInjection/Configuration.php` | Config tree (`ui.*`, `security.*`) | FR-CFG-001, FR-UI-001, FR-SEC-007 |
 | `DependencyInjection/NowoWorkflowExtension.php` | DI extension | FR-CFG-002 |
 | `NowoWorkflowBundle.php` | Bundle entry | FR-BUNDLE-001 |
 
@@ -129,8 +130,11 @@ This file proves that **every production source artifact** under `src/` is refer
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
 | `Resources/views/_locale_switcher.html.twig` | Shared partial template | FR-VIEW-010 |
+| `Resources/views/_pagination.html.twig` | List pagination partial | FR-UI-001 / PERF |
+| `Resources/views/_ui_macros.html.twig` | Multi-framework UI macros | FR-UI-001 |
+| `Resources/views/base.html.twig` | Page shell + parent() stacking | FR-UI-001, FR-VIEW-001 |
 | `Resources/views/dashboard/index.html.twig` | Dashboard template | FR-VIEW-003 |
-| `Resources/views/layout.html.twig` | Layout template | FR-VIEW-001 |
+| `Resources/views/layout.html.twig` | Demo layout template | FR-VIEW-001, FR-UI-001 |
 | `Resources/views/workflow_definition/_collection_manager.js.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/_edit_nav.html.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/_flow_diagram.html.twig` | Workflow editor template | FR-VIEW-007 |
@@ -145,7 +149,7 @@ This file proves that **every production source artifact** under `src/` is refer
 
 | Category | Files | Mapped |
 | --- | ---: | ---: |
-| Bundle & DI | 4 | 4 |
+| Bundle & DI | 5 | 5 |
 | CLI | 2 | 2 |
 | Controllers | 3 | 3 |
 | Persistence | 5 | 5 |
@@ -158,7 +162,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | Exceptions | 2 | 2 |
 | Symfony config | 2 | 2 |
 | Translations | 7 | 7 |
-| Twig views | 12 | 12 |
-| **Total production sources** | **65** | **65** |
+| Twig views | 15 | 15 |
+| **Total production sources** | **69** | **69** |
 
 Audit: `find src -type f ! -path '*/assets/dist/*' ! -name '*.test.ts' | wc -l`

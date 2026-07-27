@@ -1,7 +1,10 @@
-.PHONY: help up down build install shell logs test test-coverage cache-clear reset-demo link-bundle update-bundle ensure-up restart release-check
+.PHONY: help up down build install shell logs test test-coverage cache-clear reset-demo link-bundle update-bundle ensure-up restart release-check setup verify
 
 help:
 	@echo "Symfony 8 Demo - Workflow Bundle"
+	@echo "  up down restart build ensure-up install shell"
+	@echo "  setup reset-demo link-bundle update-bundle"
+	@echo "  test test-coverage verify release-check"
 
 up:
 	@if [ ! -f .env ]; then cp .env.example .env 2>/dev/null || true; fi
@@ -49,6 +52,11 @@ test-coverage: ensure-up
 cache-clear: ensure-up
 	docker-compose exec php php bin/console cache:clear
 
+setup: ensure-up
+	@docker-compose exec -T php php bin/console nowo:workflow:sync-schema
+	@docker-compose exec -T php php bin/console doctrine:schema:update --force --no-interaction
+	@$(MAKE) reset-demo
+
 reset-demo: ensure-up
 	docker-compose exec -T php php bin/console nowo:workflow:seed-demo --fresh --no-interaction
 
@@ -61,7 +69,15 @@ update-bundle: ensure-up
 
 release-check: ensure-up link-bundle test test-coverage
 
+verify: ensure-up
+	@PORT=$$(grep "^PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
+	[ -z "$$PORT" ] && PORT=$$(grep "^PORT=" .env.example 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
+	[ -z "$$PORT" ] && PORT=8022; \
+	code=$$(curl -fsS -o /dev/null -w "%{http_code}" "http://localhost:$$PORT/" || true); \
+	if [ "$$code" != "200" ]; then echo "verify failed: HTTP $$code"; exit 1; fi; \
+	echo "verify OK (HTTP 200)"
+
 # REQ-MAKE-008: update-deps (REQ-MAKE-008)
 COMPOSE := docker-compose
 SERVICE_PHP := php
-include $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../.scripts/Makefile.demo-update-deps.mk)
+include $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../.scripts/Makefile.demo-update-deps.mk

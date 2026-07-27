@@ -15,6 +15,9 @@ final class WorkflowExtension extends AbstractExtension implements GlobalsInterf
 {
     public function __construct(
         private readonly LocaleManager $localeManager,
+        private readonly string $layoutTemplate,
+        private readonly string $cssFramework,
+        private readonly string $iconSet,
     ) {
     }
 
@@ -22,7 +25,10 @@ final class WorkflowExtension extends AbstractExtension implements GlobalsInterf
     public function getGlobals(): array
     {
         return [
-            'nowo_workflow_locales' => $this->localeManager->getEnabledLocales(),
+            'nowo_workflow_locales'         => $this->localeManager->getEnabledLocales(),
+            'nowo_workflow_layout_template' => $this->layoutTemplate,
+            'nowo_workflow_css_framework'   => $this->cssFramework,
+            'nowo_workflow_icon_set'        => $this->iconSet,
         ];
     }
 }

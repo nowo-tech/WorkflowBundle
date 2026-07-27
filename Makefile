@@ -4,19 +4,19 @@ COMPOSE_FILE := docker-compose.yml
 COMPOSE     := docker-compose -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down build shell install assets test test-coverage cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan update validate validate-translations setup-hooks check-no-cursor-coauthor strip-cursor-coauthor-from-history
+.PHONY: help up down build shell install assets test test-coverage cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan update validate validate-translations setup-hooks check-no-cursor-coauthor strip-cursor-coauthor-from-history demo-smoke down-dev
 
 help:
 	@echo "Usage: make <target>"
 	@echo ""
 	@echo "Container:"
-	@echo "  up down build shell"
+	@echo "  up down down-dev build shell"
 	@echo "Dependencies:"
-	@echo "  install"
+	@echo "  install update-deps"
 	@echo "Assets:"
 	@echo "  assets"
 	@echo "Tests:"
-	@echo "  test test-coverage"
+	@echo "  test test-coverage demo-smoke"
 	@echo "Quality:"
 	@echo "  cs-check cs-fix rector rector-dry phpstan qa validate-translations"
 	@echo "Release:"
@@ -28,7 +28,7 @@ help:
 	@echo "Composer:"
 	@echo "  update validate"
 	@echo "Demos:"
-	@echo "  release-check-demos"
+	@echo "  release-check-demos demo-smoke"
 
 build:
 	$(COMPOSE) build --no-cache
@@ -42,6 +42,9 @@ up:
 
 down:
 	$(COMPOSE) down
+
+down-dev:
+	$(COMPOSE) down --remove-orphans
 
 shell:
 	$(COMPOSE) exec $(SERVICE_PHP) sh
@@ -95,6 +98,16 @@ release-check: check-no-cursor-coauthor ensure-up composer-sync cs-fix cs-check 
 
 release-check-demos:
 	@$(MAKE) -C demo release-verify
+
+demo-smoke:
+	@$(MAKE) -C demo/symfony8 up
+	@PORT=$$(grep "^PORT=" demo/symfony8/.env 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
+	[ -z "$$PORT" ] && PORT=$$(grep "^PORT=" demo/symfony8/.env.example 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
+	[ -z "$$PORT" ] && PORT=8022; \
+	echo "Smoke GET http://localhost:$$PORT/"; \
+	code=$$(curl -fsS -o /dev/null -w "%{http_code}" "http://localhost:$$PORT/" || true); \
+	if [ "$$code" != "200" ]; then echo "demo-smoke failed: HTTP $$code"; exit 1; fi; \
+	echo "demo-smoke OK (HTTP 200)"
 
 composer-sync: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer validate --strict

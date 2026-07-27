@@ -2,6 +2,8 @@ services:
     _defaults:
         autowire: true
         autoconfigure: true
+        bind:
+            $listPageSize: '%nowo_workflow.ui.list_page_size%'
 
     Nowo\WorkflowBundle\:
         resource: '../../'
@@ -24,8 +26,15 @@ services:
 
     Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker: ~
 
+    # Default alias; WorkflowUiSecurityPass replaces this after extensions merge.
     Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface:
         alias: Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker
+
+    Nowo\WorkflowBundle\Twig\WorkflowExtension:
+        arguments:
+            $layoutTemplate: '%nowo_workflow.ui.layout_template%'
+            $cssFramework: '%nowo_workflow.ui.css_framework%'
+            $iconSet: '%nowo_workflow.ui.icon_set%'
 
     Nowo\WorkflowBundle\Doctrine\TableNamePrefixer:
         arguments:

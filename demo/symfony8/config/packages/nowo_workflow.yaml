@@ -4,3 +4,6 @@ nowo_workflow:
         path: '/workflow'
         default_locale: 'en'
         locales: ['en', 'es', 'fr', 'it']
+    security:
+        # Demo has no SecurityBundle — local only (REQ-UI-002).
+        allow_unauthenticated: true

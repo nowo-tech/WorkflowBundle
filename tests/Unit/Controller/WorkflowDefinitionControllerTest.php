@@ -21,13 +21,15 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Translation\IdentityTranslator;
 
+use function count;
+
 final class WorkflowDefinitionControllerTest extends TestCase
 {
     public function testIndexRendersDefinitionsList(): void
     {
         $controller = $this->createController(definitions: []);
 
-        $response = $controller->index();
+        $response = $controller->index(Request::create('/definitions'));
 
         self::assertSame('index', $response->getContent());
     }
@@ -280,7 +282,13 @@ final class WorkflowDefinitionControllerTest extends TestCase
         ?DatabaseWorkflowRegistry $registry = null,
     ): WorkflowDefinitionController {
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
-        $repository->method('findBy')->willReturn($definitions);
+        $repository->method('paginateByName')->willReturn([
+            'items'     => $definitions,
+            'total'     => count($definitions),
+            'page'      => 1,
+            'pages'     => 1,
+            'page_size' => 20,
+        ]);
         $repository->method('find')->willReturnCallback(
             static fn (int $id): ?WorkflowDefinition => $definitionById instanceof WorkflowDefinition && $definitionById->getId() === $id
                 ? $definitionById
@@ -303,6 +311,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
             ),
             $graphPresenter,
             new IdentityTranslator(),
+            20,
         );
         $controller->setContainer(ControllerContainerFactory::create());
 

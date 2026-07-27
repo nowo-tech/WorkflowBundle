@@ -113,7 +113,7 @@
 </div>
 
 {% for place in graph.places %}
-    <div class="modal fade" id="place-modal-{{ loop.index0 }}" tabindex="-1" aria-labelledby="place-modal-label-{{ loop.index0 }}" aria-hidden="true">
+    <div class="nowo-ui-modal modal fade" id="place-modal-{{ loop.index0 }}" tabindex="-1" aria-labelledby="place-modal-label-{{ loop.index0 }}" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
@@ -175,7 +175,7 @@
 {% endfor %}
 
 {% for transition in graph.transitions %}
-    <div class="modal fade" id="transition-modal-{{ loop.index0 }}" tabindex="-1" aria-labelledby="transition-modal-label-{{ loop.index0 }}" aria-hidden="true">
+    <div class="nowo-ui-modal modal fade" id="transition-modal-{{ loop.index0 }}" tabindex="-1" aria-labelledby="transition-modal-label-{{ loop.index0 }}" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">

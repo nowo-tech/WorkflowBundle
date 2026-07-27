@@ -53,15 +53,19 @@ See demo playgrounds: 0-param orders, 1-param documents, 2-param expenses, 3-par
 
 ## Overriding Twig templates (REQ-TWIG-001)
 
-Place files under `templates/bundles/NowoWorkflowBundle/` with the same relative path as in `src/Resources/views/`:
+Prefer configuring `ui.layout_template` + `ui.css_framework` (see [CONFIGURATION.md](CONFIGURATION.md)) so host apps integrate **without** copying every page. Full overrides remain available under `templates/bundles/NowoWorkflowBundle/` with the same relative path as in `src/Resources/views/`:
 
-```
+```text
 templates/bundles/NowoWorkflowBundle/layout.html.twig
+templates/bundles/NowoWorkflowBundle/base.html.twig
+templates/bundles/NowoWorkflowBundle/_ui_macros.html.twig
 templates/bundles/NowoWorkflowBundle/dashboard/index.html.twig
 templates/bundles/NowoWorkflowBundle/workflow_definition/index.html.twig
 ```
 
 Application overrides always win. Render using `@NowoWorkflowBundle/...` logical names.
+
+Stable blocks for host stacking: `nowo_ui_content`, `nowo_ui_styles`, `nowo_ui_scripts` (always call `{{ parent() }}` when overriding styles/scripts).
 
 ## Overriding translations (REQ-I18N-001)
 

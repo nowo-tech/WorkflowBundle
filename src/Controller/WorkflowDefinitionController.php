@@ -27,14 +27,24 @@ final class WorkflowDefinitionController extends AbstractController
         private readonly DatabaseWorkflowRegistry $registry,
         private readonly WorkflowGraphPresenter $graphPresenter,
         private readonly TranslatorInterface $translator,
+        private readonly int $listPageSize = 20,
     ) {
     }
 
     #[Route('', name: 'index', methods: ['GET'])]
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $page = $this->repository->paginateByName(
+            $request->query->getInt('page', 1),
+            $this->listPageSize,
+        );
+
         return $this->render('@NowoWorkflowBundle/workflow_definition/index.html.twig', [
-            'definitions' => $this->repository->findBy([], ['name' => 'ASC']),
+            'definitions'    => $page['items'],
+            'list_total'     => $page['total'],
+            'list_page'      => $page['page'],
+            'list_pages'     => $page['pages'],
+            'list_page_size' => $page['page_size'],
         ]);
     }
 

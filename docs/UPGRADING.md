@@ -8,6 +8,67 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.5.0
+
+From 1.4.x:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list. Summary for integrators:
+
+### Breaking — Web UI private by default (REQ-UI-002)
+
+- The CRUD UI is **no longer open by default**. Without `symfony/security-bundle`, container compilation **fails** unless you set `nowo_workflow.security.allow_unauthenticated: true` (local demos/tests only) or provide `security.access_checker`.
+- With SecurityBundle, `RoleBasedWorkflowUiAccessChecker` is wired automatically using `security.access_roles` (default `ROLE_ADMIN`).
+- `ui.required_roles` remains as a **BC alias** of `security.access_roles`.
+- Empty `access_roles` / `required_roles` now means **no** bundle-level role check (previously denied everyone).
+- Protect `ui.path` (default `/workflow`) with Symfony `access_control` in the host app.
+
+**Minimal production config:**
+
+```yaml
+nowo_workflow:
+    ui:
+        path: '/workflow'
+        layout_template: 'base.html.twig'
+        css_framework: bootstrap5
+    security:
+        access_roles: [ROLE_ADMIN]
+        allow_unauthenticated: false
+```
+
+```yaml
+# config/packages/security.yaml
+security:
+    access_control:
+        - { path: ^/workflow, roles: ROLE_ADMIN }
+```
+
+### Web UI look-and-feel (REQ-UI-001)
+
+New keys under `ui`:
+
+| Key | Default |
+| --- | ------- |
+| `layout_template` | `@NowoWorkflowBundle/layout.html.twig` |
+| `css_framework` | `bootstrap5` |
+| `icon_set` | `bootstrap-icons` |
+| `list_page_size` | `20` |
+
+Pages now extend `@NowoWorkflowBundle/base.html.twig` and stack assets with `{{ parent() }}`. Set `layout_template` to your project layout. Dashboard and definition index lists are paginated (`?page=`); set `list_page_size: 0` only for small demos. See [CONFIGURATION.md](CONFIGURATION.md).
+
+### Twig blocks
+
+Stable blocks: `nowo_ui_content`, `nowo_ui_styles`, `nowo_ui_scripts`, `nowo_ui_page_header`, `nowo_ui_modals`, `nowo_ui_flashes`. Renaming these later is a breaking change.
+
+### Recipe / demo
+
+- Flex recipe YAML documents the new defaults.
+- The Symfony 8 demo intentionally sets `security.allow_unauthenticated: true` (no SecurityBundle). Do **not** copy that into production.
+
 ## Upgrading to 1.4.3
 
 From 1.4.2:

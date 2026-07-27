@@ -1,0 +1,18 @@
+{# Bundle page shell: extends configured host/demo layout and stacks assets with parent(). #}
+{% extends nowo_workflow_layout_template %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {% block nowo_ui_styles %}{% endblock %}
+{% endblock %}
+
+{% block body %}
+    {% block nowo_ui_page_header %}{% endblock %}
+    {% block nowo_ui_content %}{% endblock %}
+    {% block nowo_ui_modals %}{% endblock %}
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {% block nowo_ui_scripts %}{% endblock %}
+{% endblock %}

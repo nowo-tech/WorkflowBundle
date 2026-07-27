@@ -1,15 +1,15 @@
-{% extends '@NowoWorkflowBundle/layout.html.twig' %}
+{% extends '@NowoWorkflowBundle/base.html.twig' %}
 
 {% block title %}{{ title|trans({}, 'NowoWorkflowBundle') }}{% endblock %}
 
-{% block stylesheets %}
+{% block nowo_ui_styles %}
     {% if section.value == 'transitions' %}
         <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
     {% endif %}
 {% endblock %}
 
-{% block body %}
-    <div class="mb-4">
+{% block nowo_ui_content %}
+    <div class="nowo-ui-page-header mb-4">
         <h1 class="h2 mb-1">{{ title|trans({}, 'NowoWorkflowBundle') }}</h1>
         {% if definition is defined %}
             <p class="text-muted mb-0"><code>{{ definition.slug }}</code> · {{ definition.name }}</p>
@@ -62,16 +62,16 @@
             </div>
         {% endif %}
 
-        <div class="d-flex flex-wrap gap-2">
-            <button type="submit" class="btn btn-primary">{{ 'action.save'|trans({}, 'NowoWorkflowBundle') }}</button>
+        <div class="nowo-ui-toolbar d-flex flex-wrap gap-2">
+            <button type="submit" class="nowo-ui-btn nowo-ui-btn--primary btn btn-primary">{{ 'action.save'|trans({}, 'NowoWorkflowBundle') }}</button>
             {% if definition is defined %}
-                <a class="btn btn-outline-secondary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.cancel'|trans({}, 'NowoWorkflowBundle') }}</a>
+                <a class="nowo-ui-btn nowo-ui-btn--outline btn btn-outline-secondary" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.cancel'|trans({}, 'NowoWorkflowBundle') }}</a>
             {% endif %}
         </div>
     {{ form_end(form) }}
 {% endblock %}
 
-{% block javascripts %}
+{% block nowo_ui_scripts %}
     {% if section.value in ['match_rules', 'places', 'transitions'] %}
         {% if section.value == 'transitions' %}
             <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>

@@ -36,6 +36,11 @@ final class NowoWorkflowExtensionTest extends TestCase
         self::assertSame('/wf', $container->getParameter('nowo_workflow.ui.path'));
         self::assertSame('fr', $container->getParameter('nowo_workflow.ui.default_locale'));
         self::assertSame(['fr', 'en'], $container->getParameter('nowo_workflow.ui.locales'));
+        self::assertSame('@NowoWorkflowBundle/layout.html.twig', $container->getParameter('nowo_workflow.ui.layout_template'));
+        self::assertSame('bootstrap5', $container->getParameter('nowo_workflow.ui.css_framework'));
+        self::assertSame('bootstrap-icons', $container->getParameter('nowo_workflow.ui.icon_set'));
+        self::assertSame(['ROLE_ADMIN'], $container->getParameter('nowo_workflow.security.access_roles'));
+        self::assertFalse($container->getParameter('nowo_workflow.security.allow_unauthenticated'));
     }
 
     public function testPrependTwigFormThemesWhenTwigExtensionPresent(): void
@@ -51,6 +56,23 @@ final class NowoWorkflowExtensionTest extends TestCase
         $twigConfigs = $container->getExtensionConfig('twig');
         self::assertNotEmpty($twigConfigs);
         self::assertContains('bootstrap_5_layout.html.twig', $twigConfigs[0]['form_themes'] ?? []);
+    }
+
+    public function testPrependBootstrap4FormThemeWhenConfigured(): void
+    {
+        $container = new ContainerBuilder();
+        $container->registerExtension(new NowoWorkflowExtension());
+        $container->registerExtension(new TwigExtension());
+        $container->prependExtensionConfig('nowo_workflow', [
+            'ui' => ['css_framework' => 'bootstrap4'],
+        ]);
+
+        $extension = $container->getExtension('nowo_workflow');
+        self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
+        $extension->prepend($container);
+
+        $twigConfigs = $container->getExtensionConfig('twig');
+        self::assertContains('bootstrap_4_layout.html.twig', $twigConfigs[0]['form_themes'] ?? []);
     }
 
     public function testPrependDoctrineMappingsWhenDoctrineExtensionPresent(): void

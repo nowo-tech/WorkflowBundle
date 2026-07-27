@@ -28,15 +28,15 @@ class WorkflowTransition
     private string $name;
 
     #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
-    private ?string $label = null;
+    private ?string $label;
 
     /** @var list<string> */
     #[ORM\Column(name: 'from_places', type: Types::JSON)]
-    private array $fromPlaces = [];
+    private array $fromPlaces;
 
     /** @var list<string> */
     #[ORM\Column(name: 'to_places', type: Types::JSON)]
-    private array $toPlaces = [];
+    private array $toPlaces;
 
     /**
      * @param list<string> $fromPlaces

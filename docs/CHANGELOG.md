@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-27
+
+### Breaking
+
+- **Web UI private by default (REQ-UI-002):** the CRUD UI is no longer open by default. Without `symfony/security-bundle`, container compilation **fails** unless you set `nowo_workflow.security.allow_unauthenticated: true` (local demos/tests only) or provide `security.access_checker`. With SecurityBundle, `RoleBasedWorkflowUiAccessChecker` is auto-wired from `security.access_roles` (default `ROLE_ADMIN`).
+- Empty `security.access_roles` / `ui.required_roles` now means **no** bundle-level role check (previously denied all access).
+
+### Added
+
+- `ui.layout_template`, `ui.css_framework`, `ui.icon_set` (REQ-UI-001) with Twig globals and multi-framework `_ui_macros.html.twig`
+- `ui.list_page_size` (default `20`) pagination for dashboard and definition index (`?page=`); list queries eager-load associations (REQ-PERF-001)
+- Root `security` config: `access_roles`, `access_checker`, `allow_unauthenticated`
+- `WorkflowUiSecurityPass` compile-time SecurityBundle guard
+- `@NowoWorkflowBundle/base.html.twig` page shell with `{{ parent() }}` asset stacking and stable `nowo_ui_*` blocks
+- Semantic `nowo-ui-*` CSS hooks on admin markup
+- FrankenPHP PHPStan rules (`nowo-tech/phpstan-frankenphp`) and README worker-mode banner (REQ-CS-005 / REQ-DOCS-017)
+- `.scrutinizer.yml` (REQ-CI-002)
+- `make demo-smoke`, `make down-dev`; demo `setup` / `verify` targets
+
+### Changed
+
+- Pages extend configurable layout via `base.html.twig` instead of hard-coding the demo layout alone
+- Flex recipe documents security defaults; Symfony 8 demo sets `allow_unauthenticated: true`
+- README: Documentation link order (REQ-DOCS-002); Symfony badge `7.4 | 8.0 | 8.1+`
+- PHPUnit / CI: `SYMFONY_DEPRECATIONS_HELPER=max[direct]=0` (REQ-SF-005)
+- Spec Kit baseline + code inventory updated for UI/security/pagination
+
+### Documentation
+
+- [CONFIGURATION.md](CONFIGURATION.md), [SECURITY.md](SECURITY.md), [USAGE.md](USAGE.md), [UPGRADING.md](UPGRADING.md), [DEMO-FRANKENPHP.md](DEMO-FRANKENPHP.md)
+
 ## [1.4.3] - 2026-07-22
 
 ### Changed

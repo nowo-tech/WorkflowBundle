@@ -2,3 +2,11 @@ nowo_workflow:
     enabled: true
     ui:
         path: '/workflow'
+        layout_template: '@NowoWorkflowBundle/layout.html.twig'
+        css_framework: bootstrap5
+        icon_set: bootstrap-icons
+        default_locale: 'en'
+        locales: ['en', 'es', 'fr', 'it']
+    security:
+        access_roles: [ROLE_ADMIN]
+        # allow_unauthenticated: false   # default; never true in production

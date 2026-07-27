@@ -158,3 +158,9 @@ flash:
 error:
   not_found_id: 'Workflow-Definition #%id% nicht gefunden.'
   not_found_slug: 'Workflow-Definition "%slug%" nicht gefunden.'
+
+pagination:
+  label: Paginierung
+  prev: Zurück
+  next: Weiter
+  page: 'Seite %page% von %pages%'

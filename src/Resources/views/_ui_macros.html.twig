@@ -1,0 +1,86 @@
+{# Multi-framework UI macros (REQ-UI-001). Always emit nowo-ui-* semantic classes. #}
+{% macro btn_classes(variant) %}
+{%- set fw = nowo_workflow_css_framework -%}
+{%- set base = 'nowo-ui-btn nowo-ui-btn--' ~ variant -%}
+{%- if fw in ['bootstrap5', 'bootstrap4'] -%}
+{{- base ~ ' btn btn-' ~ (variant == 'primary' ? 'primary' : (variant == 'danger' ? 'danger' : (variant == 'outline' ? 'outline-secondary' : 'secondary'))) -}}
+{%- elseif fw == 'tailwind' -%}
+{{- base ~ ' inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium ' ~ (variant == 'primary' ? 'bg-blue-600 text-white hover:bg-blue-500' : (variant == 'danger' ? 'bg-red-600 text-white hover:bg-red-500' : 'border border-slate-300 text-slate-700 hover:bg-slate-50')) -}}
+{%- elseif fw == 'foundation' -%}
+{{- base ~ ' button ' ~ (variant == 'primary' ? 'primary' : (variant == 'danger' ? 'alert' : 'secondary')) -}}
+{%- else -%}
+{{- base -}}
+{%- endif -%}
+{% endmacro %}
+
+{% macro btn_link(href, label, variant) %}
+    {% import _self as ui %}
+    <a href="{{ href }}" class="{{ ui.btn_classes(variant|default('primary')) }}">{{ label }}</a>
+{% endmacro %}
+
+{% macro page_header(title, actions) %}
+    <div class="nowo-ui-page-header {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}d-flex justify-content-between align-items-center mb-4{% elseif nowo_workflow_css_framework == 'tailwind' %}mb-6 flex items-center justify-between{% elseif nowo_workflow_css_framework == 'foundation' %}grid-x grid-margin-x align-middle mb-3{% else %}{% endif %}">
+        <h1 class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}h2 mb-0{% elseif nowo_workflow_css_framework == 'tailwind' %}text-2xl font-semibold{% else %}{% endif %}">{{ title }}</h1>
+        {% if actions is defined and actions %}
+            <div class="nowo-ui-toolbar">{{ actions|raw }}</div>
+        {% endif %}
+    </div>
+{% endmacro %}
+
+{% macro table_wrap_start() %}
+    <div class="nowo-ui-table-wrap {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}card shadow-sm{% elseif nowo_workflow_css_framework == 'tailwind' %}overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm{% elseif nowo_workflow_css_framework == 'foundation' %}callout{% endif %}">
+        <div class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}table-responsive{% elseif nowo_workflow_css_framework == 'tailwind' %}overflow-x-auto{% endif %}">
+{% endmacro %}
+
+{% macro table_wrap_end() %}
+        </div>
+    </div>
+{% endmacro %}
+
+{% macro table_classes() %}
+{%- set fw = nowo_workflow_css_framework -%}
+{%- if fw in ['bootstrap5', 'bootstrap4'] -%}
+nowo-ui-table table table-hover align-middle mb-0
+{%- elseif fw == 'tailwind' -%}
+nowo-ui-table min-w-full divide-y divide-slate-200 text-sm
+{%- elseif fw == 'foundation' -%}
+nowo-ui-table stack
+{%- else -%}
+nowo-ui-table
+{%- endif -%}
+{% endmacro %}
+
+{% macro icon(name) %}
+    {% set set = nowo_workflow_icon_set %}
+    {% if set == 'none' %}
+    {% elseif set == 'bootstrap-icons' %}
+        <i class="bi bi-{{ name }}" aria-hidden="true"></i>
+    {% elseif set == 'tabler-icons' %}
+        <i class="ti ti-{{ name }}" aria-hidden="true"></i>
+    {% elseif set == 'svg_inline' %}
+        <span class="nowo-ui-icon nowo-ui-icon--{{ name }}" aria-hidden="true"></span>
+    {% endif %}
+{% endmacro %}
+
+{% macro action_link(href, label, kind) %}
+    {% import _self as ui %}
+    {% set kind = kind|default('view') %}
+    <a href="{{ href }}" class="nowo-ui-action nowo-ui-action--{{ kind }} {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}btn btn-sm btn-outline-{{ kind == 'edit' ? 'secondary' : 'primary' }}{% elseif nowo_workflow_css_framework == 'tailwind' %}inline-flex items-center rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50{% elseif nowo_workflow_css_framework == 'foundation' %}button tiny secondary{% endif %}" title="{{ label }}" aria-label="{{ label }}">
+        {% if nowo_workflow_icon_set != 'none' %}
+            {{ ui.icon(kind == 'edit' ? 'pencil' : (kind == 'delete' ? 'trash' : 'eye')) }}
+            <span class="visually-hidden">{{ label }}</span>
+        {% else %}
+            {{ label }}
+        {% endif %}
+    </a>
+{% endmacro %}
+
+{% macro row_actions() %}
+    <div class="nowo-ui-row-actions {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}btn-group btn-group-sm{% elseif nowo_workflow_css_framework == 'tailwind' %}flex gap-1{% endif %}">
+        {{ caller() }}
+    </div>
+{% endmacro %}
+
+{% macro empty_state(message) %}
+    <div class="nowo-ui-empty {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}text-muted text-center py-4{% elseif nowo_workflow_css_framework == 'tailwind' %}px-4 py-8 text-center text-slate-500{% endif %}">{{ message }}</div>
+{% endmacro %}

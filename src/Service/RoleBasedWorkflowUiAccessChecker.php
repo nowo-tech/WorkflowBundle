@@ -24,8 +24,9 @@ final readonly class RoleBasedWorkflowUiAccessChecker implements WorkflowUiAcces
 
     public function isGranted(Request $request): bool
     {
+        // Empty access_roles = no bundle-level role check (firewall / custom checker only).
         if ($this->requiredRoles === []) {
-            return false;
+            return true;
         }
 
         foreach ($this->requiredRoles as $role) {

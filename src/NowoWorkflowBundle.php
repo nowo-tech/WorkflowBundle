@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle;
 
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\TwigPathsPass;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
@@ -19,6 +20,7 @@ class NowoWorkflowBundle extends Bundle
     {
         parent::build($container);
         $container->addCompilerPass(new TwigPathsPass());
+        $container->addCompilerPass(new WorkflowUiSecurityPass());
     }
 
     public function getContainerExtension(): ?ExtensionInterface

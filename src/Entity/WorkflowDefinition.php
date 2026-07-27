@@ -33,7 +33,7 @@ class WorkflowDefinition
     private string $slug;
 
     #[ORM\Column(type: Types::STRING, length: 32, enumType: WorkflowType::class)]
-    private WorkflowType $type = WorkflowType::StateMachine;
+    private WorkflowType $type;
 
     #[ORM\Column(name: 'initial_place', type: Types::STRING, length: 128)]
     private string $initialPlace;

@@ -1,0 +1,23 @@
+{% if list_page_size is defined and list_page_size > 0 and list_pages is defined and list_pages > 1 %}
+    <nav class="nowo-ui-pagination {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}mt-3{% elseif nowo_workflow_css_framework == 'tailwind' %}mt-4{% endif %}" aria-label="{{ 'pagination.label'|trans({}, 'NowoWorkflowBundle') }}">
+        <ul class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}pagination pagination-sm mb-0{% elseif nowo_workflow_css_framework == 'tailwind' %}flex gap-2 text-sm{% elseif nowo_workflow_css_framework == 'foundation' %}pagination{% else %}nowo-ui-pagination-list{% endif %}">
+            <li class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}page-item{{ list_page <= 1 ? ' disabled' : '' }}{% endif %}">
+                {% if list_page > 1 %}
+                    <a class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}page-link{% elseif nowo_workflow_css_framework == 'tailwind' %}rounded border border-slate-300 px-2 py-1{% endif %}" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({page: list_page - 1})) }}">{{ 'pagination.prev'|trans({}, 'NowoWorkflowBundle') }}</a>
+                {% else %}
+                    <span class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}page-link{% elseif nowo_workflow_css_framework == 'tailwind' %}rounded border border-slate-200 px-2 py-1 text-slate-400{% endif %}">{{ 'pagination.prev'|trans({}, 'NowoWorkflowBundle') }}</span>
+                {% endif %}
+            </li>
+            <li class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}page-item disabled{% endif %}">
+                <span class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}page-link{% elseif nowo_workflow_css_framework == 'tailwind' %}px-2 py-1 text-slate-600{% endif %}">{{ 'pagination.page'|trans({'%page%': list_page, '%pages%': list_pages}, 'NowoWorkflowBundle') }}</span>
+            </li>
+            <li class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}page-item{{ list_page >= list_pages ? ' disabled' : '' }}{% endif %}">
+                {% if list_page < list_pages %}
+                    <a class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}page-link{% elseif nowo_workflow_css_framework == 'tailwind' %}rounded border border-slate-300 px-2 py-1{% endif %}" href="{{ path(app.request.attributes.get('_route'), app.request.query.all|merge({page: list_page + 1})) }}">{{ 'pagination.next'|trans({}, 'NowoWorkflowBundle') }}</a>
+                {% else %}
+                    <span class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}page-link{% elseif nowo_workflow_css_framework == 'tailwind' %}rounded border border-slate-200 px-2 py-1 text-slate-400{% endif %}">{{ 'pagination.next'|trans({}, 'NowoWorkflowBundle') }}</span>
+                {% endif %}
+            </li>
+        </ul>
+    </nav>
+{% endif %}

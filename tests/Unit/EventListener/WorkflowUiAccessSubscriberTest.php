@@ -11,6 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\KernelEvents;
 
 final class WorkflowUiAccessSubscriberTest extends TestCase
 {
@@ -96,5 +97,13 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
         (new WorkflowUiAccessSubscriber($checker))->onKernelController($event);
 
         self::addToAssertionCount(1);
+    }
+
+    public function testSubscribedEvents(): void
+    {
+        self::assertSame(
+            [KernelEvents::CONTROLLER => ['onKernelController', 0]],
+            WorkflowUiAccessSubscriber::getSubscribedEvents(),
+        );
     }
 }

@@ -33,6 +33,16 @@ The demo uses:
 
 **Port:** default `8022` (`PORT` in `demo/symfony8/.env.example`).
 
+### Demo smoke (REQ-TEST-011)
+
+From the bundle root, after dependencies are available:
+
+```bash
+make demo-smoke
+```
+
+This starts `demo/symfony8`, waits for boot, and expects **HTTP 200** on `http://localhost:<PORT>/` (default `8022`).
+
 Start from the bundle root:
 
 ```bash

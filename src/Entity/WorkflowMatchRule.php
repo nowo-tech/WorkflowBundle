@@ -37,7 +37,7 @@ class WorkflowMatchRule
     private array $metadata = [];
 
     #[ORM\Column(name: 'sort_order', type: Types::INTEGER)]
-    private int $sortOrder = 0;
+    private int $sortOrder;
 
     public function __construct(string $parameterKey, string $parameterValue, int $sortOrder = 0)
     {

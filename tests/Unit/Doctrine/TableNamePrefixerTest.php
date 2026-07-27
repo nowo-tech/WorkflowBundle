@@ -48,6 +48,24 @@ final class TableNamePrefixerTest extends TestCase
         self::assertArrayHasKey('uniq_acme_definition_slug', $metadata->table['uniqueConstraints']);
     }
 
+    public function testApplyToClassMetadataRenamesIndexes(): void
+    {
+        $prefixer = new TableNamePrefixer('acme_');
+        /** @var ClassMetadata<object> $metadata */
+        $metadata = new ClassMetadata(WorkflowDefinition::class);
+        $metadata->setPrimaryTable([
+            'name'    => 'workflow_definition',
+            'indexes' => [
+                'idx_workflow_definition_name' => ['columns' => ['name']],
+            ],
+        ]);
+
+        $prefixer->applyToClassMetadata($metadata);
+
+        self::assertIsArray($metadata->table['indexes'] ?? null);
+        self::assertArrayHasKey('idx_acme_definition_name', $metadata->table['indexes']);
+    }
+
     public function testApplyToClassMetadataIsNoOpForDefaultPrefix(): void
     {
         $prefixer = new TableNamePrefixer(TableNamePrefixer::DEFAULT_PREFIX);
