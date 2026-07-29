@@ -79,4 +79,5 @@ release-check: release-verify
 # REQ-MAKE-008: update-deps-all (REQ-MAKE-008)
 DEMO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 BUNDLE_ROOT := $(abspath $(DEMO_ROOT)/..)
-include $(abspath $(BUNDLE_ROOT)/../.scripts/Makefile.demo-aggregate-update-deps.mk)
+# Optional: monorepo helper absent on standalone GitHub Actions checkout (REQ-MAKE-009).
+-include $(abspath $(BUNDLE_ROOT)/../.scripts/Makefile.demo-aggregate-update-deps.mk)

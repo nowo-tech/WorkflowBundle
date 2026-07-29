@@ -11,7 +11,6 @@ use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Workflow\Definition;
 
 final class WorkflowDefinitionBuilderTest extends TestCase
 {
@@ -24,7 +23,6 @@ final class WorkflowDefinitionBuilderTest extends TestCase
 
         $definition = (new WorkflowDefinitionBuilder())->build($entity);
 
-        self::assertInstanceOf(Definition::class, $definition);
         self::assertSame(['draft', 'done'], array_values($definition->getPlaces()));
         self::assertCount(1, $definition->getTransitions());
         self::assertSame('finish', $definition->getTransitions()[0]->getName());

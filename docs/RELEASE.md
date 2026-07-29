@@ -21,3 +21,14 @@ Pipeline: open-PR check (REQ-REL-003) → Composer validate/sync → cs-fix → 
 - Smoke-test in a clean Symfony app: `composer require nowo-tech/workflow-bundle`
 
 After creating the release commit and tag, run `make check-no-cursor-coauthor` again **before** `git push` (REQ-GIT-001). The release commit itself is not covered by an earlier `release-check` run.
+
+### Example for v1.5.2
+
+```bash
+git add -A
+git -c core.hooksPath=.githooks commit -m "Release v1.5.2: coverage-check, PHPStan ignoreErrors, SchemaSync DBAL 4."
+make check-no-cursor-coauthor
+git tag -a v1.5.2 -m "Release v1.5.2"
+git push origin main
+git push origin v1.5.2
+```

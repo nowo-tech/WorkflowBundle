@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-07-29
+
+### Added
+
+- `make coverage-check` (100% clover gate) and `scripts/check-coverage.php` (REQ-TEST-006).
+- `docs/SECURITY.md` 12.4.1 row for REQ-SEC-004 Pass (conditional).
+
+### Changed
+
+- `release-check` no longer runs `cs-fix`; uses `coverage-check`.
+- PHPStan: `ignoreErrors: []` (REQ-CS-006); Form paths excluded for generics noise.
+- Packagist homepage + keywords (`php`, `frankenphp`, `symfony-bundle`).
+- Root `docker-compose.yml` fixed IPAM subnet (Docker address-pool exhaustion on dense hosts).
+- `SchemaSyncService::listExistingSequenceNames` maps Doctrine `Sequence` objects only (DBAL 4).
+
 ## [1.5.1] - 2026-07-27
 
 ### Added

@@ -8,6 +8,17 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.5.2
+
+From 1.5.1:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+No database migration, configuration change, or consumer code update is required. This patch tightens maintainer QA (`coverage-check`), PHPStan (`ignoreErrors: []`), Packagist metadata, Docker IPAM, and DBAL 4 sequence listing in `SchemaSyncService`.
+
 ## Upgrading to 1.5.1
 
 From 1.5.0:

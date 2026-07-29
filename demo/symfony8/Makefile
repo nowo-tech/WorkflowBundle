@@ -8,64 +8,64 @@ help:
 
 up:
 	@if [ ! -f .env ]; then cp .env.example .env 2>/dev/null || true; fi
-	docker-compose build
-	docker-compose up -d
+	$(COMPOSE) build
+	$(COMPOSE) up -d
 	@echo "Waiting for database..."
 	@sleep 8
 	@echo "Installing dependencies..."
-	@docker-compose exec -T -e COMPOSER_MEMORY_LIMIT=-1 php composer update --no-interaction
+	@$(COMPOSE) exec -T -e COMPOSER_MEMORY_LIMIT=-1 php composer update --no-interaction
 	@$(MAKE) link-bundle
-	@docker-compose exec -T php php bin/console nowo:workflow:sync-schema
-	@docker-compose exec -T php php bin/console doctrine:schema:update --force --no-interaction
+	@$(COMPOSE) exec -T php php bin/console nowo:workflow:sync-schema
+	@$(COMPOSE) exec -T php php bin/console doctrine:schema:update --force --no-interaction
 	@$(MAKE) reset-demo
 	@PORT=$$(grep "^PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
 	[ -z "$$PORT" ] && PORT=$$(grep "^PORT=" .env.example 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
 	echo "Demo started at: http://localhost:$$PORT"
 
 down:
-	docker-compose down
+	$(COMPOSE) down
 
 restart: ensure-up
-	docker-compose restart
+	$(COMPOSE) restart
 
 build:
-	docker-compose build --no-cache
+	$(COMPOSE) build --no-cache
 
 ensure-up:
-	@if ! docker-compose exec -T php true 2>/dev/null; then docker-compose up -d; sleep 3; fi
+	@if ! $(COMPOSE) exec -T php true 2>/dev/null; then $(COMPOSE) up -d; sleep 3; fi
 
 install: ensure-up
-	docker-compose exec -T -e COMPOSER_MEMORY_LIMIT=-1 php composer install --no-interaction
+	$(COMPOSE) exec -T -e COMPOSER_MEMORY_LIMIT=-1 php composer install --no-interaction
 
 shell: ensure-up
-	docker-compose exec php sh
+	$(COMPOSE) exec php sh
 
 logs:
-	docker-compose logs -f
+	$(COMPOSE) logs -f
 
 test: ensure-up
-	docker-compose exec -e APP_ENV=test php composer test
+	$(COMPOSE) exec -e APP_ENV=test php composer test
 
 test-coverage: ensure-up
-	docker-compose exec php composer test-coverage
+	$(COMPOSE) exec php composer test-coverage
 
 cache-clear: ensure-up
-	docker-compose exec php php bin/console cache:clear
+	$(COMPOSE) exec php php bin/console cache:clear
 
 setup: ensure-up
-	@docker-compose exec -T php php bin/console nowo:workflow:sync-schema
-	@docker-compose exec -T php php bin/console doctrine:schema:update --force --no-interaction
+	@$(COMPOSE) exec -T php php bin/console nowo:workflow:sync-schema
+	@$(COMPOSE) exec -T php php bin/console doctrine:schema:update --force --no-interaction
 	@$(MAKE) reset-demo
 
 reset-demo: ensure-up
-	docker-compose exec -T php php bin/console nowo:workflow:seed-demo --fresh --no-interaction
+	$(COMPOSE) exec -T php php bin/console nowo:workflow:seed-demo --fresh --no-interaction
 
 link-bundle: ensure-up
-	docker-compose exec php sh -c "rm -rf vendor/nowo-tech/workflow-bundle && ln -s /var/workflow-bundle vendor/nowo-tech/workflow-bundle && php bin/console cache:clear"
+	$(COMPOSE) exec php sh -c "rm -rf vendor/nowo-tech/workflow-bundle && ln -s /var/workflow-bundle vendor/nowo-tech/workflow-bundle && php bin/console cache:clear"
 
 update-bundle: ensure-up
-	docker-compose exec php composer update nowo-tech/workflow-bundle -W --no-interaction
-	docker-compose exec php sh -c "php bin/console cache:clear --env=dev"
+	$(COMPOSE) exec php composer update nowo-tech/workflow-bundle -W --no-interaction
+	$(COMPOSE) exec php sh -c "php bin/console cache:clear --env=dev"
 
 release-check: ensure-up link-bundle test test-coverage
 
@@ -78,6 +78,8 @@ verify: ensure-up
 	echo "verify OK (HTTP 200)"
 
 # REQ-MAKE-008: update-deps (REQ-MAKE-008)
-COMPOSE := docker-compose
+# Prefer Compose V2 plugin (GitHub Actions / modern Docker Desktop); fall back to docker-compose V1 (REQ-MAKE-010).
+COMPOSE := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
 SERVICE_PHP := php
-include $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../.scripts/Makefile.demo-update-deps.mk)
+# Optional: monorepo helper absent on standalone GitHub Actions checkout (REQ-MAKE-009).
+-include $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../../.scripts/Makefile.demo-update-deps.mk)

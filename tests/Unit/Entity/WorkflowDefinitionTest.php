@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\Entity;
 
-use DateTimeImmutable;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowMatchRule;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
@@ -76,7 +75,8 @@ final class WorkflowDefinitionTest extends TestCase
         self::assertSame('Renamed', $definition->getName());
         self::assertFalse($definition->isEnabled());
         self::assertSame(['k' => 'v'], $definition->getMetadata());
-        self::assertInstanceOf(DateTimeImmutable::class, $definition->getUpdatedAt());
+        $definition->setName('Renamed again');
+        self::assertSame('Renamed again', $definition->getName());
     }
 
     public function testGettersSettersAndDuplicateAdds(): void
@@ -94,7 +94,7 @@ final class WorkflowDefinitionTest extends TestCase
         self::assertSame('status', $definition->getMarkingProperty());
         self::assertNull($definition->getDescription());
         self::assertSame(0, $definition->getPriority());
-        self::assertInstanceOf(DateTimeImmutable::class, $definition->getCreatedAt());
+        self::assertSame('status', $definition->getMarkingProperty());
 
         $definition
             ->setSlug('renamed')
@@ -117,5 +117,7 @@ final class WorkflowDefinitionTest extends TestCase
         self::assertCount(1, $definition->getMatchRules());
         self::assertCount(1, $definition->getPlaces());
         self::assertCount(1, $definition->getTransitions());
+        self::assertEqualsWithDelta(time(), $definition->getCreatedAt()->getTimestamp(), 5);
+        self::assertEqualsWithDelta(time(), $definition->getUpdatedAt()->getTimestamp(), 5);
     }
 }

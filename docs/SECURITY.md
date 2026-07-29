@@ -45,6 +45,7 @@ Before tagging a release, confirm:
 | **Dependencies** | `composer audit` clean or documented. |
 | **Permissions / exposure** | `access_roles` + firewall `access_control` for `ui.path`; never ship demos with `allow_unauthenticated: true` on a public host. |
 | **CLI access** | Restrict who can run schema sync / seed commands in production. |
+| **AI security audit (REQ-SEC-004)** | Pass (conditional) recorded in monorepo `BUNDLES_SECURITY_ANALYSIS.md`. |
 
 Record confirmation in the release PR or tag notes.
 

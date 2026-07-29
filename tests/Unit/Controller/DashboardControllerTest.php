@@ -11,7 +11,6 @@ use Nowo\WorkflowBundle\Tests\Support\ControllerContainerFactory;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 final class DashboardControllerTest extends TestCase
 {
@@ -36,7 +35,6 @@ final class DashboardControllerTest extends TestCase
 
         $response = $controller->index(Request::create('/'));
 
-        self::assertInstanceOf(Response::class, $response);
         self::assertSame('dashboard', $response->getContent());
     }
 }

@@ -25,3 +25,6 @@ volumes:
 networks:
   workflow-bundle-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.250.81.0/24

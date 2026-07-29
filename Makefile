@@ -1,10 +1,12 @@
 # Makefile for Workflow Bundle
 
 COMPOSE_FILE := docker-compose.yml
-COMPOSE     := docker-compose -f $(COMPOSE_FILE)
+# Prefer Compose V2 plugin (GitHub Actions / modern Docker Desktop); fall back to docker-compose V1 (REQ-MAKE-010).
+COMPOSE_BIN := $(shell docker compose version >/dev/null 2>&1 && echo "docker compose" || echo "docker-compose")
+COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down build shell install assets test test-coverage cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan update validate validate-translations setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke down-dev
+.PHONY: help up down build shell install assets test test-coverage coverage-check cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan update validate validate-translations setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke down-dev
 
 help:
 	@echo "Usage: make <target>"
@@ -16,7 +18,7 @@ help:
 	@echo "Assets:"
 	@echo "  assets"
 	@echo "Tests:"
-	@echo "  test test-coverage demo-smoke"
+	@echo "  test test-coverage coverage-check demo-smoke"
 	@echo "Quality:"
 	@echo "  cs-check cs-fix rector rector-dry phpstan qa validate-translations"
 	@echo "Release:"
@@ -68,6 +70,9 @@ test-coverage: ensure-up
 	$(COMPOSE) exec $(SERVICE_PHP) composer test-coverage | tee coverage-php.txt
 	./.scripts/php-coverage-percent.sh coverage-php.txt
 
+coverage-check: test-coverage
+	$(COMPOSE) exec -T $(SERVICE_PHP) php scripts/check-coverage.php coverage.xml --min-percent=100
+
 cs-check: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer cs-check
 
@@ -95,7 +100,7 @@ update: ensure-up
 validate: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer validate --strict
 
-release-check: check-no-cursor-coauthor check-open-prs ensure-up composer-sync cs-fix cs-check rector-dry phpstan test-coverage validate-translations release-check-demos
+release-check: check-no-cursor-coauthor check-open-prs ensure-up composer-sync cs-check rector-dry phpstan coverage-check validate-translations release-check-demos
 
 release-check-demos:
 	@$(MAKE) -C demo release-verify
@@ -136,7 +141,8 @@ assets:
 
 # REQ-MAKE-008: update-deps (REQ-MAKE-008)
 BUNDLE_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-include $(BUNDLE_ROOT)/../.scripts/Makefile.update-deps.mk
+# Optional: monorepo helper absent on standalone GitHub Actions checkout (REQ-MAKE-009).
+-include $(BUNDLE_ROOT)/../.scripts/Makefile.update-deps.mk
 
 strip-cursor-coauthor-from-history:
 	@chmod +x .scripts/strip-cursor-coauthor-from-history.sh

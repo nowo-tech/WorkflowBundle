@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\Index;
+use Doctrine\DBAL\Schema\Sequence;
 use Doctrine\ORM\EntityManagerInterface;
 use Nowo\WorkflowBundle\Service\SchemaSyncService;
 use Nowo\WorkflowBundle\Tests\Support\SchemaSyncServiceWithoutSequenceListing;
@@ -98,7 +99,7 @@ final class SchemaSyncServiceTest extends TestCase
             ->getMockForAbstractClass();
         $schemaManager->method('listTableNames')->willReturn([]);
         $schemaManager->method('listTableIndexes')->willReturn([]);
-        $schemaManager->method('listSequences')->willReturn(['workflow_definition_id_seq']);
+        $schemaManager->method('listSequences')->willReturn([new Sequence('workflow_definition_id_seq')]);
 
         $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);
@@ -201,7 +202,7 @@ final class SchemaSyncServiceTest extends TestCase
             ->getMockForAbstractClass();
         $schemaManager->method('listTableNames')->willReturn([]);
         $schemaManager->method('listTableIndexes')->willReturn([]);
-        $schemaManager->method('listSequences')->willReturn(['workflow_definition_id_seq']);
+        $schemaManager->method('listSequences')->willReturn([new Sequence('workflow_definition_id_seq')]);
 
         $connection = $this->createMock(Connection::class);
         $connection->method('createSchemaManager')->willReturn($schemaManager);

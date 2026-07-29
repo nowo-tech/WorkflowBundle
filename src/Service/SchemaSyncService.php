@@ -6,6 +6,7 @@ namespace Nowo\WorkflowBundle\Service;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DbalException;
+use Doctrine\DBAL\Schema\Sequence;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -234,9 +235,12 @@ class SchemaSyncService
         }
 
         try {
+            /** @var list<Sequence> $sequences */
+            $sequences = $schemaManager->listSequences();
+
             return array_map(
-                static fn (string $name): string => strtolower($name),
-                $schemaManager->listSequences(),
+                static fn (Sequence $sequence): string => strtolower($sequence->getName()),
+                $sequences,
             );
         } catch (Throwable) {
             return [];
