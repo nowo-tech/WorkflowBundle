@@ -35,19 +35,23 @@
         }
     ],
     "require": {
-        "php": ">=8.2 <8.6",
         "doctrine/doctrine-bundle": "^2.13 || ^3.2.4",
         "doctrine/orm": "^2.13 || ^3.0",
+        "nowo-tech/form-kit-bundle": "^2.0",
+        "nowo-tech/ui-kit-bundle": "^1.4 || ^1.5",
+        "php": ">=8.2 <8.6",
         "symfony/config": "^7.0 || ^8.0",
         "symfony/dependency-injection": "^7.0 || ^8.0",
         "symfony/form": "^7.0 || ^8.0",
         "symfony/http-kernel": "^7.0 || ^8.0",
         "symfony/routing": "^7.0 || ^8.0",
         "symfony/security-csrf": "^7.0 || ^8.0",
-        "symfony/twig-bundle": "^7.0 || ^8.0",
         "symfony/translation": "^7.0 || ^8.0",
+        "symfony/twig-bundle": "^7.0 || ^8.0",
         "symfony/validator": "^7.0 || ^8.0",
-        "symfony/workflow": "^7.0 || ^8.0"
+        "symfony/workflow": "^7.0 || ^8.0",
+        "twig/extra-bundle": "^3.12",
+        "twig/string-extra": "^3.12"
     },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "^3.0",
@@ -61,7 +65,8 @@
         "symfony/browser-kit": "^7.0 || ^8.0",
         "symfony/framework-bundle": "^7.0 || ^8.0",
         "symfony/security-core": "^7.0 || ^8.0",
-        "symfony/yaml": "^7.0 || ^8.0"
+        "symfony/yaml": "^7.0 || ^8.0",
+        "vincentlanglet/twig-cs-fixer": "^3.0"
     },
     "autoload": {
         "psr-4": {
@@ -107,7 +112,10 @@
         "test-coverage-100": [
             "@test-coverage",
             "@coverage-check"
-        ]
+        ],
+        "twig:lint": "twig-cs-fixer lint --config=.twig-cs-fixer.php",
+        "twig:fix": "twig-cs-fixer fix --config=.twig-cs-fixer.php",
+        "twig:fix:check": "twig-cs-fixer lint --config=.twig-cs-fixer.php --fix"
     },
     "scripts-descriptions": {
         "test": "Run PHPUnit tests",

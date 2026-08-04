@@ -10,8 +10,10 @@ use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 
+use function array_key_exists;
 use function dirname;
 use function in_array;
+use function is_array;
 
 /**
  * Loads bundle services and exposes configuration as container parameters.
@@ -20,6 +22,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
 {
     public function prepend(ContainerBuilder $container): void
     {
+        $this->prependFormKitDefaults($container);
         if ($container->hasExtension('doctrine')) {
             $container->prependExtensionConfig('doctrine', [
                 'orm' => [
@@ -53,6 +56,117 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
                     ],
                 ],
             ]);
+        }
+
+        $this->prependUiKitDefaults($container);
+    }
+
+    /**
+     * Seed nowo_ui_kit from ui.css_framework / icon_set when host has not set UiKit (REQ-UI-001-kit).
+     */
+
+    /**
+     * When FormKit is installed, register the workflow profile. Forms select it via #[FormKitConfig].
+     */
+    private function prependFormKitDefaults(ContainerBuilder $container): void
+    {
+        if (!$container->hasExtension('nowo_form_kit')) {
+            return;
+        }
+
+        $hostHasCssFramework = false;
+        $hostHasProfile      = false;
+        foreach ($container->getExtensionConfig('nowo_form_kit') as $cfg) {
+            /** @var array<string, mixed> $cfg */
+            if (array_key_exists('css_framework', $cfg)) {
+                $hostHasCssFramework = true;
+            }
+            $profiles = $cfg['profiles'] ?? null;
+            if (is_array($profiles) && array_key_exists('workflow', $profiles)) {
+                $hostHasProfile = true;
+            }
+        }
+
+        $seed = [];
+
+        if (!$hostHasCssFramework) {
+            $seed['css_framework'] = 'bootstrap';
+        }
+
+        if (!$hostHasProfile) {
+            $seed['profiles'] = [
+                'workflow' => [
+                    'alias'              => 'workflow',
+                    'translation_domain' => 'NowoWorkflowBundle',
+                    'defaults'           => [
+                        'attr'     => ['class' => 'nowo-ui-input form-control'],
+                        'row_attr' => ['class' => 'mb-2'],
+                    ],
+                    'field_types' => [
+                        'checkbox' => [
+                            'attr'     => ['class' => 'form-check-input'],
+                            'row_attr' => ['class' => 'form-check mb-2'],
+                        ],
+                        'choice' => [
+                            'attr' => ['class' => 'form-select'],
+                        ],
+                        'entity' => [
+                            'attr' => ['class' => 'form-select'],
+                        ],
+                        'file' => [
+                            'attr' => ['class' => 'nowo-ui-input form-control'],
+                        ],
+                        'textarea' => [
+                            'attr' => ['class' => 'nowo-ui-input form-control'],
+                        ],
+                    ],
+                ],
+            ];
+        }
+
+        if ($seed !== []) {
+            $container->prependExtensionConfig('nowo_form_kit', $seed);
+        }
+    }
+
+    private function prependUiKitDefaults(ContainerBuilder $container): void
+    {
+        if (!$container->hasExtension('nowo_ui_kit')) {
+            return;
+        }
+
+        $hostHasCssFramework = false;
+        $hostHasIconSet      = false;
+        foreach ($container->getExtensionConfig('nowo_ui_kit') as $cfg) {
+            if (!is_array($cfg)) {
+                continue;
+            }
+            if (array_key_exists('css_framework', $cfg)) {
+                $hostHasCssFramework = true;
+            }
+            if (array_key_exists('icon_set', $cfg)) {
+                $hostHasIconSet = true;
+            }
+        }
+
+        if ($hostHasCssFramework && $hostHasIconSet) {
+            return;
+        }
+
+        $config   = $this->processConfiguration(new Configuration(), $container->getExtensionConfig(Configuration::ALIAS));
+        $ui       = is_array($config['ui'] ?? null) ? $config['ui'] : [];
+        $defaults = [];
+
+        if (!$hostHasCssFramework) {
+            $fw                        = (string) ($ui['css_framework'] ?? 'bootstrap5');
+            $defaults['css_framework'] = $fw === 'bootstrap' || $fw === 'tabler' ? 'bootstrap5' : $fw;
+        }
+        if (!$hostHasIconSet) {
+            $defaults['icon_set'] = (string) ($ui['icon_set'] ?? 'bootstrap-icons');
+        }
+
+        if ($defaults !== []) {
+            $container->prependExtensionConfig('nowo_ui_kit', $defaults);
         }
     }
 

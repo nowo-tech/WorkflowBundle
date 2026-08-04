@@ -4,24 +4,26 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\IntegerType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Form type for a workflow place row.
  */
+#[FormKitConfig('workflow')]
 final class WorkflowPlaceType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('name', TextType::class, ['label' => 'form.field.name'])
-            ->add('label', TextType::class, ['label' => 'form.field.label', 'required' => false])
-            ->add('sortOrder', IntegerType::class, ['label' => 'form.field.order']);
+        $this->addText($builder, 'name', ['label' => 'form.field.name']);
+        $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false]);
+        $this->addInteger($builder, 'sortOrder', ['label' => 'form.field.order']);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

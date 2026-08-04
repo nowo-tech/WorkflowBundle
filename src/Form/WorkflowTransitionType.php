@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
@@ -16,13 +17,15 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 /**
  * Form type for a workflow transition row.
  */
+#[FormKitConfig('workflow')]
 final class WorkflowTransitionType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('name', TextType::class, ['label' => 'form.field.name'])
-            ->add('label', TextType::class, ['label' => 'form.field.label', 'required' => false]);
+        $this->addText($builder, 'name', ['label' => 'form.field.name']);
+        $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false]);
 
         $builder->addEventListener(FormEvents::PRE_SET_DATA, static function (FormEvent $event) use ($options): void {
             /** @var WorkflowTransition|null $transition */

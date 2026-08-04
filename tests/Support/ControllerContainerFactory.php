@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Support;
 
+use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormType;
+use Nowo\WorkflowBundle\Form\WorkflowMatchRuleType;
+use Nowo\WorkflowBundle\Form\WorkflowPlaceType;
+use Nowo\WorkflowBundle\Form\WorkflowTransitionType;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\Form\Extension\HttpFoundation\HttpFoundationExtension;
 use Symfony\Component\Form\Extension\Validator\ValidatorExtension;
@@ -38,6 +42,10 @@ final class ControllerContainerFactory
         $formFactory = Forms::createFormFactoryBuilder()
             ->addExtension(new HttpFoundationExtension())
             ->addExtension(new ValidatorExtension(Validation::createValidator()))
+            ->addType(FormKitTestSupport::withMerger(new WorkflowDefinitionFormType()))
+            ->addType(FormKitTestSupport::withMerger(new WorkflowPlaceType()))
+            ->addType(FormKitTestSupport::withMerger(new WorkflowTransitionType()))
+            ->addType(FormKitTestSupport::withMerger(new WorkflowMatchRuleType()))
             ->getFormFactory();
 
         $session = new Session(new MockArraySessionStorage());

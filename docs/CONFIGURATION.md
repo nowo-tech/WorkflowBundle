@@ -107,12 +107,10 @@ layout_template: 'admin/nowo_workflow_bridge.html.twig'
 | -------------------------------------------------- | ---- |
 | `layout.html.twig` | Demo full-page layout (CDN Bootstrap) |
 | `base.html.twig` | Page shell (`parent()` asset stacking) |
-| `_ui_macros.html.twig` | Multi-framework macros |
-| `dashboard/index.html.twig` | Dashboard |
+| `dashboard/index.html.twig` | Dashboard (composes `@NowoUiKitBundle/macros/ui.html.twig`) |
 | `workflow_definition/index.html.twig` | Definition list |
 | `workflow_definition/form.html.twig` | Create/edit form |
 | `workflow_definition/show.html.twig` | Definition detail |
-| `workflow_definition/_row_actions` via macros | Edit / view actions |
 
 Semantic CSS hooks: `nowo-ui-page-header`, `nowo-ui-toolbar`, `nowo-ui-table`, `nowo-ui-row-actions`, `nowo-ui-btn`, `nowo-ui-action--*`, `nowo-ui-modal`, `nowo-ui-flash`, `nowo-ui-empty`.
 

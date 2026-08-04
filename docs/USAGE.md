@@ -58,11 +58,11 @@ Prefer configuring `ui.layout_template` + `ui.css_framework` (see [CONFIGURATION
 ```text
 templates/bundles/NowoWorkflowBundle/layout.html.twig
 templates/bundles/NowoWorkflowBundle/base.html.twig
-templates/bundles/NowoWorkflowBundle/_ui_macros.html.twig
 templates/bundles/NowoWorkflowBundle/dashboard/index.html.twig
 templates/bundles/NowoWorkflowBundle/workflow_definition/index.html.twig
 ```
 
+UI class helpers come from **UiKitBundle** (`{% import '@NowoUiKitBundle/macros/ui.html.twig' as ui %}`). Prefer remapping `--nowo-ui-*` tokens or overriding kit Twig under `templates/bundles/NowoUiKitBundle/` rather than forking page templates.
 Application overrides always win. Render using `@NowoWorkflowBundle/...` logical names.
 
 Stable blocks for host stacking: `nowo_ui_content`, `nowo_ui_styles`, `nowo_ui_scripts` (always call `{{ parent() }}` when overriding styles/scripts).

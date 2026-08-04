@@ -10,12 +10,29 @@ use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormType;
+use Nowo\WorkflowBundle\Form\WorkflowMatchRuleType;
+use Nowo\WorkflowBundle\Form\WorkflowPlaceType;
+use Nowo\WorkflowBundle\Form\WorkflowTransitionType;
+use Nowo\WorkflowBundle\Tests\Support\FormKitTestSupport;
 use Symfony\Component\Form\Extension\Validator\ValidatorExtension;
 use Symfony\Component\Form\Test\TypeTestCase;
 use Symfony\Component\Validator\Validation;
 
 final class WorkflowDefinitionFormTypeTest extends TypeTestCase
 {
+    /**
+     * @return list<object>
+     */
+    protected function getTypes(): array
+    {
+        return [
+            FormKitTestSupport::withMerger(new WorkflowDefinitionFormType()),
+            FormKitTestSupport::withMerger(new WorkflowPlaceType()),
+            FormKitTestSupport::withMerger(new WorkflowMatchRuleType()),
+            FormKitTestSupport::withMerger(new WorkflowTransitionType()),
+        ];
+    }
+
     protected function getExtensions(): array
     {
         return [

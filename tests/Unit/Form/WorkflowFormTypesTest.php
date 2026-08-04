@@ -10,12 +10,25 @@ use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Form\WorkflowMatchRuleType;
 use Nowo\WorkflowBundle\Form\WorkflowPlaceType;
 use Nowo\WorkflowBundle\Form\WorkflowTransitionType;
+use Nowo\WorkflowBundle\Tests\Support\FormKitTestSupport;
 use ReflectionMethod;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Test\TypeTestCase;
 
 final class WorkflowFormTypesTest extends TypeTestCase
 {
+    /**
+     * @return list<object>
+     */
+    protected function getTypes(): array
+    {
+        return [
+            FormKitTestSupport::withMerger(new WorkflowPlaceType()),
+            FormKitTestSupport::withMerger(new WorkflowMatchRuleType()),
+            FormKitTestSupport::withMerger(new WorkflowTransitionType()),
+        ];
+    }
+
     public function testWorkflowPlaceTypeSubmit(): void
     {
         $place = new WorkflowPlace('initial');

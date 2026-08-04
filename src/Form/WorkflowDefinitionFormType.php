@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Form;
 
+use Nowo\FormKitBundle\Attribute\FormKitConfig;
+use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Symfony\Component\Form\AbstractType;
-use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
-use Symfony\Component\Form\Extension\Core\Type\IntegerType;
-use Symfony\Component\Form\Extension\Core\Type\TextareaType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
@@ -24,8 +22,11 @@ use function is_array;
 /**
  * CRUD form for persisted workflow definitions (full or single-section).
  */
+#[FormKitConfig('workflow')]
 final class WorkflowDefinitionFormType extends AbstractType
 {
+    use FormOptionsTrait;
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $section = $options['section'];
@@ -49,25 +50,24 @@ final class WorkflowDefinitionFormType extends AbstractType
 
     private function addGeneralFields(FormBuilderInterface $builder): void
     {
-        $builder
-            ->add('name', TextType::class, ['label' => 'form.field.name'])
-            ->add('slug', TextType::class, ['label' => 'form.field.slug'])
-            ->add('type', EnumType::class, [
-                'class'        => WorkflowType::class,
-                'label'        => 'form.field.type',
-                'choice_label' => static fn (WorkflowType $type): string => 'workflow_type.' . $type->value,
-            ])
-            ->add('initialPlace', TextType::class, ['label' => 'form.field.initial_place'])
-            ->add('subjectClass', TextType::class, ['label' => 'form.field.subject_class'])
-            ->add('markingProperty', TextType::class, ['label' => 'form.field.marking_property'])
-            ->add('enabled', CheckboxType::class, ['label' => 'form.field.enabled', 'required' => false])
-            ->add('priority', IntegerType::class, ['label' => 'form.field.priority'])
-            ->add('description', TextareaType::class, ['label' => 'form.field.description', 'required' => false]);
+        $this->addText($builder, 'name', ['label' => 'form.field.name']);
+        $this->addText($builder, 'slug', ['label' => 'form.field.slug']);
+        $this->addWithDefaults($builder, 'type', EnumType::class, [
+            'class'        => WorkflowType::class,
+            'label'        => 'form.field.type',
+            'choice_label' => static fn (WorkflowType $type): string => 'workflow_type.' . $type->value,
+        ]);
+        $this->addText($builder, 'initialPlace', ['label' => 'form.field.initial_place']);
+        $this->addText($builder, 'subjectClass', ['label' => 'form.field.subject_class']);
+        $this->addText($builder, 'markingProperty', ['label' => 'form.field.marking_property']);
+        $this->addCheckbox($builder, 'enabled', ['label' => 'form.field.enabled', 'required' => false]);
+        $this->addInteger($builder, 'priority', ['label' => 'form.field.priority']);
+        $this->addTextarea($builder, 'description', ['label' => 'form.field.description', 'required' => false]);
     }
 
     private function addMatchRulesFields(FormBuilderInterface $builder): void
     {
-        $builder->add('matchRules', CollectionType::class, [
+        $this->addWithDefaults($builder, 'matchRules', CollectionType::class, [
             'entry_type'     => WorkflowMatchRuleType::class,
             'allow_add'      => true,
             'allow_delete'   => true,
@@ -80,7 +80,7 @@ final class WorkflowDefinitionFormType extends AbstractType
 
     private function addPlacesFields(FormBuilderInterface $builder): void
     {
-        $builder->add('places', CollectionType::class, [
+        $this->addWithDefaults($builder, 'places', CollectionType::class, [
             'entry_type'     => WorkflowPlaceType::class,
             'allow_add'      => true,
             'allow_delete'   => true,
