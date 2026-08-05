@@ -1,0 +1,7 @@
+Workflow Bundle installed.
+
+Next steps (security):
+  1. Keep nowo_workflow.security.access_roles (default ROLE_ADMIN); never set allow_unauthenticated: true in production.
+  2. Protect the UI path with Symfony security.access_control (e.g. ^/workflow → ROLE_ADMIN).
+  3. See docs/SECURITY.md and the commented snippet in config/packages/nowo_workflow.yaml.
+

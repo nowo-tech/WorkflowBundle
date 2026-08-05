@@ -40,8 +40,10 @@ See [demo/README.md](../demo/README.md) for the FrankenPHP playground.
 When using Symfony Flex, the recipe at `.symfony/recipe/nowo-tech/workflow-bundle/0.1/` copies:
 
 - `config/packages/nowo_workflow.yaml` — default bundle configuration
+- `config/services/nowo_workflow_security.yaml` — optional access-checker wiring notes
+- `post-install.txt` — reminds you to set `access_roles` and host `security.access_control` for `^/workflow`
 
-After install, run `nowo:workflow:sync-schema` and import routes as shown above.
+After install, run `nowo:workflow:sync-schema` and import routes as shown above. Never enable `security.allow_unauthenticated` in production; see [SECURITY.md](SECURITY.md).
 
 ## Twig Extra Bundle (REQ-TWIG-004)
 
