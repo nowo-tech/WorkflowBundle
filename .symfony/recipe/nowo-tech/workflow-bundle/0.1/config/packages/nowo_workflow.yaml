@@ -10,3 +10,8 @@ nowo_workflow:
     security:
         access_roles: [ROLE_ADMIN]
         # allow_unauthenticated: false   # default; never true in production
+
+# Host security.yaml example (do not paste under nowo_workflow — add to security.access_control):
+# security:
+#     access_control:
+#         - { path: ^/workflow, roles: ROLE_ADMIN }
