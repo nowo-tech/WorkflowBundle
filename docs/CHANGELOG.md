@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-08-07
+
+### Fixed
+
+- **CI / Composer:** regenerate `composer.lock` content-hash after the v1.6.0 `composer.json` changes (FormKit, UiKit, Twig Extra, Twig-CS-Fixer). `composer validate --strict` on the default branch is green again (REQ-CI-003).
+
+### Tests
+
+- Cover `prependFormKitDefaults` / `prependUiKitDefaults` (seed, host override, non-array UiKit config bags) so line coverage stays at 100%.
+
+[1.6.1]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.6.1
+
 ## [1.6.0] - 2026-08-04
 
 ### Changed

@@ -8,6 +8,26 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.6.1
+
+From 1.6.0 — maintainer/CI fix only (`composer.lock` content-hash + prepend coverage). No host migration.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+## Upgrading to 1.6.0
+
+From 1.5.2 — FormKit admin forms, UiKit macros, Twig Extra (REQ-TWIG-004), Twig-CS-Fixer.
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+php bin/console assets:install --symlink --relative public
+```
+
+Requires `nowo-tech/form-kit-bundle` ^2.0 and `nowo-tech/ui-kit-bundle` ^1.4. Hosts that render Twig templates need `twig/extra-bundle` + `twig/string-extra` (usually via Flex).
+
 ## Upgrading to 1.5.2
 
 From 1.5.1:

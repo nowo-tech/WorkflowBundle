@@ -22,6 +22,17 @@ Pipeline: open-PR check (REQ-REL-003) → Composer validate/sync → cs-fix → 
 
 After creating the release commit and tag, run `make check-no-cursor-coauthor` again **before** `git push` (REQ-GIT-001). The release commit itself is not covered by an earlier `release-check` run.
 
+### Example for v1.6.1
+
+```bash
+git add -A
+git -c core.hooksPath=.githooks commit -m "Release v1.6.1: sync composer.lock and restore 100% coverage for CI."
+make check-no-cursor-coauthor
+git tag -a v1.6.1 -m "Release v1.6.1: sync composer.lock content-hash for CI validate."
+git push origin main
+git push origin v1.6.1
+```
+
 ### Example for v1.5.2
 
 ```bash
