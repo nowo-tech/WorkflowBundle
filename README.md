@@ -44,6 +44,7 @@ nowo_workflow:
 
 ```bash
 php bin/console nowo:workflow:sync-schema
+php bin/console nowo:workflow:seed-demo   # optional sample definitions
 ```
 
 ## Demo
