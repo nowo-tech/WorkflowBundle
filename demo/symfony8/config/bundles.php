@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Nowo\FormKitBundle\NowoFormKitBundle;
+use Nowo\HotReloadBundle\NowoHotReloadBundle;
 use Nowo\TwigInspectorBundle\NowoTwigInspectorBundle;
 use Nowo\UiKitBundle\NowoUiKitBundle;
 use Nowo\WorkflowBundle\NowoWorkflowBundle;
@@ -20,6 +21,7 @@ return [
     WebProfilerBundle::class       => ['dev' => true, 'test' => true],
     DoctrineBundle::class          => ['all' => true],
     NowoWorkflowBundle::class      => ['all' => true],
+    NowoHotReloadBundle::class     => ['dev' => true, 'test' => true],
     NowoTwigInspectorBundle::class => ['dev' => true, 'test' => true],
     NowoUiKitBundle::class         => ['all' => true],
     NowoFormKitBundle::class       => ['all' => true],

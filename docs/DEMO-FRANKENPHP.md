@@ -58,6 +58,7 @@ Open `http://localhost:8022` — CRUD UI at `/workflow`, demo playgrounds for or
 ## What the demo includes
 
 - **Symfony Web Profiler** and **Debug bundle** in `dev` / `test`.
+- **Nowo Twig Inspector** (`nowo-tech/twig-inspector-bundle`) and **Nowo Hot Reload** (`nowo-tech/hot-reload-bundle`) — required together on FrankenPHP demos (dev/test only; Caddyfile Mercure + `hot_reload`, plus `worker { watch }` in worker mode). Do not enable Hot Reload in production.
 - **Nowo Twig Inspector** in `dev` / `test`.
 - **Workflow Bundle** with Doctrine + PostgreSQL for persisted workflow definitions.
 
