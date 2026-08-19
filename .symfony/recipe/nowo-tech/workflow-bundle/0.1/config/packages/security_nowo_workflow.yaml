@@ -1,0 +1,5 @@
+# Merged into security.access_control by Symfony (REQ-SEC-004).
+# Adjust path if you changed nowo_workflow.ui.path.
+security:
+    access_control:
+        - { path: ^/workflow, roles: ROLE_ADMIN }
