@@ -98,6 +98,9 @@ jobs:
               ;;
           esac
           composer update symfony/* doctrine/doctrine-bundle --with-all-dependencies --no-interaction --prefer-dist --no-progress
+      - name: Composer audit (Critical/High)
+        run: composer audit --locked
+
 
       - name: Run tests
         env:
