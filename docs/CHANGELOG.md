@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-08-19
+
+### Security
+
+- **CI:** run `composer audit --locked` after dependency install (REQ-SEC / P3).
+
+[1.6.3]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.6.3
+
 ## [1.6.2] - 2026-08-18
 
 ### Changed

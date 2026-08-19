@@ -8,6 +8,14 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.6.3
+
+No application upgrade steps.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
 ## Upgrading to 1.6.2
 
 No application upgrade steps. **Demos only:** Hot Reload Bundle `^1.4` (FrankenPHP Mercure/`hot_reload`, `dev`/`test`). Continue requiring `nowo-tech/workflow-bundle` as before.
