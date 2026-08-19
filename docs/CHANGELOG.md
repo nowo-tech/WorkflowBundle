@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-08-19
+
+### Security
+
+- **Flex recipe:** `security.access_control` for workflow routes (REQ-SEC-004).
+
 ## [1.6.3] - 2026-08-19
 
 ### Security
