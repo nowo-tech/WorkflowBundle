@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-08-19
+
+### Security
+
+- **Flex recipe:** ship `security_nowo_workflow.yaml` access rules (REQ-SEC-004). Prefer **`^1.6.5`** over `v1.6.4`.
+
 ## [1.6.4] - 2026-08-19
 
 ### Security

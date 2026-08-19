@@ -8,6 +8,14 @@
 4. Run `php bin/console nowo:workflow:sync-schema`
 5. Clear cache: `php bin/console cache:clear`
 
+## Upgrading to 1.6.5
+
+Review Flex recipe `security_nowo_workflow.yaml` after update.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
 ## Upgrading to 1.6.4
 
 Review Flex recipe `security_nowo_workflow.yaml` access rules after install/update.
