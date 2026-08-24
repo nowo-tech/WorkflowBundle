@@ -29,9 +29,9 @@ final class PlaceChoiceHelperTest extends TestCase
     {
         $names = PlaceChoiceHelper::extractNamesFromSubmittedPlaces([ // @phpstan-ignore argument.type
             ['name' => ' draft '],
-            ['name'  => 'review'],
+            ['name' => 'review'],
             ['label' => 'ignored'],
-            ['name'  => ''],
+            ['name' => ''],
             'invalid',
         ]);
 
