@@ -1,3 +1,25 @@
+# Upgrading
+
+## Table of contents
+
+- [From 1.6.5 to 1.6.6](#from-165-to-166)
+
+## From 1.6.5 to 1.6.6
+
+No breaking changes. **No application upgrade steps.**
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+## From 1.6.5 to 1.6.6
+
+No breaking changes. **No application upgrade steps.**
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
 # Upgrade Guide
 
 ## General process
