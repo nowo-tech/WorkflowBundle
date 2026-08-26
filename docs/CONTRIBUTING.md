@@ -30,6 +30,8 @@ make release-check
 
 Or inside the container: `composer qa` runs cs-check + tests.
 
+PHPStan includes **`nowo-tech/phpstan-frankenphp`** rulesets (classic + worker) as a **require-dev** maintainer tool only (REQ-CS-005) — it is not a runtime dependency of consumer apps.
+
 ## Code standards
 
 - PHP 8.2+, `declare(strict_types=1);`

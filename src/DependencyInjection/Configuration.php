@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
+use Nowo\WorkflowBundle\Enum\CssFramework;
+use Nowo\WorkflowBundle\Enum\IconSet;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
@@ -13,25 +15,6 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
 final class Configuration implements ConfigurationInterface
 {
     public const ALIAS = 'nowo_workflow';
-
-    public const CSS_FRAMEWORKS = [
-        'bootstrap',
-        'bootstrap4',
-        'bootstrap5',
-        'tailwind',
-        'foundation',
-        'custom',
-        'tabler',
-        'none',
-    ];
-
-    public const ICON_SETS = [
-        'bootstrap-icons',
-        'tabler-icons',
-        'ux_icon',
-        'svg_inline',
-        'none',
-    ];
 
     public function getConfigTreeBuilder(): TreeBuilder
     {
@@ -69,13 +52,13 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                         ->enumNode('css_framework')
                             ->info('CSS stack for Workflow UI markup. bootstrap is an alias of bootstrap5.')
-                            ->values(self::CSS_FRAMEWORKS)
-                            ->defaultValue('bootstrap5')
+                            ->values(CssFramework::values())
+                            ->defaultValue(CssFramework::Bootstrap5->value)
                         ->end()
                         ->enumNode('icon_set')
                             ->info('Icon rendering for row actions and toolbars.')
-                            ->values(self::ICON_SETS)
-                            ->defaultValue('bootstrap-icons')
+                            ->values(IconSet::values())
+                            ->defaultValue(IconSet::BootstrapIcons->value)
                         ->end()
                         ->integerNode('list_page_size')
                             ->info('Definitions shown per page on dashboard/index lists (REQ-PERF-001). Use 0 to load all (not recommended in production).')
@@ -121,12 +104,7 @@ final class Configuration implements ConfigurationInterface
             ->end()
             ->validate()
                 ->always(static function (array $config): array {
-                    if ($config['ui']['css_framework'] === 'bootstrap') {
-                        $config['ui']['css_framework'] = 'bootstrap5';
-                    }
-                    if ($config['ui']['css_framework'] === 'tabler') {
-                        $config['ui']['css_framework'] = 'bootstrap5';
-                    }
+                    $config['ui']['css_framework'] = CssFramework::from($config['ui']['css_framework'])->normalized()->value;
 
                     // Prefer explicit security.access_roles when both differ from defaults;
                     // keep ui.required_roles as BC mirror when security uses default and ui was customized.

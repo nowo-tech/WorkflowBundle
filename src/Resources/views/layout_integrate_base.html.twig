@@ -1,0 +1,10 @@
+{# Optional one-file bridge (REQ-UI-001): set ui.layout_template to this template.
+   Host chrome keeps stylesheets/javascripts; bundle pages stack with {{ parent() }}.
+   Copy to the app if base.html.twig uses a content block other than body. #}
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    {% block nowo_ui_page_header %}{% endblock %}
+    {% block nowo_ui_content %}{% endblock %}
+    {% block nowo_ui_modals %}{% endblock %}
+{% endblock %}

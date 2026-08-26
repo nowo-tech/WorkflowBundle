@@ -1,0 +1,15 @@
+{# Framework CSS for the default bundle layout only (REQ-UI-001). Host layouts load their own stack. #}
+{% set framework = nowo_workflow_css_framework|default('bootstrap5') %}
+{% if framework in ['bootstrap', 'bootstrap5', 'tabler'] %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    {% if nowo_workflow_icon_set|default('bootstrap-icons') == 'bootstrap-icons' %}
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" crossorigin="anonymous">
+    {% endif %}
+{% elseif framework == 'bootstrap4' %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+{% elseif framework == 'tailwind' %}
+    <script src="https://cdn.tailwindcss.com"></script>
+{% elseif framework == 'foundation' %}
+    <link href="https://cdn.jsdelivr.net/npm/foundation-sites@6.8.1/dist/css/foundation.min.css" rel="stylesheet" crossorigin="anonymous">
+{% endif %}
+{# custom|none: host provides styles via project layout / nowo-ui-* mapping #}

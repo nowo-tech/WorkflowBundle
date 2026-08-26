@@ -101,11 +101,18 @@ layout_template: 'admin/nowo_workflow_bridge.html.twig'
 {% endblock %}
 ```
 
+If the host layout is already `base.html.twig` with a `body` block, you can skip a project file and set:
+
+```yaml
+layout_template: '@NowoWorkflowBundle/layout_integrate_base.html.twig'
+```
+
 ### Overridable Twig paths
 
 | Path under `templates/bundles/NowoWorkflowBundle/` | Role |
 | -------------------------------------------------- | ---- |
-| `layout.html.twig` | Demo full-page layout (CDN Bootstrap) |
+| `layout.html.twig` | Demo full-page layout (CDN via `_framework_assets.*.twig`) |
+| `layout_integrate_base.html.twig` | Optional Nowo-to-Nowo bridge: `ui.layout_template: '@NowoWorkflowBundle/layout_integrate_base.html.twig'` when the host layout is `base.html.twig` and the content block is `body` |
 | `base.html.twig` | Page shell (`parent()` asset stacking) |
 | `dashboard/index.html.twig` | Dashboard (composes `@NowoUiKitBundle/macros/ui.html.twig`) |
 | `workflow_definition/index.html.twig` | Definition list |
