@@ -2,11 +2,12 @@
 
 ## Table of contents
 
+- [From 1.6.6 to 1.6.7](#from-166-to-167)
 - [From 1.6.5 to 1.6.6](#from-165-to-166)
 
-## From 1.6.5 to 1.6.6
+## From 1.6.6 to 1.6.7
 
-No breaking changes. **No application upgrade steps.**
+No breaking changes. **No application upgrade steps.** Hosts using the default demo layout pick up extracted CDN partials automatically. Optional: `ui.layout_template: '@NowoWorkflowBundle/layout_integrate_base.html.twig'` when the project layout is `base.html.twig`.
 
 ```bash
 composer update nowo-tech/workflow-bundle

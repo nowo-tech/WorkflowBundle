@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [1.6.7] - 2026-08-26
+
+### Added
+
+- **REQ-UI-001:** `CssFramework` / `IconSet` PHP enums for config validation; CDN assets extracted to `_framework_assets.css.twig` / `_framework_assets.js.twig`; optional layout bridge `@NowoWorkflowBundle/layout_integrate_base.html.twig`.
+
+### Changed
+
+- Demo layout uses semantic `nowo-ui-*` hooks and loads framework CSS/JS via the extracted partials (Bootstrap 4 keeps its own CDN).
+- **Docs:** CONTRIBUTING notes phpstan-frankenphp as maintainer-only (REQ-CS-005).
+
+### Notes
+
+- **No API or configuration changes** for integrators unless noted above.
+
+[1.6.7]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.6.7
+
 ## [1.6.6] - 2026-08-24
 
 ### Changed
