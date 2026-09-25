@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Controller;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
+use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormType;
@@ -17,6 +19,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use Throwable;
 
 #[Route(path: '/definitions', name: 'nowo_workflow_definition_')]
 final class WorkflowDefinitionController extends AbstractController
@@ -28,6 +31,7 @@ final class WorkflowDefinitionController extends AbstractController
         private readonly WorkflowGraphPresenter $graphPresenter,
         private readonly TranslatorInterface $translator,
         private readonly int $listPageSize = 20,
+        private readonly ?ManagerRegistry $managerRegistry = null,
     ) {
     }
 
@@ -59,7 +63,7 @@ final class WorkflowDefinitionController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->entityManager->persist($definition);
-            $this->entityManager->flush();
+            $this->flush();
             $this->registry->invalidate($definition->getSlug());
 
             $this->addFlash('success', 'flash.created');
@@ -127,7 +131,7 @@ final class WorkflowDefinitionController extends AbstractController
 
         $slug = $definition->getSlug();
         $this->entityManager->remove($definition);
-        $this->entityManager->flush();
+        $this->flush();
         $this->registry->invalidate($slug);
 
         $this->addFlash('success', 'flash.deleted');
@@ -145,7 +149,7 @@ final class WorkflowDefinitionController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $this->entityManager->flush();
+            $this->flush();
             $this->registry->invalidate($previousSlug);
             $this->registry->invalidate($definition->getSlug());
 
@@ -160,6 +164,17 @@ final class WorkflowDefinitionController extends AbstractController
             'definition' => $definition,
             'section'    => $section,
         ]);
+    }
+
+    private function flush(): void
+    {
+        try {
+            $this->entityManager->flush();
+        } catch (Throwable $exception) {
+            ClosedEntityManagerResetter::resetIfClosed($this->managerRegistry, $this->entityManager);
+
+            throw $exception;
+        }
     }
 
     private function renderShow(WorkflowDefinition $definition): Response

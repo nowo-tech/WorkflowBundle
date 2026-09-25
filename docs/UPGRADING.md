@@ -2,8 +2,19 @@
 
 ## Table of contents
 
+- [From 1.6.7 to 1.6.8](#from-167-to-168)
 - [From 1.6.6 to 1.6.7](#from-166-to-167)
 - [From 1.6.5 to 1.6.6](#from-165-to-166)
+
+## From 1.6.7 to 1.6.8
+
+No breaking changes. **No application upgrade steps.** Behaviour change for long-running processes: `DatabaseWorkflowRegistry::get()` memoizes built workflows only for the current main request. Outside of an HTTP request (console commands, Messenger workers) or when the registry is instantiated manually without a `RequestStack`, each `get()` / `has()` call reloads the definition from the database. Calling `invalidate()` after editing definitions is still supported but no longer required for other workers to see the change.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+See [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md) for worker-mode guidance (scenario B: kernel not reset).
 
 ## From 1.6.6 to 1.6.7
 

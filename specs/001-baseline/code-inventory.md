@@ -2,7 +2,7 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/workflow-bundle`  
-**Last audited**: 2026-07-27
+**Last audited**: 2026-09-25
 
 This file proves that **every production source artifact** under `src/` is referenced by the baseline specification. Test-only files under `tests/` and `*.test.ts` under `src/` are out of Packagist scope. Built assets under `Resources/public/` are documented as Vite/build outputs.
 
@@ -29,7 +29,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | --- | --- | --- |
 | `Controller/DashboardController.php` | Dashboard controller | FR-DASH-001 |
 | `Controller/LocaleController.php` | Locale switch controller | FR-I18N-001 |
-| `Controller/WorkflowDefinitionController.php` | Workflow CRUD controller | FR-WF-001 |
+| `Controller/WorkflowDefinitionController.php` | Workflow CRUD controller (closed-EM recovery) | FR-WF-001, FR-WF-007 |
 
 ## Persistence
 
@@ -57,6 +57,8 @@ This file proves that **every production source artifact** under `src/` is refer
 
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
+| `Enum/CssFramework.php` | UI config enum | FR-MDL-001 / FR-UI-001 |
+| `Enum/IconSet.php` | UI config enum | FR-MDL-001 / FR-UI-001 |
 | `Enum/WorkflowType.php` | Domain enum | FR-MDL-001 |
 | `Model/WorkflowContext.php` | Domain model | FR-MDL-002 |
 
@@ -67,11 +69,11 @@ This file proves that **every production source artifact** under `src/` is refer
 | `EventListener/LocaleSubscriber.php` | Domain events | FR-EVT-001 |
 | `EventListener/WorkflowUiAccessSubscriber.php` | Domain events | FR-EVT-001 |
 | `Service/AllowAllWorkflowUiAccessChecker.php` | Allow-all UI access | FR-SEC-007 |
-| `Service/DatabaseWorkflowRegistry.php` | DB workflow registry | FR-WF-002 |
+| `Service/DatabaseWorkflowRegistry.php` | DB workflow registry (request-scoped memo + `ResetInterface`) | FR-WF-002, FR-WF-007 |
 | `Service/DemoSeedService.php` | Demo seed data | FR-CLI-002 |
 | `Service/LocaleManager.php` | UI locale manager | FR-I18N-002 |
 | `Service/RoleBasedWorkflowUiAccessChecker.php` | Role-based UI access | FR-SEC-007 |
-| `Service/WorkflowApplicator.php` | Transition applicator | FR-WF-004 |
+| `Service/WorkflowApplicator.php` | Transition applicator (closed-EM recovery) | FR-WF-004, FR-WF-007 |
 | `Service/WorkflowDefinitionBuilder.php` | Definition builder from entities | FR-WF-005 |
 | `Service/WorkflowGraphPresenter.php` | Flow diagram presenter | FR-WF-006 |
 | `Service/WorkflowResolver.php` | Workflow match resolver | FR-WF-003 |
@@ -94,9 +96,10 @@ This file proves that **every production source artifact** under `src/` is refer
 
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
+| `Doctrine/ClosedEntityManagerResetter.php` | Closed EM recovery (worker mode) | FR-DB-003, FR-WF-007 |
 | `Doctrine/TableNamePrefixer.php` | Persistence integration | FR-DB-001 |
 | `Doctrine/TablePrefixSubscriber.php` | Persistence integration | FR-DB-001 |
-| `Service/DatabaseMetadataStore.php` | DB metadata introspection | FR-DB-002 |
+| `Service/DatabaseMetadataStore.php` | DB metadata snapshot (no entity retained) | FR-DB-002, FR-WF-007 |
 | `Service/SchemaSyncService.php` | Schema sync | FR-CLI-003 |
 
 ## Exceptions
@@ -129,12 +132,14 @@ This file proves that **every production source artifact** under `src/` is refer
 
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
+| `Resources/views/_framework_assets.css.twig` | Framework CDN CSS partial | FR-UI-001 |
+| `Resources/views/_framework_assets.js.twig` | Framework CDN JS partial | FR-UI-001 |
 | `Resources/views/_locale_switcher.html.twig` | Shared partial template | FR-VIEW-010 |
 | `Resources/views/_pagination.html.twig` | List pagination partial | FR-UI-001 / PERF |
-| `Resources/views/_ui_macros.html.twig` | Multi-framework UI macros | FR-UI-001 |
 | `Resources/views/base.html.twig` | Page shell + parent() stacking | FR-UI-001, FR-VIEW-001 |
 | `Resources/views/dashboard/index.html.twig` | Dashboard template | FR-VIEW-003 |
 | `Resources/views/layout.html.twig` | Demo layout template | FR-VIEW-001, FR-UI-001 |
+| `Resources/views/layout_integrate_base.html.twig` | Optional host layout bridge | FR-UI-001 |
 | `Resources/views/workflow_definition/_collection_manager.js.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/_edit_nav.html.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/_flow_diagram.html.twig` | Workflow editor template | FR-VIEW-007 |
@@ -154,15 +159,15 @@ This file proves that **every production source artifact** under `src/` is refer
 | Controllers | 3 | 3 |
 | Persistence | 5 | 5 |
 | Forms | 7 | 7 |
-| Domain models | 2 | 2 |
+| Domain models | 4 | 4 |
 | Application services | 11 | 11 |
 | Contracts & attributes | 3 | 3 |
 | Twig PHP | 1 | 1 |
-| Persistence integration | 4 | 4 |
+| Persistence integration | 5 | 5 |
 | Exceptions | 2 | 2 |
 | Symfony config | 2 | 2 |
 | Translations | 7 | 7 |
-| Twig views | 15 | 15 |
-| **Total production sources** | **69** | **69** |
+| Twig views | 17 | 17 |
+| **Total production sources** | **74** | **74** |
 
 Audit: `find src -type f ! -path '*/assets/dist/*' ! -name '*.test.ts' | wc -l`

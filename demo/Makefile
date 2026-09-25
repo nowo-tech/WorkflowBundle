@@ -54,7 +54,8 @@ test-coverage:
 
 # REQ-TEST-011: boot demo + one successful HTTP response
 release-verify:
-	@for demo in $(DEMOS); do \
+	@set -e; \
+	for demo in $(DEMOS); do \
 		port=$$(grep '^PORT=' $$demo/.env 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
 		[ -z "$$port" ] && port=$$(grep '^PORT=' $$demo/.env.example 2>/dev/null | cut -d= -f2 | tr -d '\r'); \
 		[ -z "$$port" ] && port=8022; \

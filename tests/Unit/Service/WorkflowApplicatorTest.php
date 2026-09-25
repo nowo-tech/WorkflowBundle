@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use InvalidArgumentException;
 use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -18,6 +19,7 @@ use Nowo\WorkflowBundle\Service\WorkflowApplicator;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use stdClass;
 use Symfony\Component\Workflow\Marking;
 use Symfony\Component\Workflow\WorkflowInterface;
@@ -160,6 +162,65 @@ final class WorkflowApplicatorTest extends TestCase
         self::assertSame('', $applicator->getMarking($subject, 'order_approval'));
     }
 
+    public function testFailedFlushResetsClosedEntityManagerSoNextRequestCanFlush(): void
+    {
+        $definition = $this->orderDefinition();
+        $failure    = new RuntimeException('Unique constraint violation');
+        $open       = true;
+        $flushes    = 0;
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('isOpen')->willReturnCallback(static function () use (&$open): bool {
+            return $open;
+        });
+        $em->expects(self::exactly(2))->method('flush')->willReturnCallback(static function () use (&$open, &$flushes, $failure): void {
+            if (!$open) {
+                throw new RuntimeException('EntityManager is closed');
+            }
+
+            if (++$flushes === 1) {
+                $open = false;
+
+                throw $failure;
+            }
+        });
+
+        $managerRegistry = $this->createMock(ManagerRegistry::class);
+        $managerRegistry->method('getManagers')->willReturn(['default' => $em]);
+        $managerRegistry->expects(self::once())->method('resetManager')->with('default')->willReturnCallback(static function () use (&$open, $em): EntityManagerInterface {
+            $open = true;
+
+            return $em;
+        });
+
+        $applicator = $this->applicator($definition, $em, $managerRegistry);
+
+        try {
+            $applicator->apply(new WorkflowApplicatorTestSubject('draft'), 'order_approval', 'approve');
+            self::fail('The flush exception must be rethrown.');
+        } catch (RuntimeException $exception) {
+            self::assertSame($failure, $exception);
+        }
+
+        self::assertTrue($em->isOpen());
+
+        $secondRequestSubject = new WorkflowApplicatorTestSubject('draft');
+        $applicator->apply($secondRequestSubject, 'order_approval', 'approve');
+
+        self::assertSame('approved', $secondRequestSubject->getStatus());
+    }
+
+    public function testFailedFlushWithoutManagerRegistryRethrows(): void
+    {
+        $failure = new RuntimeException('Deadlock');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('flush')->willThrowException($failure);
+
+        $this->expectExceptionObject($failure);
+        $this->applicator($this->orderDefinition(), $em)->apply(new WorkflowApplicatorTestSubject('draft'), 'order_approval', 'approve');
+    }
+
     private function orderDefinition(): WorkflowDefinition
     {
         $definition = new WorkflowDefinition('Order', 'order_approval', 'draft', self::SUBJECT_CLASS);
@@ -173,6 +234,7 @@ final class WorkflowApplicatorTest extends TestCase
     private function applicator(
         WorkflowDefinition $definition,
         ?EntityManagerInterface $em = null,
+        ?ManagerRegistry $managerRegistry = null,
     ): WorkflowApplicator {
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('findOneBySlug')->with('order_approval')->willReturn($definition);
@@ -185,6 +247,7 @@ final class WorkflowApplicatorTest extends TestCase
             $repository,
             new WorkflowResolver($repository),
             $em,
+            $managerRegistry,
         );
     }
 }

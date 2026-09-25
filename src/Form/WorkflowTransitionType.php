@@ -16,6 +16,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Form type for a workflow transition row.
+ *
+ * @extends AbstractType<WorkflowTransition>
  */
 #[FormKitConfig('workflow')]
 final class WorkflowTransitionType extends AbstractType
@@ -49,6 +51,7 @@ final class WorkflowTransitionType extends AbstractType
     }
 
     /**
+     * @param FormInterface<WorkflowTransition|null> $form
      * @param list<string> $placeChoices
      * @param list<string> $selected
      */

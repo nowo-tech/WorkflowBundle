@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit\Controller;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
@@ -15,6 +16,7 @@ use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use Nowo\WorkflowBundle\Tests\Support\ControllerContainerFactory;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -173,6 +175,34 @@ final class WorkflowDefinitionControllerTest extends TestCase
         self::assertStringContainsString('nowo_workflow_definition_edit_match_rules', (string) $response->headers->get('Location'));
     }
 
+    public function testNewPostResetsClosedEntityManagerWhenFlushFails(): void
+    {
+        $failure = new RuntimeException('Duplicate slug');
+        $open    = true;
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('isOpen')->willReturnCallback(static function () use (&$open): bool {
+            return $open;
+        });
+        $em->method('flush')->willReturnCallback(static function () use (&$open, $failure): never {
+            $open = false;
+
+            throw $failure;
+        });
+
+        $managerRegistry = $this->createMock(ManagerRegistry::class);
+        $managerRegistry->method('getManagers')->willReturn(['default' => $em]);
+        $managerRegistry->expects(self::once())->method('resetManager')->with('default')->willReturn($em);
+
+        $controller = $this->createController(entityManager: $em, managerRegistry: $managerRegistry);
+        $request    = Request::create('/definitions/new', 'POST', [
+            'workflow_definition_form' => $this->generalFormData('new_workflow', 'New workflow'),
+        ]);
+
+        $this->expectExceptionObject($failure);
+        $controller->new($request);
+    }
+
     public function testEditMatchRulesPostUpdatesRules(): void
     {
         $definition = $this->definitionWithId(2);
@@ -280,6 +310,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
         ?WorkflowDefinition $definitionBySlug = null,
         ?EntityManagerInterface $entityManager = null,
         ?DatabaseWorkflowRegistry $registry = null,
+        ?ManagerRegistry $managerRegistry = null,
     ): WorkflowDefinitionController {
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('paginateByName')->willReturn([
@@ -312,6 +343,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
             $graphPresenter,
             new IdentityTranslator(),
             20,
+            $managerRegistry,
         );
         $controller->setContainer(ControllerContainerFactory::create());
 

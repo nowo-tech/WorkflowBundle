@@ -5,10 +5,6 @@ parameters:
         - tests
     excludePaths:
         - vendor/*
-        # Form AbstractType generics / missingType.generics noise
-        - src/Form/*
-        # Doctrine entity $id unusedType noise (ORM-assigned)
-        - src/Entity/*
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
     ignoreErrors: []

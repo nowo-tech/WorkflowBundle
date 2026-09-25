@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use InvalidArgumentException;
 use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
+use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Symfony\Component\Workflow\Transition;
+use Throwable;
 
 use function sprintf;
 
@@ -25,6 +28,7 @@ final class WorkflowApplicator
         private readonly WorkflowDefinitionRepository $definitionRepository,
         private readonly WorkflowResolver $resolver,
         private readonly EntityManagerInterface $entityManager,
+        private readonly ?ManagerRegistry $managerRegistry = null,
     ) {
     }
 
@@ -98,7 +102,14 @@ final class WorkflowApplicator
         }
 
         $workflow->apply($subject, $transitionName);
-        $this->entityManager->flush();
+
+        try {
+            $this->entityManager->flush();
+        } catch (Throwable $exception) {
+            ClosedEntityManagerResetter::resetIfClosed($this->managerRegistry, $this->entityManager);
+
+            throw $exception;
+        }
     }
 
     /** @return list<string> */

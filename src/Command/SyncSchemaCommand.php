@@ -25,7 +25,7 @@ final class SyncSchemaCommand extends Command
 {
     public function __construct(
         private readonly ManagerRegistry $registry,
-        #[Autowire('%nowo_workflow.connection%')]
+        #[Autowire(param: 'nowo_workflow.connection')]
         private readonly string $connectionName,
     ) {
         parent::__construct();

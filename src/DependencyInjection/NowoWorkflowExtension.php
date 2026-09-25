@@ -11,7 +11,6 @@ use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 
 use function array_key_exists;
-use function dirname;
 use function in_array;
 use function is_array;
 
@@ -29,7 +28,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
                     'mappings' => [
                         'NowoWorkflowBundle' => [
                             'type'      => 'attribute',
-                            'dir'       => dirname(__DIR__) . '/Entity',
+                            'dir'       => __DIR__ . '/../Entity',
                             'prefix'    => 'Nowo\\WorkflowBundle\\Entity',
                             'is_bundle' => false,
                         ],
@@ -52,7 +51,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             $container->prependExtensionConfig('framework', [
                 'translator' => [
                     'paths' => [
-                        dirname(__DIR__) . '/Resources/translations',
+                        __DIR__ . '/../Resources/translations',
                     ],
                 ],
             ]);

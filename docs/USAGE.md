@@ -51,6 +51,10 @@ By default every request to `nowo_workflow_*` routes is allowed. Implement `Work
 
 See demo playgrounds: 0-param orders, 1-param documents, 2-param expenses, 3-param purchase orders, plus `/playground/resolver`.
 
+## FrankenPHP / long-running workers
+
+`DatabaseWorkflowRegistry` memoizes built workflows only for the **current main request** (and implements `ResetInterface`). Edits in one worker are visible to every worker on the next request; outside HTTP (CLI, Messenger) nothing is memoized. Prefer keeping Symfony's `services_resetter` enabled so Doctrine's identity map is cleared between requests; the bundle never calls `EntityManager::clear()`. Details: [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md).
+
 ## Overriding Twig templates (REQ-TWIG-001)
 
 Prefer configuring `ui.layout_template` + `ui.css_framework` (see [CONFIGURATION.md](CONFIGURATION.md)) so host apps integrate **without** copying every page. Full overrides remain available under `templates/bundles/NowoWorkflowBundle/` with the same relative path as in `src/Resources/views/`:

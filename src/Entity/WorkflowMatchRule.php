@@ -20,7 +20,7 @@ class WorkflowMatchRule
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::INTEGER)]
-    private ?int $id = null;
+    protected ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: WorkflowDefinition::class, inversedBy: 'matchRules')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]

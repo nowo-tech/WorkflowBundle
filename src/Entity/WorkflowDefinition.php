@@ -24,7 +24,7 @@ class WorkflowDefinition
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::INTEGER)]
-    private ?int $id = null;
+    protected ?int $id = null;
 
     #[ORM\Column(type: Types::STRING, length: 128)]
     private string $name;

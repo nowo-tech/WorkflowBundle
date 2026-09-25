@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.8] - 2026-09-25
+
+### Fixed
+
+- **FrankenPHP worker mode (no kernel reset):** `DatabaseWorkflowRegistry` now memoizes built workflows only for the current main request (and implements `ResetInterface`), so definitions edited or disabled in one worker are seen by every worker on the next request. Outside of an HTTP request (CLI, Messenger) nothing is memoized.
+- `DatabaseMetadataStore` copies labels and workflow metadata at construction instead of keeping the `WorkflowDefinition` entity.
+- `WorkflowApplicator` and `WorkflowDefinitionController` reset a closed EntityManager (through `ManagerRegistry`) after a failed `flush()` before rethrowing, so a worker does not keep a closed manager for later requests.
+- PHPStan level 8 clean with `src/Form` and `src/Entity` included (Form `@extends` generics; entity `$id` visibility for ORM-assigned ids).
+- Demo FrankenPHP stack restored to **PostgreSQL** (`pdo_pgsql`) to match the Dockerfile and `.env.example`; `release-verify` now fails if demo `up` fails.
+
+### Documentation
+
+- [`FRANKENPHP-WORKER-AUDIT.md`](FRANKENPHP-WORKER-AUDIT.md): remediation for W-01–W-03; baseline spec **FR-WF-007** / **FR-DB-003**.
+- [UPGRADING.md](UPGRADING.md), [DEMO-FRANKENPHP.md](DEMO-FRANKENPHP.md), [USAGE.md](USAGE.md).
+
+### Notes
+
+- New optional constructor arguments (`?RequestStack` on `DatabaseWorkflowRegistry`, `?ManagerRegistry` on `WorkflowApplicator` and `WorkflowDefinitionController`) are autowired; no configuration changes.
+
+[1.6.8]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.6.8
 
 ## [1.6.7] - 2026-08-26
 

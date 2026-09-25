@@ -21,6 +21,8 @@ use function is_array;
 
 /**
  * CRUD form for persisted workflow definitions (full or single-section).
+ *
+ * @extends AbstractType<WorkflowDefinition>
  */
 #[FormKitConfig('workflow')]
 final class WorkflowDefinitionFormType extends AbstractType
@@ -48,6 +50,9 @@ final class WorkflowDefinitionFormType extends AbstractType
         }
     }
 
+    /**
+     * @param FormBuilderInterface<WorkflowDefinition|null> $builder
+     */
     private function addGeneralFields(FormBuilderInterface $builder): void
     {
         $this->addText($builder, 'name', ['label' => 'form.field.name']);
@@ -65,6 +70,9 @@ final class WorkflowDefinitionFormType extends AbstractType
         $this->addTextarea($builder, 'description', ['label' => 'form.field.description', 'required' => false]);
     }
 
+    /**
+     * @param FormBuilderInterface<WorkflowDefinition|null> $builder
+     */
     private function addMatchRulesFields(FormBuilderInterface $builder): void
     {
         $this->addWithDefaults($builder, 'matchRules', CollectionType::class, [
@@ -78,6 +86,9 @@ final class WorkflowDefinitionFormType extends AbstractType
         ]);
     }
 
+    /**
+     * @param FormBuilderInterface<WorkflowDefinition|null> $builder
+     */
     private function addPlacesFields(FormBuilderInterface $builder): void
     {
         $this->addWithDefaults($builder, 'places', CollectionType::class, [
@@ -91,6 +102,9 @@ final class WorkflowDefinitionFormType extends AbstractType
         ]);
     }
 
+    /**
+     * @param FormBuilderInterface<WorkflowDefinition|null> $builder
+     */
     private function addTransitionsFields(FormBuilderInterface $builder): void
     {
         $builder->addEventListener(FormEvents::PRE_SET_DATA, static function (FormEvent $event): void {
@@ -113,6 +127,7 @@ final class WorkflowDefinitionFormType extends AbstractType
     }
 
     /**
+     * @param FormInterface<WorkflowDefinition|null> $form
      * @param list<string> $placeNames
      */
     private static function configureTransitionsField(FormInterface $form, array $placeNames): void

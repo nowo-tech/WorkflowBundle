@@ -13,6 +13,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Form type for a workflow place row.
+ *
+ * @extends AbstractType<WorkflowPlace>
  */
 #[FormKitConfig('workflow')]
 final class WorkflowPlaceType extends AbstractType

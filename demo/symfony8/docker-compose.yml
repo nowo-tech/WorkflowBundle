@@ -24,7 +24,7 @@ services:
       APP_DEBUG: "1"
       APP_SECRET: ${APP_SECRET:-demo-secret}
       # Override .env localhost URL — use internal Docker network host `database`.
-      DATABASE_URL: mysql://app:app@database:3306/app?serverVersion=8.4&charset=utf8mb4
+      DATABASE_URL: postgresql://app:!ChangeMe!@database:5432/app?serverVersion=16&charset=utf8
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -38,21 +38,20 @@ services:
         condition: service_healthy
 
   database:
-    image: mysql:8.4
+    image: postgres:16-alpine
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-app}
-      MYSQL_USER: ${MYSQL_USER:-app}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uapp", "-papp"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 20
     volumes:
-      - database_data:/var/lib/mysql
+      - database_data:/var/lib/postgresql/data
     expose:
-      - "3306"
+      - "5432"
     networks:
       - workflow-demo-network
 

@@ -39,4 +39,23 @@ final class DatabaseMetadataStoreTest extends TestCase
         self::assertSame([], $store->getPlaceMetadata('missing'));
         self::assertSame([], $store->getTransitionMetadata(new Transition('x', [], [])));
     }
+
+    public function testMetadataIsSnapshottedAndDoesNotFollowLaterEntityChanges(): void
+    {
+        $place      = new WorkflowPlace('draft', 'Draft', 0);
+        $transition = new WorkflowTransition('approve', ['draft'], ['approved'], 'Approve');
+        $definition = new WorkflowDefinition('Order', 'order', 'draft', 'App\\Entity\\Order');
+        $definition->addPlace($place);
+        $definition->addTransition($transition);
+
+        $store = new DatabaseMetadataStore($definition);
+
+        $definition->setName('Renamed');
+        $place->setLabel('Changed');
+        $transition->setLabel('Changed');
+
+        self::assertSame('Order', $store->getMetadata('name'));
+        self::assertSame('Draft', $store->getMetadata('label', 'draft'));
+        self::assertSame('Approve', $store->getMetadata('label', new Transition('approve', ['draft'], ['approved'])));
+    }
 }

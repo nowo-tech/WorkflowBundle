@@ -22,7 +22,7 @@ This bundle is **FrankenPHP worker mode friendly**.
 - Runtime resolution via `DatabaseWorkflowRegistry` (Symfony Workflow component)
 - `WorkflowApplicator` helper to apply transitions and flush subjects
 - Demo with order approval (state machine) and document review (parallel workflow)
-- FrankenPHP worker mode: Supported (tested in the Symfony 8 demo; see [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md))
+- FrankenPHP worker mode: Supported (including kernel not reset between requests; see [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md) and [Worker audit](docs/FRANKENPHP-WORKER-AUDIT.md))
 
 ## Quick start
 
@@ -80,6 +80,7 @@ make demo-smoke
 ### Additional documentation
 
 - [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md)
+- [FrankenPHP worker audit (no kernel reset)](docs/FRANKENPHP-WORKER-AUDIT.md)
 - [GitHub Actions CI requirements](docs/GITHUB_CI.md)
 
 ## Tests and coverage

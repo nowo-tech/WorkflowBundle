@@ -10,6 +10,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Searchable multiselect for workflow place names.
+ *
+ * @extends AbstractType<list<string>>
  */
 final class PlaceMultiSelectType extends AbstractType
 {

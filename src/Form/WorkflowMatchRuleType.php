@@ -13,6 +13,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Form type for a workflow match rule row.
+ *
+ * @extends AbstractType<WorkflowMatchRule>
  */
 #[FormKitConfig('workflow')]
 final class WorkflowMatchRuleType extends AbstractType

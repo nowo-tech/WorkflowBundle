@@ -104,6 +104,8 @@ See also [IconSelectorBundle DEMO-FRANKENPHP.md](https://github.com/nowo-tech/Ic
 
 Set **`FRANKENPHP_MODE=worker`** (default), `APP_ENV=prod` and `APP_DEBUG=0`, and do not mount `php-dev.ini`. Warm up Symfony cache after deploy.
 
+The bundle is safe when the kernel is **not** rebooted between requests (scenario B: no `services_resetter`). Built workflows are memoized only for the current main request; a closed EntityManager after a failed flush is reopened before the exception is rethrown. Full review: [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md).
+
 ---
 
 ## Troubleshooting
