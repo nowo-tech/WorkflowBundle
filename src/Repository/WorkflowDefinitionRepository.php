@@ -8,6 +8,7 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use SortDirection;
 
 /**
  * @extends ServiceEntityRepository<WorkflowDefinition>
@@ -101,6 +102,6 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
             ->leftJoin('d.places', 'p')->addSelect('p')
             ->leftJoin('d.transitions', 't')->addSelect('t')
             ->leftJoin('d.matchRules', 'm')->addSelect('m')
-            ->orderBy('d.name', 'ASC');
+            ->orderBy('d.name', SortDirection::Ascending);
     }
 }

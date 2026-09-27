@@ -12,6 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use SortDirection;
 
 /**
  * Persisted Symfony Workflow definition (places, transitions, subject binding).
@@ -64,7 +65,7 @@ class WorkflowDefinition
         cascade: ['persist', 'remove'],
         orphanRemoval: true,
     )]
-    #[ORM\OrderBy(['sortOrder' => 'ASC', 'parameterKey' => 'ASC'])]
+    #[ORM\OrderBy(['sortOrder' => SortDirection::Ascending, 'parameterKey' => SortDirection::Ascending])]
     private Collection $matchRules;
 
     /** @var Collection<int, WorkflowPlace> */
@@ -74,7 +75,7 @@ class WorkflowDefinition
         cascade: ['persist', 'remove'],
         orphanRemoval: true,
     )]
-    #[ORM\OrderBy(['sortOrder' => 'ASC', 'name' => 'ASC'])]
+    #[ORM\OrderBy(['sortOrder' => SortDirection::Ascending, 'name' => SortDirection::Ascending])]
     private Collection $places;
 
     /** @var Collection<int, WorkflowTransition> */
@@ -84,7 +85,7 @@ class WorkflowDefinition
         cascade: ['persist', 'remove'],
         orphanRemoval: true,
     )]
-    #[ORM\OrderBy(['name' => 'ASC'])]
+    #[ORM\OrderBy(['name' => SortDirection::Ascending])]
     private Collection $transitions;
 
     #[ORM\Column(name: 'created_at', type: Types::DATETIME_IMMUTABLE)]
