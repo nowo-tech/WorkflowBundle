@@ -58,6 +58,7 @@ class WorkflowMatchRule
 
     public function setWorkflow(?WorkflowDefinition $workflow): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->workflow = $workflow;
 
         return $this;
@@ -70,6 +71,7 @@ class WorkflowMatchRule
 
     public function setParameterKey(string $parameterKey): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->parameterKey = $parameterKey;
 
         return $this;
@@ -82,6 +84,7 @@ class WorkflowMatchRule
 
     public function setParameterValue(string $parameterValue): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->parameterValue = $parameterValue;
 
         return $this;
@@ -94,6 +97,7 @@ class WorkflowMatchRule
 
     public function setSortOrder(int $sortOrder): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->sortOrder = $sortOrder;
 
         return $this;
@@ -108,6 +112,7 @@ class WorkflowMatchRule
     /** @param array<string, mixed> $metadata */
     public function setMetadata(array $metadata): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->metadata = $metadata;
 
         return $this;

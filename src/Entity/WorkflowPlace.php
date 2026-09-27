@@ -52,6 +52,7 @@ class WorkflowPlace
 
     public function setWorkflow(?WorkflowDefinition $workflow): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->workflow = $workflow;
 
         return $this;
@@ -64,6 +65,7 @@ class WorkflowPlace
 
     public function setName(string $name): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->name = $name;
 
         return $this;
@@ -76,6 +78,7 @@ class WorkflowPlace
 
     public function setLabel(?string $label): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->label = $label;
 
         return $this;
@@ -88,6 +91,7 @@ class WorkflowPlace
 
     public function setSortOrder(int $sortOrder): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->sortOrder = $sortOrder;
 
         return $this;

@@ -62,6 +62,7 @@ class WorkflowTransition
 
     public function setWorkflow(?WorkflowDefinition $workflow): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->workflow = $workflow;
 
         return $this;
@@ -74,6 +75,7 @@ class WorkflowTransition
 
     public function setName(string $name): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->name = $name;
 
         return $this;
@@ -86,6 +88,7 @@ class WorkflowTransition
 
     public function setLabel(?string $label): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->label = $label;
 
         return $this;
@@ -100,6 +103,7 @@ class WorkflowTransition
     /** @param list<string> $fromPlaces */
     public function setFromPlaces(array $fromPlaces): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->fromPlaces = array_values($fromPlaces);
 
         return $this;
@@ -114,6 +118,7 @@ class WorkflowTransition
     /** @param list<string> $toPlaces */
     public function setToPlaces(array $toPlaces): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->toPlaces = array_values($toPlaces);
 
         return $this;

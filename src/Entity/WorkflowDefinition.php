@@ -124,6 +124,7 @@ class WorkflowDefinition
 
     public function setName(string $name): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->name = $name;
 
         return $this->touch();
@@ -136,6 +137,7 @@ class WorkflowDefinition
 
     public function setSlug(string $slug): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->slug = $slug;
 
         return $this->touch();
@@ -148,6 +150,7 @@ class WorkflowDefinition
 
     public function setType(WorkflowType $type): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->type = $type;
 
         return $this->touch();
@@ -160,6 +163,7 @@ class WorkflowDefinition
 
     public function setInitialPlace(string $initialPlace): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->initialPlace = $initialPlace;
 
         return $this->touch();
@@ -172,6 +176,7 @@ class WorkflowDefinition
 
     public function setSubjectClass(string $subjectClass): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->subjectClass = $subjectClass;
 
         return $this->touch();
@@ -184,6 +189,7 @@ class WorkflowDefinition
 
     public function setMarkingProperty(string $markingProperty): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->markingProperty = $markingProperty;
 
         return $this->touch();
@@ -196,6 +202,7 @@ class WorkflowDefinition
 
     public function setEnabled(bool $enabled): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->enabled = $enabled;
 
         return $this->touch();
@@ -208,6 +215,7 @@ class WorkflowDefinition
 
     public function setDescription(?string $description): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->description = $description;
 
         return $this->touch();
@@ -220,6 +228,7 @@ class WorkflowDefinition
 
     public function setPriority(int $priority): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->priority = $priority;
 
         return $this->touch();
@@ -234,6 +243,7 @@ class WorkflowDefinition
     /** @param array<string, mixed> $metadata */
     public function setMetadata(array $metadata): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->metadata = $metadata;
 
         return $this->touch();
@@ -373,6 +383,7 @@ class WorkflowDefinition
 
     private function touch(): self
     {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
         $this->updatedAt = new DateTimeImmutable();
 
         return $this;

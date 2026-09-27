@@ -23,6 +23,7 @@ Demos: `make -C demo up-symfony8` (FrankenPHP + PostgreSQL).
 ```bash
 make cs-check
 make phpstan
+make igor
 make test
 make test-coverage
 make release-check

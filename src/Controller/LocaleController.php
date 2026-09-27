@@ -21,6 +21,7 @@ final class LocaleController extends AbstractController
     #[Route('/locale/{_locale}', name: 'locale_switch', requirements: ['_locale' => 'en|es|fr|it'], methods: ['GET'])]
     public function switch(string $_locale, Request $request): RedirectResponse
     {
+        // @igor-ignore - HTTP handler delegates to services; no controller worker state.
         $this->localeManager->setLocale($_locale);
 
         $referer = $request->headers->get('referer');
