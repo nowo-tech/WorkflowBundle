@@ -65,7 +65,7 @@ nowo_workflow:
 
 | Key | Default | Notes |
 | --- | ------- | ----- |
-| `security.access_roles` | `[ROLE_ADMIN]` | At least one role required. Empty = no bundle-level role check. |
+| `security.access_roles` | `[ROLE_ADMIN]` | At least one non-empty role required. Empty list is rejected at compile time unless `allow_unauthenticated` or a custom `access_checker` is set. |
 | `security.access_checker` | `null` | Custom service id implementing `WorkflowUiAccessCheckerInterface`. |
 | `security.allow_unauthenticated` | `false` | Without SecurityBundle, compilation **fails** unless this is `true` or a custom checker is set. **Never `true` in production.** |
 | `ui.required_roles` | `[ROLE_ADMIN]` | BC alias mirrored to/from `security.access_roles`. |

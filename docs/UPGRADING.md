@@ -2,9 +2,22 @@
 
 ## Table of contents
 
+- [From 1.6.9 to 1.6.10](#from-169-to-1610)
 - [From 1.6.7 to 1.6.8](#from-167-to-168)
 - [From 1.6.6 to 1.6.7](#from-166-to-167)
 - [From 1.6.5 to 1.6.6](#from-165-to-166)
+
+## From 1.6.9 to 1.6.10
+
+From **1.6.9** — UI `access_roles` fail-closed; Doctrine `SortDirection`.
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+- Empty `security.access_roles` is rejected at compile time unless `allow_unauthenticated` or a custom `access_checker` is set.
+- Ensure `doctrine/orm` is `^3.7` (SortDirection).
 
 ## From 1.6.7 to 1.6.8
 
@@ -333,6 +346,18 @@ Override under `templates/bundles/NowoWorkflowBundle/` (see [USAGE.md](USAGE.md)
 If you use admin/dashboard Symfony forms, ensure `nowo-tech/form-kit-bundle` ^2.0 is installed (pulled transitively) and `Nowo\FormKitBundle\NowoFormKitBundle` is registered. Form types use profile `workflow` via `#[FormKitConfig]`; the bundle prepends that profile when the host has not defined it.
 
 ## Unreleased
+
+## To 1.6.10
+
+From **1.6.9** — UI `access_roles` fail-closed; Doctrine `SortDirection`.
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+- Empty `security.access_roles` is rejected at compile time unless `allow_unauthenticated` or a custom `access_checker` is set.
+- Ensure `doctrine/orm` is `^3.7` (SortDirection).
 
 ## To 1.6.9
 

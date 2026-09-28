@@ -86,6 +86,19 @@ final class ConfigurationTest extends TestCase
     }
 
     #[Test]
+    public function emptyAccessRolesRejectedWhenAuthenticatedGateIsRequired(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('access_roles');
+
+        (new Processor())->processConfiguration(new Configuration(), [[
+            'security' => [
+                'access_roles' => [],
+            ],
+        ]]);
+    }
+
+    #[Test]
     public function testInvalidCssFrameworkRejected(): void
     {
         $this->expectException(InvalidConfigurationException::class);

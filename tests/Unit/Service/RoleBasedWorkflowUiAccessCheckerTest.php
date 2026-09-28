@@ -31,12 +31,12 @@ final class RoleBasedWorkflowUiAccessCheckerTest extends TestCase
         self::assertTrue($checker->isGranted(Request::create('/workflow')));
     }
 
-    public function testAllowsWhenRequiredRolesEmpty(): void
+    public function testDeniesWhenRequiredRolesEmpty(): void
     {
         $auth = $this->createMock(AuthorizationCheckerInterface::class);
 
         $checker = new RoleBasedWorkflowUiAccessChecker([], $auth);
 
-        self::assertTrue($checker->isGranted(Request::create('/workflow')));
+        self::assertFalse($checker->isGranted(Request::create('/workflow')));
     }
 }

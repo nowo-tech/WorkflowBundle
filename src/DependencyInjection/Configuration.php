@@ -9,6 +9,9 @@ use Nowo\WorkflowBundle\Enum\IconSet;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
+use function is_array;
+use function is_string;
+
 /**
  * Configuration tree for nowo_workflow.
  */
@@ -86,7 +89,7 @@ final class Configuration implements ConfigurationInterface
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->arrayNode('access_roles')
-                            ->info('User must have at least one role. Empty list = no bundle-level role check.')
+                            ->info('User must have at least one role. Empty list is rejected unless allow_unauthenticated or access_checker is set.')
                             ->scalarPrototype()->end()
                             ->defaultValue(['ROLE_ADMIN'])
                             ->example(['ROLE_ADMIN'])
@@ -99,6 +102,24 @@ final class Configuration implements ConfigurationInterface
                             ->info('DEV/DEMO ONLY. When true, UI may load without SecurityBundle. Never true in production.')
                             ->defaultFalse()
                         ->end()
+                    ->end()
+                    ->validate()
+                        ->ifTrue(static function (array $v): bool {
+                            if (!empty($v['allow_unauthenticated'])) {
+                                return false;
+                            }
+                            $checker = $v['access_checker'] ?? null;
+                            if (is_string($checker) && $checker !== '') {
+                                return false;
+                            }
+                            $roles = array_values(array_filter(
+                                is_array($v['access_roles'] ?? null) ? $v['access_roles'] : [],
+                                static fn (mixed $r): bool => is_string($r) && $r !== '',
+                            ));
+
+                            return $roles === [];
+                        })
+                        ->thenInvalid('nowo_workflow.security.access_roles must contain at least one non-empty role when allow_unauthenticated is false and no access_checker is set.')
                     ->end()
                 ->end()
             ->end()
