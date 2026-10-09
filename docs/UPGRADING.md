@@ -2,10 +2,19 @@
 
 ## Table of contents
 
+- [From 1.6.10 to 1.6.11](#from-1610-to-1611)
 - [From 1.6.9 to 1.6.10](#from-169-to-1610)
 - [From 1.6.7 to 1.6.8](#from-167-to-168)
 - [From 1.6.6 to 1.6.7](#from-166-to-167)
 - [From 1.6.5 to 1.6.6](#from-165-to-166)
+
+## From 1.6.10 to 1.6.11
+
+From **1.6.10** — dependency refresh only. No breaking changes. No application upgrade steps.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 ## From 1.6.9 to 1.6.10
 

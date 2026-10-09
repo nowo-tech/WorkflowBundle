@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.11] - 2026-10-09
+
+### Dependencies
+
+- Dependabot: `doctrine/orm` 3.7.3, `nowo-tech/form-kit-bundle` 2.5.4, `nowo-tech/ui-kit-bundle` 1.8.5, `igor-php/igor-php` `^0.10.0` (dev), phpstan group.
+- Composer refresh: `symfony/workflow` 7.4.20, `nowo-tech/form-kit-bundle` 2.6.1, `nowo-tech/ui-kit-bundle` 1.9.2, `doctrine/orm` 3.7.4 (lockfile); dev tooling `phpstan/phpstan` 2.3.1, `phpstan/phpstan-symfony` 2.1.0, `rector/rector` 2.7.0.
+- Demo: Symfony 8.1.8, `doctrine/orm` 3.7.4, `doctrine/dbal` 4.5.0, `twig/twig` 3.30.0; regenerated `config/reference.php`.
+
+[1.6.11]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.6.11
+
 ## [1.6.10] - 2026-09-28
 
 ### Security
