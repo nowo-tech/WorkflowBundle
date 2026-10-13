@@ -9,7 +9,9 @@ use Nowo\WorkflowBundle\EventListener\WorkflowUiAccessSubscriber;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 
@@ -102,8 +104,74 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
     public function testSubscribedEvents(): void
     {
         self::assertSame(
-            [KernelEvents::CONTROLLER => ['onKernelController', 0]],
+            [
+                KernelEvents::REQUEST    => ['onKernelRequest', 30],
+                KernelEvents::CONTROLLER => ['onKernelController', 0],
+            ],
             WorkflowUiAccessSubscriber::getSubscribedEvents(),
         );
+    }
+
+    public function testDisabledBundleAnswers404OnRequestForWorkflowUiRoute(): void
+    {
+        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
+        $checker->expects(self::never())->method('isGranted');
+
+        $request = Request::create('/workflow');
+        $request->attributes->set('_route', 'nowo_workflow_dashboard');
+
+        $this->expectException(NotFoundHttpException::class);
+
+        (new WorkflowUiAccessSubscriber($checker, false))->onKernelRequest(new RequestEvent(
+            $this->createMock(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+        ));
+    }
+
+    public function testDisabledBundleIgnoresHostRoutesOnRequest(): void
+    {
+        $request = Request::create('/');
+        $request->attributes->set('_route', 'app_home');
+
+        (new WorkflowUiAccessSubscriber($this->createMock(WorkflowUiAccessCheckerInterface::class), false))->onKernelRequest(new RequestEvent(
+            $this->createMock(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+        ));
+
+        self::addToAssertionCount(1);
+    }
+
+    public function testEnabledBundleDoesNothingOnRequest(): void
+    {
+        $request = Request::create('/workflow');
+        $request->attributes->set('_route', 'nowo_workflow_dashboard');
+
+        (new WorkflowUiAccessSubscriber($this->createMock(WorkflowUiAccessCheckerInterface::class)))->onKernelRequest(new RequestEvent(
+            $this->createMock(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+        ));
+
+        self::addToAssertionCount(1);
+    }
+
+    public function testDisabledBundleAnswers404OnControllerEvenForAllowAllChecker(): void
+    {
+        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
+        $checker->method('isGranted')->willReturn(true);
+
+        $request = new Request();
+        $request->attributes->set('_route', 'nowo_workflow_definition_index');
+
+        $this->expectException(NotFoundHttpException::class);
+
+        (new WorkflowUiAccessSubscriber($checker, false))->onKernelController(new ControllerEvent(
+            $this->createMock(HttpKernelInterface::class),
+            static fn (): string => 'ok',
+            $request,
+            HttpKernelInterface::SUB_REQUEST,
+        ));
     }
 }

@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection\Compiler;
 use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker;
+use Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker;
 use Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -17,14 +18,42 @@ use Symfony\Component\DependencyInjection\Definition;
 final class WorkflowUiSecurityPassTest extends TestCase
 {
     #[Test]
-    public function testSkipsWhenBundleDisabled(): void
+    public function testKeepsFailClosedDefaultWhenExtensionParametersMissing(): void
     {
         $container = new ContainerBuilder();
-        $container->setParameter('nowo_workflow.enabled', false);
 
         (new WorkflowUiSecurityPass())->process($container);
 
         self::assertFalse($container->hasAlias(WorkflowUiAccessCheckerInterface::class));
+    }
+
+    #[Test]
+    public function testDisabledBundleStillWiresRoleBasedChecker(): void
+    {
+        $container = $this->containerWithParams(allowUnauthenticated: false);
+        $container->setParameter('nowo_workflow.enabled', false);
+        $container->setDefinition('security.authorization_checker', new Definition());
+
+        (new WorkflowUiSecurityPass())->process($container);
+
+        self::assertSame(
+            RoleBasedWorkflowUiAccessChecker::class,
+            (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class),
+        );
+    }
+
+    #[Test]
+    public function testDisabledBundleWithoutSecurityFailsClosedInsteadOfThrowing(): void
+    {
+        $container = $this->containerWithParams(allowUnauthenticated: false);
+        $container->setParameter('nowo_workflow.enabled', false);
+
+        (new WorkflowUiSecurityPass())->process($container);
+
+        self::assertSame(
+            DenyAllWorkflowUiAccessChecker::class,
+            (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class),
+        );
     }
 
     #[Test]

@@ -10,7 +10,10 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Applies the stored workflow UI locale to each request.
+ * Applies the stored workflow UI locale to Workflow UI requests only.
+ *
+ * Runs after the router (priority 32) so {@code _route} is known; host application routes keep their own
+ * locale and no session is opened for them.
  */
 final class LocaleSubscriber implements EventSubscriberInterface
 {
@@ -21,7 +24,7 @@ final class LocaleSubscriber implements EventSubscriberInterface
 
     public function onKernelRequest(RequestEvent $event): void
     {
-        if (!$event->isMainRequest()) {
+        if (!$event->isMainRequest() || !WorkflowUiAccessSubscriber::isWorkflowUiRoute($event->getRequest())) {
             return;
         }
 

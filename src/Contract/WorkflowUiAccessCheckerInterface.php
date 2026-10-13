@@ -10,7 +10,8 @@ use Symfony\Component\HttpFoundation\Request;
  * Controls access to the built-in Workflow CRUD UI.
  *
  * Register a custom implementation and alias it to this interface to protect
- * `/workflow` routes. When no custom service is configured, all requests are allowed.
+ * `/workflow` routes. When no custom service is configured, the bundle wires a role-based
+ * checker (security.access_roles); the fallback policy denies every request.
  */
 interface WorkflowUiAccessCheckerInterface
 {

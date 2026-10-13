@@ -23,7 +23,7 @@ nowo_workflow:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `enabled` | `true` | Enable bundle services |
+| `enabled` | `true` | When `false`, every Workflow UI route (`nowo_workflow_*`) answers 404; UI access checks stay wired (fail-closed) |
 | `connection` | `default` | Doctrine connection for entities |
 | `table_prefix` | `workflow_` | Prefix for Doctrine table and constraint names (`workflow_definition` → `{prefix}definition`) |
 | `ui.path` | `/workflow` | Base path for CRUD UI (use as Symfony `access_control` path prefix) |
@@ -31,7 +31,7 @@ nowo_workflow:
 | `ui.css_framework` | `bootstrap5` | CSS stack for markup macros: `bootstrap`/`bootstrap5`, `bootstrap4`, `tailwind`, `foundation`, `custom`, `tabler` (alias of bootstrap5), `none`. With `custom`, templates rely on semantic `nowo-ui-*` classes. |
 | `ui.icon_set` | `bootstrap-icons` | Icon rendering for row actions: `bootstrap-icons`, `tabler-icons`, `ux_icon`, `svg_inline`, `none` (text labels only) |
 | `ui.list_page_size` | `20` | Definitions per page on dashboard and index (REQ-PERF-001). `0` = load all (not recommended in production). Query param `?page=` |
-| `ui.default_locale` | `en` | Default locale for the CRUD UI |
+| `ui.default_locale` | `en` | Default locale for the CRUD UI (applied only to `nowo_workflow_*` routes; host routes keep their locale) |
 | `ui.locales` | `en`, `es`, `fr`, `it` | Enabled locales for the locale switcher |
 | `ui.required_roles` | `ROLE_ADMIN` | **BC alias** of `security.access_roles` |
 | `security.access_roles` | `ROLE_ADMIN` | User must have **at least one** role. Empty list = no bundle-level role check (firewall / custom checker only) |

@@ -27,9 +27,15 @@ services:
 
     Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker: ~
 
-    # Default alias; WorkflowUiSecurityPass replaces this after extensions merge.
+    Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker: ~
+
+    # Fail-closed default alias; WorkflowUiSecurityPass replaces this after extensions merge.
     Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface:
-        alias: Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker
+        alias: Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker
+
+    Nowo\WorkflowBundle\EventListener\WorkflowUiAccessSubscriber:
+        arguments:
+            $enabled: '%nowo_workflow.enabled%'
 
     Nowo\WorkflowBundle\Twig\WorkflowExtension:
         arguments:

@@ -21,7 +21,8 @@ final class LocaleSubscriberTest extends TestCase
     {
         $session = new Session(new MockArraySessionStorage());
         $session->set('_nowo_workflow_locale', 'es');
-        $request = Request::create('/');
+        $request = Request::create('/workflow');
+        $request->attributes->set('_route', 'nowo_workflow_dashboard');
         $request->setSession($session);
 
         $stack = new RequestStack([$request]);
@@ -36,6 +37,44 @@ final class LocaleSubscriberTest extends TestCase
         (new LocaleSubscriber($manager))->onKernelRequest($event);
 
         self::assertSame('es', $request->getLocale());
+    }
+
+    public function testLeavesHostRoutesUntouchedAndDoesNotOpenSession(): void
+    {
+        $session = new Session(new MockArraySessionStorage());
+        $session->set('_nowo_workflow_locale', 'es');
+        $request = Request::create('/');
+        $request->attributes->set('_route', 'app_home');
+        $request->setLocale('fr');
+        $request->setSession($session);
+        $session->save();
+
+        $manager = new LocaleManager(new RequestStack([$request]), ['en', 'es'], 'en');
+        $event   = new RequestEvent(
+            $this->createMock(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+        );
+
+        (new LocaleSubscriber($manager))->onKernelRequest($event);
+
+        self::assertSame('fr', $request->getLocale());
+        self::assertFalse($session->isStarted());
+    }
+
+    public function testLeavesUnroutedRequestsUntouched(): void
+    {
+        $request = Request::create('/');
+        $request->setLocale('de');
+        $event = new RequestEvent(
+            $this->createMock(HttpKernelInterface::class),
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+        );
+
+        (new LocaleSubscriber(new LocaleManager(new RequestStack([$request]), ['en'], 'en')))->onKernelRequest($event);
+
+        self::assertSame('de', $request->getLocale());
     }
 
     public function testIgnoresSubRequest(): void

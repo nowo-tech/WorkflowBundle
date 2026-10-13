@@ -19,6 +19,8 @@ This Symfony bundle persists **workflow definitions** in Doctrine, exposes a **b
 | **SQL injection** | Use Doctrine ORM only; no raw SQL with user input. |
 | **XSS in admin UI** | Twig auto-escaping; validate user-supplied labels in forms. |
 | **Unsafe subject classes** | Validate `subject_class` refers to expected application entities; document trust boundaries for match rules. |
+| **Fail-open when disabled** | `enabled: false` makes every `nowo_workflow_*` route answer **404** (request listener right after the router); the access checker is still wired (fail-closed `DenyAllWorkflowUiAccessChecker` when no security is available). |
+| **Open redirect (locale switch)** | `/locale/{_locale}` only redirects to a same-host `Referer` (or a local path); anything else goes to the dashboard. |
 | **CSRF** | Symfony forms include CSRF tokens on mutating actions. |
 | **Denial of service** | Limit definition complexity; tune DB and HTTP timeouts at infrastructure level. |
 
@@ -81,7 +83,7 @@ security:
         - { path: ^/workflow, roles: ROLE_ADMIN }
 ```
 
-2. **Bundle checker** — `WorkflowUiAccessSubscriber` enforces `WorkflowUiAccessCheckerInterface` on routes named `nowo_workflow_*`. With SecurityBundle and no custom checker, `RoleBasedWorkflowUiAccessChecker` is wired automatically from `access_roles`.
+2. **Bundle checker** — `WorkflowUiAccessSubscriber` enforces `WorkflowUiAccessCheckerInterface` on routes named `nowo_workflow_*`; with `enabled: false` those routes return 404. With SecurityBundle and no custom checker, `RoleBasedWorkflowUiAccessChecker` is wired automatically from `access_roles`.
 
 ### Custom checker
 

@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Unit\Controller;
 use Nowo\WorkflowBundle\Controller\LocaleController;
 use Nowo\WorkflowBundle\Service\LocaleManager;
 use Nowo\WorkflowBundle\Tests\Support\ControllerContainerFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -45,6 +46,50 @@ final class LocaleControllerTest extends TestCase
 
         $response = $controller->switch('en', $request);
 
-        self::assertSame('/', $response->headers->get('Location'));
+        self::assertSame('/generated/nowo_workflow_dashboard', $response->headers->get('Location'));
+    }
+
+    public function testSwitchAllowsSameHostAbsoluteReferer(): void
+    {
+        $request = Request::create('http://app.test/workflow/locale/es', 'GET', [], [], [], ['HTTP_REFERER' => 'https://APP.test/workflow/definitions?page=2']);
+
+        $response = $this->controller($request)->switch('es', $request);
+
+        self::assertSame('https://APP.test/workflow/definitions?page=2', $response->headers->get('Location'));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unsafeRefererProvider(): iterable
+    {
+        yield 'foreign host' => ['https://evil.example/phish'];
+        yield 'host suffix' => ['https://app.test.evil.example/'];
+        yield 'scheme-relative' => ['//evil.example/phish'];
+        yield 'backslash' => ['/\\evil.example/phish'];
+        yield 'javascript scheme' => ['javascript:alert(1)'];
+        yield 'relative without slash' => ['evil.example'];
+        yield 'control char' => ["/workflow\r\nX-Injected: 1"];
+        yield 'userinfo trick' => ['https://app.test@evil.example/'];
+        yield 'malformed' => ['http:///'];
+    }
+
+    #[DataProvider('unsafeRefererProvider')]
+    public function testSwitchRejectsOpenRedirectReferer(string $referer): void
+    {
+        $request = Request::create('http://app.test/workflow/locale/es', 'GET', [], [], [], ['HTTP_REFERER' => $referer]);
+
+        $response = $this->controller($request)->switch('es', $request);
+
+        self::assertSame('/generated/nowo_workflow_dashboard', $response->headers->get('Location'));
+    }
+
+    private function controller(Request $request): LocaleController
+    {
+        $request->setSession(new Session(new MockArraySessionStorage()));
+        $controller = new LocaleController(new LocaleManager(new RequestStack([$request]), ['en', 'es'], 'en'));
+        $controller->setContainer(ControllerContainerFactory::create());
+
+        return $controller;
     }
 }

@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\DependencyInjection\Compiler;
 use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker;
+use Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker;
 use Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
@@ -25,15 +26,26 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
 {
     public function process(ContainerBuilder $container): void
     {
-        if (!$container->hasParameter('nowo_workflow.enabled') || !$container->getParameter('nowo_workflow.enabled')) {
+        if (!$container->hasParameter('nowo_workflow.security.allow_unauthenticated')) {
+            // Extension not loaded: keep the fail-closed default alias from services.yaml.
             return;
         }
 
+        // Security wiring is never skipped: with enabled: false the UI routes answer 404
+        // (WorkflowUiAccessSubscriber) and the checker still fails closed.
+        $enabled              = !$container->hasParameter('nowo_workflow.enabled') || (bool) $container->getParameter('nowo_workflow.enabled');
         $allowUnauthenticated = (bool) $container->getParameter('nowo_workflow.security.allow_unauthenticated');
         $hasSecurity          = $container->has('security.authorization_checker');
         $accessCheckerId      = $container->getParameter('nowo_workflow.security.access_checker');
 
         if (!$hasSecurity && !$allowUnauthenticated && (!is_string($accessCheckerId) || $accessCheckerId === '')) {
+            if (!$enabled) {
+                $container->setAlias(WorkflowUiAccessCheckerInterface::class, DenyAllWorkflowUiAccessChecker::class)
+                    ->setPublic(false);
+
+                return;
+            }
+
             throw new InvalidConfigurationException('nowo_workflow requires symfony/security-bundle (security.authorization_checker), or set nowo_workflow.security.allow_unauthenticated: true (dev/demo only — never in production), or set nowo_workflow.security.access_checker to a custom service id.');
         }
 
