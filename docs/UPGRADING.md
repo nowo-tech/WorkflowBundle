@@ -2,12 +2,25 @@
 
 ## Table of contents
 
+- [From 1.6.12 to 1.7.0](#from-1612-to-170)
 - [From 1.6.11 to 1.6.12](#from-1611-to-1612)
 - [From 1.6.10 to 1.6.11](#from-1610-to-1611)
 - [From 1.6.9 to 1.6.10](#from-169-to-1610)
 - [From 1.6.7 to 1.6.8](#from-167-to-168)
 - [From 1.6.6 to 1.6.7](#from-166-to-167)
 - [From 1.6.5 to 1.6.6](#from-165-to-166)
+
+## From 1.6.12 to 1.7.0
+
+From **1.6.12** — security: UI fails closed when disabled, locale subscriber scoped to bundle routes, no open redirect.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+- **Behaviour change:** with `enabled: false` the workflow UI routes now return 404 instead of being served without access checks; the default UI access checker is deny-all when security is not wired.
+- The host request locale is no longer overridden (and no session is opened) on non-bundle routes.
+- A `Referer` pointing to another host now redirects to the workflow dashboard after a locale switch.
 
 ## From 1.6.11 to 1.6.12
 

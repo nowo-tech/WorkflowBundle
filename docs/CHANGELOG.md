@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-13
+
 ### Security
 
 - `enabled: false` no longer disables UI access control (fail-open): Workflow UI routes now answer 404 and the access checker is always wired (fail-closed `DenyAllWorkflowUiAccessChecker` fallback; also the default alias).
@@ -15,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `LocaleSubscriber` only applies `ui.default_locale` / the stored UI locale to `nowo_workflow_*` routes; host application requests keep their locale and no longer open the session.
+
+[1.7.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.7.0
 
 ## [1.6.12] - 2026-10-13
 
