@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [From 1.8.1 to 1.8.2](#from-181-to-182)
 - [From 1.8.0 to 1.8.1](#from-180-to-181)
 - [From 1.7.0 to 1.8.0](#from-170-to-180)
 - [From 1.6.12 to 1.7.0](#from-1612-to-170)
@@ -53,6 +54,16 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## From 1.8.1 to 1.8.2
+
+From **1.8.1** — Twig coding-standard cleanup; twig-lint in CI
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+- No breaking changes. No application upgrade steps.
 
 ## From 1.8.0 to 1.8.1
 
