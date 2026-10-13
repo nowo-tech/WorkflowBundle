@@ -21,7 +21,7 @@
     {% if graph.places is empty %}
         <div class="alert alert-warning">{{ 'definition.no_places'|trans({}, 'NowoWorkflowBundle') }}</div>
     {% else %}
-        {% include '@NowoWorkflowBundle/workflow_definition/_flow_diagram.html.twig' %}
+        {{ include('@NowoWorkflowBundle/workflow_definition/_flow_diagram.html.twig') }}
     {% endif %}
 
     <div class="row g-4">

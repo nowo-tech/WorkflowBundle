@@ -26,7 +26,7 @@
                 <li class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}nav-item{% endif %}">
                     <a class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}nav-link{% elseif nowo_workflow_css_framework == 'tailwind' %}hover:text-slate-300{% endif %}" href="{{ path('nowo_workflow_definition_new') }}">{{ 'nav.new_definition'|trans({}, 'NowoWorkflowBundle') }}</a>
                 </li>
-                {% include '@NowoWorkflowBundle/_locale_switcher.html.twig' %}
+                {{ include('@NowoWorkflowBundle/_locale_switcher.html.twig') }}
             </ul>
         </div>
     </nav>

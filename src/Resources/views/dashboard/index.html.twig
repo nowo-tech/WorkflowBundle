@@ -54,16 +54,16 @@
                                         {% endif %}
                                     </td>
                                     <td class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}text-end{% elseif nowo_workflow_css_framework == 'tailwind' %}text-right{% endif %}">
-                                        {% include '@NowoUiKitBundle/partials/_row_actions.html.twig' with {
+                                        {{ include('@NowoUiKitBundle/partials/_row_actions.html.twig', {
                                             framework: nowo_workflow_css_framework,
                                             actions: [
                                                 {
                                                     kind: 'view',
                                                     href: path('nowo_workflow_definition_show', {id: definition.id}),
-                                                    label: 'action.view'|trans({}, 'NowoWorkflowBundle')
-                                                }
-                                            ]
-                                        } %}
+                                                    label: 'action.view'|trans({}, 'NowoWorkflowBundle'),
+                                                },
+                                            ],
+                                        }) }}
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -73,5 +73,5 @@
             {% endif %}
         </div>
     </div>
-    {% include '@NowoWorkflowBundle/_pagination.html.twig' %}
+    {{ include('@NowoWorkflowBundle/_pagination.html.twig') }}
 {% endblock %}

@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Twig coding standard**: `make twig-lint` (twig-cs-fixer) now passes with 0 errors (19 coding-standard findings, no template bugs). Admin templates use the `include()` function instead of the `{% include %}` tag, multi-line hashes/arrays get trailing commas and the form `id` attribute key is unquoted. Rendered markup is unchanged apart from insignificant whitespace (one newline after each include). CI runs `composer twig:lint` in a new **Twig lint** job.
+
 ## [1.8.1] - 2026-10-13
 
 ### Fixed
