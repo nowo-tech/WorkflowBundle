@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.12] - 2026-10-13
+
+### Dependencies
+
+- `nowo-tech/form-kit-bundle` 2.6.1 → 2.7.1 (development lock; #49).
+- `nowo-tech/ui-kit-bundle` 1.9.2 → 1.11.0 (development lock; #50).
+- `doctrine/orm` 3.7.4 → 3.7.5 (development lock; #51).
+
+[1.6.12]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.6.12
+
 ## [1.6.11] - 2026-10-09
 
 ### Dependencies
