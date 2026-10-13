@@ -2,6 +2,7 @@
 
 ## Table of contents
 
+- [From 1.7.0 to 1.8.0](#from-170-to-180)
 - [From 1.6.12 to 1.7.0](#from-1612-to-170)
 - [From 1.6.11 to 1.6.12](#from-1611-to-1612)
 - [From 1.6.10 to 1.6.11](#from-1610-to-1611)
@@ -11,6 +12,14 @@
 - [From 1.6.5 to 1.6.6](#from-165-to-166)
 
 ## Unreleased
+
+## From 1.7.0 to 1.8.0
+
+From **1.7.0** — fixes - Doctrine proxies/subclasses resolved, normalized context, scoped form themes, configured locales, Symfony >=7.4.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 - **Requirements:** Symfony `^7.4 || ^8.0` (7.0–7.3 are no longer allowed) and `symfony/yaml` is now required at runtime.
 - **Form themes:** the bundle no longer adds `bootstrap_5_layout.html.twig` / `bootstrap_4_layout.html.twig` to the global `twig.form_themes`; they now apply only to the Workflow UI forms. If your own forms relied on that side effect, add the theme to `config/packages/twig.yaml` (`twig: { form_themes: ['bootstrap_5_layout.html.twig'] }`).

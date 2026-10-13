@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-13
+
 ### Fixed
 
 - Workflow resolution now matches Doctrine proxies and subclasses of a definition's `subject_class` (real class + parents + interfaces, closest class first), consistent with `WorkflowApplicator`'s `is_a()` check; previously only the exact `::class` matched.
@@ -22,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 - `nowo_workflow.environments` has no effect and triggers a deprecation when set; it will be removed in 2.0.
+
+[1.8.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.8.0
 
 ## [1.7.0] - 2026-10-13
 
