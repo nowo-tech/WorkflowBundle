@@ -45,9 +45,9 @@
             {% endfor %}
         {% endblock %}
 
+        {# Bundle pages fill nowo_ui_page_header / nowo_ui_content / nowo_ui_modals through base.html.twig's body block;
+           declaring them here too rendered every page twice (and broke forms: "Field has already been rendered"). #}
         {% block body %}{% endblock %}
-        {% block nowo_ui_content %}{% endblock %}
-        {% block nowo_ui_modals %}{% endblock %}
     </main>
 
     {% block javascripts %}

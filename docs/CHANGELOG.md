@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Default UI layout (`@NowoWorkflowBundle/layout.html.twig`) no longer renders `nowo_ui_content` / `nowo_ui_modals` a second time after the `body` block. Every Workflow UI page was output twice, and the definition form pages (`/workflow/definitions/new`, `/workflow/definitions/{id}/edit/*`) failed with HTTP 500 `Field "name" has already been rendered`. Hosts with their own `ui.layout_template` were not affected.
+
 ## [1.8.0] - 2026-10-13
 
 ### Fixed
