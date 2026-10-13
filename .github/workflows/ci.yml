@@ -1,4 +1,4 @@
-# CI: tests on PHP 8.2+ × Symfony 7.0, 7.4, 8.0, 8.1 (minimum minors per REQ-SF-002).
+# CI: tests on PHP 8.2+ × Symfony 7.4, 8.0, 8.1 (minimum minors per REQ-SF-002; composer floor is ^7.4).
 # Release (incl. latest) is created by release.yml on tag push (v*).
 name: CI
 
@@ -31,7 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         php: ['8.2', '8.3', '8.4', '8.5']
-        symfony: ['7.0', '7.4', '8.0', '8.1']
+        symfony: ['7.4', '8.0', '8.1']
         exclude:
           - php: '8.2'
             symfony: '8.0'
@@ -75,7 +75,6 @@ jobs:
           composer require --dev \
             symfony/browser-kit:^${{ matrix.symfony }} \
             symfony/framework-bundle:^${{ matrix.symfony }} \
-            symfony/yaml:^${{ matrix.symfony }} \
             --no-interaction --no-update
           composer require \
             symfony/config:^${{ matrix.symfony }} \
@@ -88,6 +87,7 @@ jobs:
             symfony/twig-bundle:^${{ matrix.symfony }} \
             symfony/validator:^${{ matrix.symfony }} \
             symfony/workflow:^${{ matrix.symfony }} \
+            symfony/yaml:^${{ matrix.symfony }} \
             --no-interaction --no-update
           case "${{ matrix.symfony }}" in
             8.0|8.1)

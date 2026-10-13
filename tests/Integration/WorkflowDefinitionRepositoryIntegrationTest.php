@@ -61,6 +61,14 @@ final class WorkflowDefinitionRepositoryIntegrationTest extends TestCase
         self::assertSame('enabled_order', $definitions[0]->getSlug());
     }
 
+    public function testFindEnabledCandidatesAcceptsClassHierarchy(): void
+    {
+        $definitions = $this->repository->findEnabledCandidates(['App\\Entity\\OrderChild', 'App\\Entity\\Order']);
+
+        self::assertCount(1, $definitions);
+        self::assertSame('enabled_order', $definitions[0]->getSlug());
+    }
+
     public function testFindEnabledCandidatesWithoutSubjectClass(): void
     {
         self::assertCount(2, $this->repository->findEnabledCandidates(null));

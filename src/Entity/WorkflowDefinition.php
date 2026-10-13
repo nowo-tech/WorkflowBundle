@@ -12,6 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Util\SubjectClass;
 use SortDirection;
 
 /**
@@ -295,7 +296,7 @@ class WorkflowDefinition
 
     public function matchesContext(WorkflowContext $context): bool
     {
-        if ($context->subjectClass !== null && $this->subjectClass !== $context->subjectClass) {
+        if ($context->subjectClass !== null && !SubjectClass::matches($context->subjectClass, $this->subjectClass)) {
             return false;
         }
 

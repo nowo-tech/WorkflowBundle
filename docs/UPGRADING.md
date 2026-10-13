@@ -10,6 +10,15 @@
 - [From 1.6.6 to 1.6.7](#from-166-to-167)
 - [From 1.6.5 to 1.6.6](#from-165-to-166)
 
+## Unreleased
+
+- **Requirements:** Symfony `^7.4 || ^8.0` (7.0–7.3 are no longer allowed) and `symfony/yaml` is now required at runtime.
+- **Form themes:** the bundle no longer adds `bootstrap_5_layout.html.twig` / `bootstrap_4_layout.html.twig` to the global `twig.form_themes`; they now apply only to the Workflow UI forms. If your own forms relied on that side effect, add the theme to `config/packages/twig.yaml` (`twig: { form_themes: ['bootstrap_5_layout.html.twig'] }`).
+- **Resolution:** definitions now also match Doctrine proxies, subclasses and implemented interfaces of their `subject_class`; when several classes match, the closest one wins before specificity/priority. Check for new `WorkflowAmbiguousMatchException`s if you had parent/child definitions with equal scores.
+- **WorkflowContext:** non-string parameter values are cast to strings (booleans → `"true"`/`"false"`, `null` dropped); arrays and non-`Stringable` objects now throw `InvalidArgumentException`.
+- **Locale switch:** `/locale/{_locale}` accepts the locales configured in `ui.locales` and answers 404 for any other locale.
+- **Deprecated:** remove `nowo_workflow.environments` from your configuration (it never had an effect); register the bundle per environment in `config/bundles.php` instead.
+
 ## From 1.6.12 to 1.7.0
 
 From **1.6.12** — security: UI fails closed when disabled, locale subscriber scoped to bundle routes, no open redirect.
@@ -373,7 +382,7 @@ Override under `templates/bundles/NowoWorkflowBundle/` (see [USAGE.md](USAGE.md)
 
 | Bundle | Symfony | PHP |
 |--------|---------|-----|
-| 1.x | 7.x (PHP 8.2+), 8.x (PHP 8.4+) | 8.2 – 8.5 |
+| 1.x | 7.4+ (PHP 8.2+), 8.x (PHP 8.4+) | 8.2 – 8.5 |
 ### FormKitBundle (admin forms)
 
 If you use admin/dashboard Symfony forms, ensure `nowo-tech/form-kit-bundle` ^2.0 is installed (pulled transitively) and `Nowo\FormKitBundle\NowoFormKitBundle` is registered. Form types use profile `workflow` via `#[FormKitConfig]`; the bundle prepends that profile when the host has not defined it.

@@ -6,7 +6,7 @@
 
 Define Symfony Workflow state machines and workflows in the database, manage them with a built-in CRUD UI, and execute transitions at runtime through `DatabaseWorkflowRegistry` and `WorkflowApplicator`.
 
-> 📋 **Compatible with Symfony 7.x (PHP 8.2+) and 8.x (PHP 8.4+)** — tested on Symfony **7.4**, **8.0**, and **8.1+**.
+> 📋 **Compatible with Symfony 7.4+ (PHP 8.2+) and 8.x (PHP 8.4+)** — tested on Symfony **7.4**, **8.0**, and **8.1+**.
 
 ![FrankenPHP Friendly Worker Mode](docs/images/frankenphp-friendly.png)
 

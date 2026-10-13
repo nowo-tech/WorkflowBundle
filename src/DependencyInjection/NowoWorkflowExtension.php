@@ -11,7 +11,6 @@ use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 
 use function array_key_exists;
-use function in_array;
 use function is_array;
 
 /**
@@ -37,15 +36,9 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ]);
         }
 
-        $cssFramework = $this->resolveCssFrameworkFromConfigs($container);
-        if ($container->hasExtension('twig') && in_array($cssFramework, ['bootstrap5', 'bootstrap4'], true)) {
-            $formTheme = $cssFramework === 'bootstrap4'
-                ? 'bootstrap_4_layout.html.twig'
-                : 'bootstrap_5_layout.html.twig';
-            $container->prependExtensionConfig('twig', [
-                'form_themes' => [$formTheme],
-            ]);
-        }
+        // Form themes are applied only to the bundle's own forms ({% form_theme %} in
+        // workflow_definition/form.html.twig via the nowo_workflow_form_themes global);
+        // never prepend twig.form_themes globally (it would restyle every host form).
 
         if ($container->hasExtension('framework')) {
             $container->prependExtensionConfig('framework', [
@@ -196,13 +189,5 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     public function getAlias(): string
     {
         return Configuration::ALIAS;
-    }
-
-    private function resolveCssFrameworkFromConfigs(ContainerBuilder $container): string
-    {
-        $configs = $container->getExtensionConfig($this->getAlias());
-        $merged  = $this->processConfiguration(new Configuration(), $configs);
-
-        return (string) $merged['ui']['css_framework'];
     }
 }

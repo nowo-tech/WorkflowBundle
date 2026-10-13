@@ -12,6 +12,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 use function in_array;
 use function is_string;
+use function sprintf;
 
 #[Route(path: '', name: 'nowo_workflow_')]
 final class LocaleController extends AbstractController
@@ -21,9 +22,18 @@ final class LocaleController extends AbstractController
     ) {
     }
 
-    #[Route('/locale/{_locale}', name: 'locale_switch', requirements: ['_locale' => 'en|es|fr|it'], methods: ['GET'])]
+    /**
+     * Locale-shaped pattern only; the actual allow-list is nowo_workflow.ui.locales (checked below).
+     */
+    public const LOCALE_REQUIREMENT = '[a-zA-Z]{2,3}(?:[_-][a-zA-Z0-9]{2,8})*';
+
+    #[Route('/locale/{_locale}', name: 'locale_switch', requirements: ['_locale' => self::LOCALE_REQUIREMENT], methods: ['GET'])]
     public function switch(string $_locale, Request $request): RedirectResponse
     {
+        if (!$this->localeManager->isEnabled($_locale)) {
+            throw $this->createNotFoundException(sprintf('Locale "%s" is not enabled in nowo_workflow.ui.locales.', $_locale));
+        }
+
         // @igor-ignore - HTTP handler delegates to services; no controller worker state.
         $this->localeManager->setLocale($_locale);
 

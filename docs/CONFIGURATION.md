@@ -24,7 +24,8 @@ nowo_workflow:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `enabled` | `true` | When `false`, every Workflow UI route (`nowo_workflow_*`) answers 404; UI access checks stay wired (fail-closed) |
-| `connection` | `default` | Doctrine connection for entities |
+| `connection` | `default` | **Entity manager name** used by `nowo:workflow:sync-schema`. The bundle mapping (`NowoWorkflowBundle`) is always prepended to the **default** entity manager; to store workflow tables elsewhere, map `NowoWorkflowBundle` on that entity manager yourself and set this option to its name. |
+| `environments` | `[dev, test, prod]` | **Deprecated since 1.8, ignored.** Register the bundle only for the wanted environments in `config/bundles.php` instead. |
 | `table_prefix` | `workflow_` | Prefix for Doctrine table and constraint names (`workflow_definition` → `{prefix}definition`) |
 | `ui.path` | `/workflow` | Base path for CRUD UI (use as Symfony `access_control` path prefix) |
 | `ui.layout_template` | `@NowoWorkflowBundle/layout.html.twig` | Twig layout extended by UI pages (Twig global `nowo_workflow_layout_template`). **Host apps should set this to the project layout** (or a one-file bridge). The default layout is for demos / standalone installs only. |
@@ -32,13 +33,17 @@ nowo_workflow:
 | `ui.icon_set` | `bootstrap-icons` | Icon rendering for row actions: `bootstrap-icons`, `tabler-icons`, `ux_icon`, `svg_inline`, `none` (text labels only) |
 | `ui.list_page_size` | `20` | Definitions per page on dashboard and index (REQ-PERF-001). `0` = load all (not recommended in production). Query param `?page=` |
 | `ui.default_locale` | `en` | Default locale for the CRUD UI (applied only to `nowo_workflow_*` routes; host routes keep their locale) |
-| `ui.locales` | `en`, `es`, `fr`, `it` | Enabled locales for the locale switcher |
+| `ui.locales` | `en`, `es`, `fr`, `it` | Enabled locales for the locale switcher. `/locale/{_locale}` accepts exactly these values (any other locale answers 404). |
 | `ui.required_roles` | `ROLE_ADMIN` | **BC alias** of `security.access_roles` |
-| `security.access_roles` | `ROLE_ADMIN` | User must have **at least one** role. Empty list = no bundle-level role check (firewall / custom checker only) |
+| `security.access_roles` | `ROLE_ADMIN` | User must have **at least one** role. An empty list is **rejected** unless `security.access_checker` is set (your checker decides) or `security.allow_unauthenticated: true` (dev/demo only). |
 | `security.access_checker` | `null` | Optional service id implementing `WorkflowUiAccessCheckerInterface` |
 | `security.allow_unauthenticated` | `false` | **DEV/DEMO only.** When `false` (default), SecurityBundle (`security.authorization_checker`) is required. Never `true` in production. |
 
 Shipped translation catalogs: `en`, `es`, `fr`, `it`, `de`, `nl`, `pt`. Add `de`, `nl`, or `pt` to `ui.locales` to expose them in the switcher.
+
+### Form themes
+
+With `ui.css_framework: bootstrap5` (or its aliases) / `bootstrap4`, the bundle applies `bootstrap_5_layout.html.twig` / `bootstrap_4_layout.html.twig` **only to its own forms** (`{% form_theme %}` in `workflow_definition/form.html.twig`, via the Twig global `nowo_workflow_form_themes`). It no longer adds anything to `twig.form_themes`, so host application forms keep the host's own theme. Other frameworks get no extra theme.
 
 ## Host layout integration (REQ-UI-001)
 

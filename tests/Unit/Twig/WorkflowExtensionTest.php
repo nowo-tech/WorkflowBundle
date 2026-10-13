@@ -27,6 +27,18 @@ final class WorkflowExtensionTest extends TestCase
             'nowo_workflow_layout_template' => '@NowoWorkflowBundle/layout.html.twig',
             'nowo_workflow_css_framework'   => 'bootstrap5',
             'nowo_workflow_icon_set'        => 'bootstrap-icons',
+            'nowo_workflow_form_themes'     => ['bootstrap_5_layout.html.twig'],
         ], $extension->getGlobals());
+    }
+
+    #[Test]
+    public function testFormThemesAreScopedPerCssFramework(): void
+    {
+        self::assertSame(['bootstrap_5_layout.html.twig'], WorkflowExtension::formThemesFor('bootstrap5'));
+        self::assertSame(['bootstrap_5_layout.html.twig'], WorkflowExtension::formThemesFor('bootstrap'));
+        self::assertSame(['bootstrap_5_layout.html.twig'], WorkflowExtension::formThemesFor('tabler'));
+        self::assertSame(['bootstrap_4_layout.html.twig'], WorkflowExtension::formThemesFor('bootstrap4'));
+        self::assertSame([], WorkflowExtension::formThemesFor('tailwind'));
+        self::assertSame([], WorkflowExtension::formThemesFor('none'));
     }
 }

@@ -10,6 +10,9 @@ use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
+use Nowo\WorkflowBundle\Tests\Support\__CG__\Nowo\WorkflowBundle\Tests\Support\Subject\WorkflowSubjectBase as ProxySubject;
+use Nowo\WorkflowBundle\Tests\Support\Subject\WorkflowSubjectBase;
+use Nowo\WorkflowBundle\Tests\Support\Subject\WorkflowSubjectChild;
 use PHPUnit\Framework\TestCase;
 
 final class WorkflowDefinitionTest extends TestCase
@@ -40,6 +43,18 @@ final class WorkflowDefinitionTest extends TestCase
         self::assertTrue($definition->matchesContext(new WorkflowContext('App\\Entity\\Order', ['tenant' => 'acme'])));
         self::assertFalse($definition->matchesContext(new WorkflowContext('App\\Entity\\Other', ['tenant' => 'acme'])));
         self::assertFalse($definition->matchesContext(new WorkflowContext('App\\Entity\\Order', ['tenant' => 'other'])));
+    }
+
+    public function testMatchesContextAcceptsSubclassesAndDoctrineProxies(): void
+    {
+        $definition = new WorkflowDefinition('Base', 'base', 'draft', WorkflowSubjectBase::class);
+
+        self::assertTrue($definition->matchesContext(new WorkflowContext(WorkflowSubjectChild::class)));
+        self::assertTrue($definition->matchesContext(new WorkflowContext(ProxySubject::class)));
+        self::assertTrue($definition->matchesContext(new WorkflowContext(null)));
+
+        $child = new WorkflowDefinition('Child', 'child', 'draft', WorkflowSubjectChild::class);
+        self::assertFalse($child->matchesContext(new WorkflowContext(WorkflowSubjectBase::class)));
     }
 
     public function testDefaultMatcherWhenNoRules(): void

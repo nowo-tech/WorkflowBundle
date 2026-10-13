@@ -31,8 +31,12 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
         return $this->findBy(['enabled' => true], ['name' => 'ASC']);
     }
 
-    /** @return list<WorkflowDefinition> */
-    public function findEnabledCandidates(?string $subjectClass): array
+    /**
+     * @param list<string>|string|null $subjectClass One class, a class hierarchy (IN), or null for all
+     *
+     * @return list<WorkflowDefinition>
+     */
+    public function findEnabledCandidates(string|array|null $subjectClass): array
     {
         $criteria = ['enabled' => true];
         if ($subjectClass !== null) {

@@ -12,7 +12,13 @@ use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
+use Nowo\WorkflowBundle\Tests\Support\__CG__\Nowo\WorkflowBundle\Tests\Support\Subject\WorkflowSubjectBase as ProxySubject;
+use Nowo\WorkflowBundle\Tests\Support\Subject\WorkflowSubjectBase;
+use Nowo\WorkflowBundle\Tests\Support\Subject\WorkflowSubjectChild;
+use Nowo\WorkflowBundle\Tests\Support\Subject\WorkflowSubjectMarkerInterface;
 use PHPUnit\Framework\TestCase;
+
+use function in_array;
 
 final class WorkflowResolverTest extends TestCase
 {
@@ -182,6 +188,48 @@ final class WorkflowResolverTest extends TestCase
         self::assertSame('ctx', $resolved->getSlug());
     }
 
+    public function testResolveForSubjectMatchesDoctrineProxyOfConfiguredClass(): void
+    {
+        $definition = $this->definition('base', WorkflowSubjectBase::class, []);
+        $proxy      = new ProxySubject();
+
+        self::assertSame('base', $this->resolver($definition)->resolveSlugForSubject($proxy));
+    }
+
+    public function testResolveForSubjectMatchesSubclassOfConfiguredClass(): void
+    {
+        $definition = $this->definition('base', WorkflowSubjectBase::class, []);
+
+        self::assertSame('base', $this->resolver($definition)->resolveSlugForSubject(new WorkflowSubjectChild()));
+    }
+
+    public function testResolveMatchesInterfaceSubjectClass(): void
+    {
+        $definition = $this->definition('iface', WorkflowSubjectMarkerInterface::class, []);
+
+        self::assertSame('iface', $this->resolver($definition)->resolveSlug(new WorkflowContext(WorkflowSubjectChild::class)));
+    }
+
+    public function testExactClassWinsOverMoreSpecificParentDefinition(): void
+    {
+        $parent = $this->definition('parent', WorkflowSubjectBase::class, ['tenant' => 'acme'], priority: 100);
+        $child  = $this->definition('child', WorkflowSubjectChild::class, []);
+
+        $resolver = $this->resolver($parent, $child);
+
+        self::assertSame('child', $resolver->resolveSlug(new WorkflowContext(WorkflowSubjectChild::class, ['tenant' => 'acme'])));
+        self::assertSame('parent', $resolver->resolveSlug(new WorkflowContext(WorkflowSubjectBase::class, ['tenant' => 'acme'])));
+        self::assertCount(2, $resolver->findMatching(new WorkflowContext(WorkflowSubjectChild::class, ['tenant' => 'acme'])));
+    }
+
+    public function testResolveWithoutSubjectClassUsesSpecificityAndPriority(): void
+    {
+        $a = $this->definition('a', self::SUBJECT, ['tenant' => 'acme'], priority: 1);
+        $b = $this->definition('b', 'App\\Entity\\Other', ['tenant' => 'acme'], priority: 5);
+
+        self::assertSame('b', $this->resolver($a, $b)->resolveSlug(new WorkflowContext(null, ['tenant' => 'acme'])));
+    }
+
     /** @param array<string, string> $rules */
     private function definition(string $slug, string $subjectClass, array $rules, int $priority = 0): WorkflowDefinition
     {
@@ -199,11 +247,13 @@ final class WorkflowResolverTest extends TestCase
     {
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('findEnabledCandidates')->willReturnCallback(
-            static function (?string $subjectClass) use ($definitions): array {
+            static function (string|array|null $subjectClass) use ($definitions): array {
+                $classes = $subjectClass === null ? null : (array) $subjectClass;
+
                 return array_values(array_filter(
                     $definitions,
-                    static fn (WorkflowDefinition $definition): bool => $subjectClass === null
-                        || $definition->getSubjectClass() === $subjectClass,
+                    static fn (WorkflowDefinition $definition): bool => $classes === null
+                        || in_array($definition->getSubjectClass(), $classes, true),
                 ));
             },
         );

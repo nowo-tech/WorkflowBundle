@@ -10,11 +10,14 @@ Each `WorkflowDefinition` can define zero or more `WorkflowMatchRule` rows (`par
 
 Resolution order:
 
-1. Filter enabled definitions by subject class.
+1. Filter enabled definitions by subject class: the subject's real class (Doctrine `__CG__` proxies are unwrapped), its parent classes and its interfaces all match, consistent with `WorkflowApplicator`'s `is_a()` check.
 2. Keep definitions whose rules all match the runtime context.
-3. Pick the one with the **most rules** (highest specificity).
-4. On tie, pick the highest **priority**.
-5. Throw `WorkflowAmbiguousMatchException` if still tied.
+3. Prefer the **closest subject class** (exact class, then parent, then interface).
+4. Then pick the one with the **most rules** (highest specificity).
+5. On tie, pick the highest **priority**.
+6. Throw `WorkflowAmbiguousMatchException` if still tied.
+
+Context parameter values are normalized to strings when the `WorkflowContext` is built: ints/floats are cast (`1500` → `"1500"`), booleans become `"true"` / `"false"`, `Stringable` objects are cast, `null` values are dropped; arrays and other objects throw `InvalidArgumentException`.
 
 ## Runtime API
 

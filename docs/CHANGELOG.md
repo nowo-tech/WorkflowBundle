@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Workflow resolution now matches Doctrine proxies and subclasses of a definition's `subject_class` (real class + parents + interfaces, closest class first), consistent with `WorkflowApplicator`'s `is_a()` check; previously only the exact `::class` matched.
+- `WorkflowContext` normalizes parameter values to strings (ints/floats cast, booleans `"true"`/`"false"`, `Stringable` cast, `null` dropped) so `get()` no longer throws `TypeError` for non-string values; arrays/objects are rejected with `InvalidArgumentException`.
+- Locale switch route accepts every locale configured in `ui.locales` (e.g. `de`, `nl`, `pt`) instead of a hard-coded `en|es|fr|it`; locales outside `ui.locales` answer 404.
+- Docs: `security.access_roles` cannot be empty unless `access_checker` or `allow_unauthenticated` is set; `connection` is the entity manager used by `nowo:workflow:sync-schema` (the mapping is always registered on the default entity manager).
+
+### Changed
+
+- Bootstrap form themes are applied only to the bundle's own forms (`{% form_theme %}` + Twig global `nowo_workflow_form_themes`) instead of being prepended to the global `twig.form_themes`, which restyled every host form.
+- Symfony floor raised to `^7.4 || ^8.0` (the CI `7.0` cell actually resolved 7.4); `symfony/yaml` is now a runtime requirement (the extension uses `YamlFileLoader`).
+
+### Deprecated
+
+- `nowo_workflow.environments` has no effect and triggers a deprecation when set; it will be removed in 2.0.
+
 ## [1.7.0] - 2026-10-13
 
 ### Security

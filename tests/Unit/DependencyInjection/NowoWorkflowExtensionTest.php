@@ -48,36 +48,24 @@ final class NowoWorkflowExtensionTest extends TestCase
         self::assertFalse($container->getParameter('nowo_workflow.security.allow_unauthenticated'));
     }
 
-    public function testPrependTwigFormThemesWhenTwigExtensionPresent(): void
+    public function testPrependDoesNotRegisterGlobalTwigFormThemes(): void
     {
-        $container = new ContainerBuilder();
-        $container->registerExtension(new NowoWorkflowExtension());
-        $container->registerExtension(new TwigExtension());
+        foreach (['bootstrap5', 'bootstrap4'] as $cssFramework) {
+            $container = new ContainerBuilder();
+            $container->registerExtension(new NowoWorkflowExtension());
+            $container->registerExtension(new TwigExtension());
+            $container->prependExtensionConfig('nowo_workflow', [
+                'ui' => ['css_framework' => $cssFramework],
+            ]);
 
-        $extension = $container->getExtension('nowo_workflow');
-        self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
-        $extension->prepend($container);
+            $extension = $container->getExtension('nowo_workflow');
+            self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
+            $extension->prepend($container);
 
-        $twigConfigs = $container->getExtensionConfig('twig');
-        self::assertNotEmpty($twigConfigs);
-        self::assertContains('bootstrap_5_layout.html.twig', $twigConfigs[0]['form_themes'] ?? []);
-    }
-
-    public function testPrependBootstrap4FormThemeWhenConfigured(): void
-    {
-        $container = new ContainerBuilder();
-        $container->registerExtension(new NowoWorkflowExtension());
-        $container->registerExtension(new TwigExtension());
-        $container->prependExtensionConfig('nowo_workflow', [
-            'ui' => ['css_framework' => 'bootstrap4'],
-        ]);
-
-        $extension = $container->getExtension('nowo_workflow');
-        self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
-        $extension->prepend($container);
-
-        $twigConfigs = $container->getExtensionConfig('twig');
-        self::assertContains('bootstrap_4_layout.html.twig', $twigConfigs[0]['form_themes'] ?? []);
+            foreach ($container->getExtensionConfig('twig') as $twigConfig) {
+                self::assertArrayNotHasKey('form_themes', $twigConfig, 'Host forms must not be restyled globally.');
+            }
+        }
     }
 
     public function testPrependDoctrineMappingsWhenDoctrineExtensionPresent(): void

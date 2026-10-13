@@ -7,6 +7,8 @@ namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection;
 use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\ArrayNode;
+use Symfony\Component\Config\Definition\BaseNode;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
 
@@ -106,5 +108,59 @@ final class ConfigurationTest extends TestCase
         (new Processor())->processConfiguration(new Configuration(), [[
             'ui' => ['css_framework' => 'material'],
         ]]);
+    }
+
+    #[Test]
+    public function testEmptyAccessRolesAllowedWithUnauthenticatedMode(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [[
+            'security' => ['access_roles' => [], 'allow_unauthenticated' => true],
+        ]]);
+
+        self::assertSame([], $config['security']['access_roles']);
+    }
+
+    #[Test]
+    public function testEmptyAccessRolesAllowedWithCustomAccessChecker(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [[
+            'security' => ['access_roles' => [], 'access_checker' => 'app.workflow_checker'],
+        ]]);
+
+        self::assertSame([], $config['security']['access_roles']);
+        self::assertSame('app.workflow_checker', $config['security']['access_checker']);
+    }
+
+    #[Test]
+    public function testEmptyAccessCheckerStringDoesNotBypassRoleRequirement(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        (new Processor())->processConfiguration(new Configuration(), [[
+            'security' => ['access_roles' => ['', ''], 'access_checker' => ''],
+        ]]);
+    }
+
+    #[Test]
+    public function testEnvironmentsOptionIsDeprecated(): void
+    {
+        $tree = (new Configuration())->getConfigTreeBuilder()->buildTree();
+        self::assertInstanceOf(ArrayNode::class, $tree);
+        $environments = $tree->getChildren()['environments'];
+        $connection   = $tree->getChildren()['connection'];
+        self::assertInstanceOf(BaseNode::class, $environments);
+        self::assertInstanceOf(BaseNode::class, $connection);
+
+        self::assertTrue($environments->isDeprecated());
+        $deprecation = $environments->getDeprecation('environments', 'nowo_workflow');
+        self::assertSame('nowo-tech/workflow-bundle', $deprecation['package']);
+        self::assertSame('1.8', $deprecation['version']);
+        self::assertSame('The "nowo_workflow.environments" option is deprecated and has no effect; register the bundle only for the wanted environments in config/bundles.php instead.', $deprecation['message']);
+        self::assertFalse($connection->isDeprecated());
+
+        $config = (new Processor())->processConfiguration(new Configuration(), [[
+            'environments' => ['prod'],
+        ]]);
+        self::assertSame(['prod'], $config['environments']);
     }
 }

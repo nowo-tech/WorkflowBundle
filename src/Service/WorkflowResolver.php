@@ -10,13 +10,18 @@ use Nowo\WorkflowBundle\Exception\WorkflowAmbiguousMatchException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Util\SubjectClass;
 
 use function count;
+
+use const PHP_INT_MIN;
 
 /**
  * Resolves the best workflow definition for a runtime context.
  *
  * Matching rules:
+ * - The definition subject_class must be the subject class or one of its parents/interfaces
+ *   (Doctrine proxies resolve to their real class); the closest class wins first.
  * - All match rules of a definition must match (AND).
  * - Definitions with more rules win over broader ones (specificity).
  * - On equal specificity, higher priority wins.
@@ -31,34 +36,31 @@ final class WorkflowResolver
 
     public function resolve(WorkflowContext $context): WorkflowDefinition
     {
-        $candidates = $this->repository->findEnabledCandidates($context->subjectClass);
-
-        $matches = array_values(array_filter(
-            $candidates,
-            static fn (WorkflowDefinition $definition): bool => $definition->matchesContext($context),
-        ));
+        $hierarchy = $context->subjectClass !== null ? SubjectClass::hierarchy($context->subjectClass) : [];
+        $matches   = $this->findMatching($context);
 
         if ($matches === []) {
             throw WorkflowNotFoundException::forContext($context);
         }
 
-        usort($matches, static function (WorkflowDefinition $a, WorkflowDefinition $b): int {
-            $specificity = $b->getMatchSpecificity() <=> $a->getMatchSpecificity();
-            if ($specificity !== 0) {
-                return $specificity;
-            }
+        $score = static function (WorkflowDefinition $definition) use ($hierarchy): array {
+            // Closest class in the subject hierarchy first (exact class beats parent class / interface).
+            $distance = array_search($definition->getSubjectClass(), $hierarchy, true);
 
-            return $b->getPriority() <=> $a->getPriority();
-        });
-
-        $best        = $matches[0];
-        $bestScore   = [$best->getMatchSpecificity(), $best->getPriority()];
-        $equallyBest = array_filter(
-            $matches,
-            static fn (WorkflowDefinition $definition): bool => [
+            return [
+                $distance === false ? PHP_INT_MIN : -$distance,
                 $definition->getMatchSpecificity(),
                 $definition->getPriority(),
-            ] === $bestScore,
+            ];
+        };
+
+        usort($matches, static fn (WorkflowDefinition $a, WorkflowDefinition $b): int => $score($b) <=> $score($a));
+
+        $best        = $matches[0];
+        $bestScore   = $score($best);
+        $equallyBest = array_filter(
+            $matches,
+            static fn (WorkflowDefinition $definition): bool => $score($definition) === $bestScore,
         );
 
         if (count($equallyBest) > 1) {
@@ -76,9 +78,9 @@ final class WorkflowResolver
     public function resolveForSubject(object $subject): WorkflowDefinition
     {
         if ($subject instanceof WorkflowContextAwareInterface) {
-            $context = $subject->getWorkflowContext()->withSubjectClass($subject::class);
+            $context = $subject->getWorkflowContext()->withSubjectClass(SubjectClass::real($subject));
         } else {
-            $context = new WorkflowContext(subjectClass: $subject::class);
+            $context = new WorkflowContext(subjectClass: SubjectClass::real($subject));
         }
 
         return $this->resolve($context);
@@ -94,7 +96,9 @@ final class WorkflowResolver
      */
     public function findMatching(WorkflowContext $context): array
     {
-        $candidates = $this->repository->findEnabledCandidates($context->subjectClass);
+        $candidates = $this->repository->findEnabledCandidates(
+            $context->subjectClass !== null ? SubjectClass::hierarchy($context->subjectClass) : null,
+        );
 
         return array_values(array_filter(
             $candidates,

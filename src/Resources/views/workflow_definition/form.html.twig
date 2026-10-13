@@ -18,6 +18,7 @@
 
     {% include '@NowoWorkflowBundle/workflow_definition/_edit_nav.html.twig' %}
 
+    {% form_theme form with nowo_workflow_form_themes %}
     {{ form_start(form, {attr: {
         'id': 'workflow-definition-form',
     }}) }}

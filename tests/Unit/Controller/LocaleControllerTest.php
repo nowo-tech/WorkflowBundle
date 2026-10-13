@@ -9,11 +9,14 @@ use Nowo\WorkflowBundle\Service\LocaleManager;
 use Nowo\WorkflowBundle\Tests\Support\ControllerContainerFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\Session;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Routing\Attribute\Route;
 
 final class LocaleControllerTest extends TestCase
 {
@@ -82,6 +85,45 @@ final class LocaleControllerTest extends TestCase
         $response = $this->controller($request)->switch('es', $request);
 
         self::assertSame('/generated/nowo_workflow_dashboard', $response->headers->get('Location'));
+    }
+
+    public function testSwitchAcceptsConfiguredLocaleOutsideLegacyList(): void
+    {
+        $session = new Session(new MockArraySessionStorage());
+        $request = Request::create('/workflow/locale/de');
+        $request->setSession($session);
+        $controller = new LocaleController(new LocaleManager(new RequestStack([$request]), ['en', 'de', 'pt_BR'], 'en'));
+        $controller->setContainer(ControllerContainerFactory::create());
+
+        $controller->switch('de', $request);
+        self::assertSame('de', $session->get(LocaleManager::SESSION_KEY));
+
+        $controller->switch('pt_BR', $request);
+        self::assertSame('pt_BR', $session->get(LocaleManager::SESSION_KEY));
+    }
+
+    public function testSwitchRejectsLocaleNotInConfiguredLocales(): void
+    {
+        $request = Request::create('/workflow/locale/fr');
+
+        $this->expectException(NotFoundHttpException::class);
+        $this->expectExceptionMessage('Locale "fr" is not enabled in nowo_workflow.ui.locales.');
+
+        $this->controller($request)->switch('fr', $request);
+    }
+
+    public function testRouteRequirementAcceptsLocaleShapedValuesOnly(): void
+    {
+        $route       = (new ReflectionMethod(LocaleController::class, 'switch'))->getAttributes(Route::class)[0]->newInstance();
+        $requirement = $route->getRequirements()['_locale'];
+        self::assertSame(LocaleController::LOCALE_REQUIREMENT, $requirement);
+
+        foreach (['en', 'de', 'nl', 'pt', 'pt_BR', 'zh-Hant', 'fil'] as $locale) {
+            self::assertMatchesRegularExpression('{^' . $requirement . '$}', $locale);
+        }
+        foreach (['', 'e', '../x', 'en/evil', 'toolonglocale'] as $locale) {
+            self::assertDoesNotMatchRegularExpression('{^' . $requirement . '$}', $locale);
+        }
     }
 
     private function controller(Request $request): LocaleController
