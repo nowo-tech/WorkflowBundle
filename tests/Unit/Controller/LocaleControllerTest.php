@@ -115,7 +115,7 @@ final class LocaleControllerTest extends TestCase
     public function testRouteRequirementAcceptsLocaleShapedValuesOnly(): void
     {
         $route       = (new ReflectionMethod(LocaleController::class, 'switch'))->getAttributes(Route::class)[0]->newInstance();
-        $requirement = $route->getRequirements()['_locale'];
+        $requirement = $route->requirements['_locale'];
         self::assertSame(LocaleController::LOCALE_REQUIREMENT, $requirement);
 
         foreach (['en', 'de', 'nl', 'pt', 'pt_BR', 'zh-Hant', 'fil'] as $locale) {

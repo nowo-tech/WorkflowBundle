@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WorkflowContext` normalizes parameter values to strings (ints/floats cast, booleans `"true"`/`"false"`, `Stringable` cast, `null` dropped) so `get()` no longer throws `TypeError` for non-string values; arrays/objects are rejected with `InvalidArgumentException`.
 - Locale switch route accepts every locale configured in `ui.locales` (e.g. `de`, `nl`, `pt`) instead of a hard-coded `en|es|fr|it`; locales outside `ui.locales` answer 404.
 - Docs: `security.access_roles` cannot be empty unless `access_checker` or `allow_unauthenticated` is set; `connection` is the entity manager used by `nowo:workflow:sync-schema` (the mapping is always registered on the default entity manager).
+- CI/tests: `LocaleControllerTest` reads the `#[Route]` attribute's public `requirements` property (available since Symfony 7.4) instead of `getRequirements()`, which no longer exists in Symfony 8.x.
 
 ### Changed
 
