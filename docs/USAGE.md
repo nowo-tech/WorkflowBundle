@@ -60,19 +60,12 @@ See demo playgrounds: 0-param orders, 1-param documents, 2-param expenses, 3-par
 
 ## Overriding Twig templates (REQ-TWIG-001)
 
-Prefer configuring `ui.layout_template` + `ui.css_framework` (see [CONFIGURATION.md](CONFIGURATION.md)) so host apps integrate **without** copying every page. Full overrides remain available under `templates/bundles/NowoWorkflowBundle/` with the same relative path as in `src/Resources/views/`:
-
-```text
-templates/bundles/NowoWorkflowBundle/layout.html.twig
-templates/bundles/NowoWorkflowBundle/base.html.twig
-templates/bundles/NowoWorkflowBundle/dashboard/index.html.twig
-templates/bundles/NowoWorkflowBundle/workflow_definition/index.html.twig
-```
-
-UI class helpers come from **UiKitBundle** (`{% import '@NowoUiKitBundle/macros/ui.html.twig' as ui %}`). Prefer remapping `--nowo-ui-*` tokens or overriding kit Twig under `templates/bundles/NowoUiKitBundle/` rather than forking page templates.
-Application overrides always win. Render using `@NowoWorkflowBundle/...` logical names.
-
-Stable blocks for host stacking: `nowo_ui_content`, `nowo_ui_styles`, `nowo_ui_scripts` (always call `{{ parent() }}` when overriding styles/scripts).
+The pages follow the UiKit page contract (REQ-UI-003): theme each view type once in UiKit (`nowo_ui_kit.theme`,
+`templates/bundles/NowoUiKitBundle/page/*.html.twig`) and every Workflow page follows. For a Workflow-specific need,
+point `nowo_workflow.web_ui.templates.<page>` (`dashboard`, `index`, `show`, `new`, `edit`) at a thin template that
+extends `@!NowoWorkflowBundle/…` and overrides a data block — see [TEMPLATES.md](TEMPLATES.md). Full copies under
+`templates/bundles/NowoWorkflowBundle/` still win (REQ-TWIG-001) but must keep the data block names and the `page`
+variable.
 
 ## Overriding translations (REQ-I18N-001)
 

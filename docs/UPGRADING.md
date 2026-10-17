@@ -3,6 +3,8 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [Template contract](#template-contract)
+  - [Configuration](#configuration)
 - [From 1.8.1 to 1.8.2](#from-181-to-182)
 - [From 1.8.0 to 1.8.1](#from-180-to-181)
 - [From 1.7.0 to 1.8.0](#from-170-to-180)
@@ -54,6 +56,77 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+From **1.8.2** — admin pages on the UiKit 2.0 page contract (REQ-UI-003). Minor release: the old configuration keeps
+working (deprecated), but the page markup changed.
+
+```bash
+composer update nowo-tech/workflow-bundle nowo-tech/ui-kit-bundle -W
+php bin/console assets:install
+php bin/console cache:clear
+```
+
+### Template contract
+
+What a host may notice:
+
+| Page | Before | Now |
+| --- | --- | --- |
+| Dashboard | `dashboard/index.html.twig` on `base.html.twig`, paginated table | `page/dashboard` (`DashboardPage`): KPI tiles + definitions card (`nowo_ui_dashboard_cards`) |
+| Definitions | `workflow_definition/index.html.twig`, local `_pagination` | `page/list` (`ListPage`): `nowo_ui_list_row`; row actions view / edit / **delete** (UiKit confirm `<dialog>`) |
+| Detail | `workflow_definition/show.html.twig`, inline `confirm()` | `page/show` (`ShowPage`): `nowo_ui_show_sections` (diagram + sections), `nowo_ui_modals` (diagram dialogs) |
+| New | `workflow_definition/form.html.twig` (`title`, `form`, `section`) | same file on `page/form` (`FormPage`): `nowo_ui_form_body` |
+| Edit sections | `workflow_definition/form.html.twig` + `_edit_nav` | `workflow_definition/edit.html.twig` on `page/settings` (`SettingsPage`, tabs): `nowo_ui_settings_section` |
+
+- Templates receive `page` (UiKit view model) instead of `definitions` / `list_*` / `title` / `form`; the show page
+  still gets `definition` and `graph`, the edit page `definition` and `section`, the dashboard `definitions` and
+  `total`.
+- Removed templates: `layout.html.twig`, `_framework_assets.css.twig`, `_framework_assets.js.twig`,
+  `_pagination.html.twig`, `workflow_definition/_edit_nav.html.twig`, `_match_rules_section.html.twig`,
+  `_places_section.html.twig`, `_transitions_section.html.twig`, `_collection_manager.js.twig`.
+- Dialogs are native `<dialog>`s (UiKit `confirm_*` slots): Bootstrap JS is no longer needed. The delete confirmation
+  needs UiKit's `nowo-ui-confirm.js` in your layout (UiKit layouts load it).
+- Assets load from `bundles/nowoworkflow/` (run `assets:install`); Tom Select is bundled, no CDN.
+- Forms no longer apply `bootstrap_5_layout.html.twig` on their own unless the deprecated `ui.css_framework` is set:
+  configure `twig.form_themes` (or the FormKit `workflow` profile) for your stack.
+
+Migrating overrides: delete copies under `templates/bundles/NowoWorkflowBundle/` and theme the view types once in
+UiKit (`nowo_ui_kit.theme`, `templates/bundles/NowoUiKitBundle/page/*.html.twig`). For a Workflow-only change, use
+`nowo_workflow.web_ui.templates.<page>` with a template that extends `@!NowoWorkflowBundle/…` and overrides a data
+block ([TEMPLATES.md](TEMPLATES.md#per-page-overrides)).
+
+### Configuration
+
+| Deprecated (1.9, removed in 2.0) | New |
+| --- | --- |
+| `enabled` | `web_ui.enabled` |
+| `ui.path` | `web_ui.path_prefix` |
+| `ui.layout_template` | `web_ui.layout_template` (`null` = `nowo_ui_kit.layouts.admin`) |
+| `ui.list_page_size` / `ui.default_locale` / `ui.locales` | `web_ui.list_page_size` / `web_ui.default_locale` / `web_ui.locales` |
+| `ui.required_roles` | `security.access_roles` |
+| `ui.css_framework` / `ui.icon_set` | `nowo_ui_kit.css_framework` / `nowo_ui_kit.icon_set` |
+
+```yaml
+# Before
+nowo_workflow:
+    ui:
+        path: '/workflow'
+        layout_template: 'base.html.twig'
+        css_framework: bootstrap5
+
+# After
+nowo_ui_kit:
+    css_framework: bootstrap5
+    layouts:
+        admin: 'layouts/admin.html.twig'   # renders the UiKit canonical blocks (CONFIGURATION.md)
+nowo_workflow:
+    web_ui:
+        path_prefix: '/workflow'
+```
+
+While `ui.layout_template` is set, pages render through the deprecated `@NowoWorkflowBundle/base.html.twig` bridge
+into that layout (its `title`, `stylesheets`, `body` and `javascripts` blocks), as in 1.x. The removed default
+`@NowoWorkflowBundle/layout.html.twig` maps to the UiKit layout.
 
 ## From 1.8.1 to 1.8.2
 

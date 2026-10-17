@@ -1,0 +1,23 @@
+# REQ-UI-003 host integration: one layout bridge and one theme for every bundle page.
+nowo_ui_kit:
+    css_framework: bootstrap5
+    icon_set: bootstrap-icons
+    row_actions_display: icon
+    layouts:
+        # Bridge into the demo base.html.twig (renders the UiKit canonical blocks).
+        admin: 'layouts/admin.html.twig'
+    theme:
+        # Host design tokens (UiKit paints its components from --nowo-ui-*).
+        tokens:
+            primary: '#4338ca'
+            primary-contrast: '#ffffff'
+            surface: '#ffffff'
+            surface-muted: '#f4f5fb'
+            border: '#e3e5f0'
+            border-strong: '#c9cde0'
+            text: '#1e2235'
+            muted: '#5d6280'
+            radius: '0.6rem'
+        classes:
+            card: 'demo-card'
+            page_title: 'demo-page-title'

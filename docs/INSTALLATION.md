@@ -21,6 +21,15 @@ nowo_workflow:
     resource: '@NowoWorkflowBundle/Resources/config/routes.yaml'
 ```
 
+## Layout and assets (UiKit page contract)
+
+The admin pages extend UiKit 2.0 scaffolds: point `nowo_ui_kit.layouts.admin` at your layout or a one-file bridge
+(see [CONFIGURATION.md](CONFIGURATION.md#host-layout-integration-req-ui-003)) and publish the bundle assets:
+
+```bash
+php bin/console assets:install
+```
+
 ## Database
 
 ```bash

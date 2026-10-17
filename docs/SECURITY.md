@@ -15,7 +15,7 @@ This Symfony bundle persists **workflow definitions** in Doctrine, exposes a **b
 
 | Threat | Mitigation |
 |--------|------------|
-| **Unauthorized CRUD access** | Default `RoleBasedWorkflowUiAccessChecker` with `security.access_roles` (typically `ROLE_ADMIN`). Optional custom `security.access_checker`. Host **MUST** also add Symfony `access_control` for `ui.path`. `allow_unauthenticated: true` is **demo/dev only**. |
+| **Unauthorized CRUD access** | Default `RoleBasedWorkflowUiAccessChecker` with `security.access_roles` (typically `ROLE_ADMIN`). Optional custom `security.access_checker`. Host **MUST** also add Symfony `access_control` for `web_ui.path_prefix`. `allow_unauthenticated: true` is **demo/dev only**. |
 | **SQL injection** | Use Doctrine ORM only; no raw SQL with user input. |
 | **XSS in admin UI** | Twig auto-escaping; validate user-supplied labels in forms. |
 | **Unsafe subject classes** | Validate `subject_class` refers to expected application entities; document trust boundaries for match rules. |
@@ -45,7 +45,7 @@ Before tagging a release, confirm:
 | **Recipe / Flex** | Default recipe values are safe (`allow_unauthenticated: false`). |
 | **Input / output** | Forms validated; Twig escaping in UI; ORM for persistence. |
 | **Dependencies** | `composer audit` clean or documented. |
-| **Permissions / exposure** | `access_roles` + firewall `access_control` for `ui.path`; never ship demos with `allow_unauthenticated: true` on a public host. |
+| **Permissions / exposure** | `access_roles` + firewall `access_control` for `web_ui.path_prefix`; never ship demos with `allow_unauthenticated: true` on a public host. |
 | **CLI access** | Restrict who can run schema sync / seed commands in production. |
 | **AI security audit (REQ-SEC-004)** | Pass (conditional) recorded in monorepo `BUNDLES_SECURITY_ANALYSIS.md`. |
 
@@ -57,8 +57,8 @@ Record confirmation in the release PR or tag notes.
 
 ```yaml
 nowo_workflow:
-    ui:
-        path: '/workflow'
+    web_ui:
+        path_prefix: '/workflow'
     security:
         access_roles: [ROLE_ADMIN]
         # access_checker: App\Security\WorkflowUiAccessChecker

@@ -940,17 +940,32 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  * }
  * @psalm-type NowoWorkflowConfig = array{
- *     enabled?: bool|Param, // Default: true
+ *     enabled?: bool|Param, // Deprecated: The "nowo_workflow.enabled.enabled" option is deprecated, use "nowo_workflow.web_ui.enabled" instead. // Deprecated alias of web_ui.enabled.
  *     environments?: list<scalar|Param|null>,
  *     connection?: scalar|Param|null, // Entity manager name used by nowo:workflow:sync-schema. The bundle mapping is registered on the default entity manager; for another manager, map NowoWorkflowBundle on it yourself. // Default: "default"
  *     table_prefix?: scalar|Param|null, // Default: "workflow_"
- *     ui?: array{
- *         path?: scalar|Param|null, // Default: "/workflow"
- *         layout_template?: scalar|Param|null, // Twig layout extended by Workflow UI pages (global nowo_workflow_layout_template). Host apps should set this to the project layout. // Default: "@NowoWorkflowBundle/layout.html.twig"
- *         css_framework?: "bootstrap"|"bootstrap5"|"bootstrap4"|"tailwind"|"foundation"|"custom"|"tabler"|"none"|Param, // CSS stack for Workflow UI markup. bootstrap is an alias of bootstrap5. // Default: "bootstrap5"
- *         icon_set?: "bootstrap-icons"|"tabler-icons"|"ux_icon"|"svg_inline"|"none"|Param, // Icon rendering for row actions and toolbars. // Default: "bootstrap-icons"
+ *     web_ui?: array{ // Workflow admin UI (REQ-UI-003 vocabulary).
+ *         enabled?: bool|Param, // When false every Workflow UI route answers 404 (the registry keeps working). // Default: true
+ *         path_prefix?: scalar|Param|null, // URL prefix of the Workflow UI routes. // Default: "/workflow"
+ *         layout_template?: scalar|Param|null, // Layout extended by the Workflow pages. null = UiKit layout (nowo_ui_kit.layouts.admin). The template must render the UiKit canonical blocks. // Default: null
+ *         templates?: array{ // Per-page template overrides (REQ-UI-003): a host template that extends @!NowoWorkflowBundle/… and overrides a data block.
+ *             dashboard?: scalar|Param|null, // Default: "@NowoWorkflowBundle/dashboard/index.html.twig"
+ *             index?: scalar|Param|null, // Default: "@NowoWorkflowBundle/workflow_definition/index.html.twig"
+ *             show?: scalar|Param|null, // Default: "@NowoWorkflowBundle/workflow_definition/show.html.twig"
+ *             new?: scalar|Param|null, // Default: "@NowoWorkflowBundle/workflow_definition/form.html.twig"
+ *             edit?: scalar|Param|null, // Default: "@NowoWorkflowBundle/workflow_definition/edit.html.twig"
+ *         },
  *         list_page_size?: int|Param, // Definitions shown per page on dashboard/index lists (REQ-PERF-001). Use 0 to load all (not recommended in production). // Default: 20
  *         default_locale?: scalar|Param|null, // Default: "en"
+ *         locales?: list<scalar|Param|null>,
+ *     },
+ *     ui?: array{ // Deprecated since 1.9: use web_ui.*, security.access_roles and nowo_ui_kit.css_framework / icon_set.
+ *         path?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.path.path" option is deprecated, use "nowo_workflow.web_ui.path_prefix" instead.
+ *         layout_template?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.layout_template.layout_template" option is deprecated, use "nowo_workflow.web_ui.layout_template" (a layout rendering the UiKit canonical blocks; null = nowo_ui_kit.layouts.admin) instead. // 1.x layout (global nowo_workflow_layout_template). Pages render through the deprecated @NowoWorkflowBundle/base.html.twig bridge while it is set.
+ *         css_framework?: "bootstrap"|"bootstrap5"|"bootstrap4"|"tailwind"|"foundation"|"custom"|"tabler"|"none"|Param|null, // Deprecated: The "nowo_workflow.ui.css_framework.css_framework" option is deprecated, set "nowo_ui_kit.css_framework" instead. // Seeds nowo_ui_kit.css_framework when the host does not set it. bootstrap / tabler are aliases of bootstrap5. // Default: null
+ *         icon_set?: "bootstrap-icons"|"tabler-icons"|"ux_icon"|"svg_inline"|"none"|Param|null, // Deprecated: The "nowo_workflow.ui.icon_set.icon_set" option is deprecated, set "nowo_ui_kit.icon_set" instead. // Seeds nowo_ui_kit.icon_set when the host does not set it. // Default: null
+ *         list_page_size?: int|Param, // Deprecated: The "nowo_workflow.ui.list_page_size.list_page_size" option is deprecated, use "nowo_workflow.web_ui.list_page_size" instead.
+ *         default_locale?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.default_locale.default_locale" option is deprecated, use "nowo_workflow.web_ui.default_locale" instead.
  *         locales?: list<scalar|Param|null>,
  *         required_roles?: list<scalar|Param|null>,
  *     },
@@ -1006,10 +1021,93 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         default_branch?: scalar|Param|null, // Branch used as compare target when the installed version is already the latest. // Default: "main"
  *         user_agent?: scalar|Param|null, // User-Agent sent to api.github.com. // Default: "nowo-ui-kit-release-check"
  *     },
+ *     route_links?: array{ // Route (or route prefix) → link map read by nowo_ui_route_link(), e.g. for the page-edge "manual" tab (partials/_edge_tab.html.twig). A prefix matches the route itself or any route starting with "<prefix>_"; the longest prefix wins.
+ *         base_url?: scalar|Param|null, // Prepended to every relative path (paths starting with "/", "//", "http://" or "https://" are used as is). // Default: ""
+ *         default_testid?: scalar|Param|null, // testid returned for entries without their own. // Default: null
+ *         routes?: array<string, Param|string|array{ // Default: []
+ *             path?: scalar|Param|null,
+ *             testid?: scalar|Param|null, // Default: null
+ *         }>,
+ *     },
+ *     appearance?: array{ // Optional site appearance SPI (presets, --nowo-ui-* token emitter, Twig functions). Off by default.
+ *         enabled?: bool|Param, // Default: false
+ *         provider?: scalar|Param|null, // Service id implementing AppearanceProviderInterface (host storage). Null = the config defaults below. // Default: null
+ *         defaults?: array{
+ *             brand_name?: scalar|Param|null, // Default: ""
+ *             brand_eyebrow?: scalar|Param|null, // Default: ""
+ *             preset?: scalar|Param|null, // Preset whose light colours are the default. // Default: "slate"
+ *             preset_dark?: scalar|Param|null, // Preset whose dark colours are the default. // Default: "midnight"
+ *             corner_style?: "sharp"|"soft"|"rounded"|Param, // Default: "soft"
+ *             border_strength?: "subtle"|"medium"|"strong"|Param, // Default: "medium"
+ *             footer_fixed?: bool|Param, // Default: false
+ *         },
+ *         presets?: array<string, array{ // Default: []
+ *             mode?: "light"|"dark"|Param, // Default: "light"
+ *             light?: array{
+ *                 accent?: scalar|Param|null,
+ *                 accent_deep?: scalar|Param|null,
+ *                 danger?: scalar|Param|null,
+ *                 warn?: scalar|Param|null,
+ *                 paper?: scalar|Param|null,
+ *                 ink?: scalar|Param|null,
+ *                 surface?: scalar|Param|null,
+ *             },
+ *             dark?: array{
+ *                 accent?: scalar|Param|null,
+ *                 accent_deep?: scalar|Param|null,
+ *                 danger?: scalar|Param|null,
+ *                 warn?: scalar|Param|null,
+ *                 paper?: scalar|Param|null,
+ *                 ink?: scalar|Param|null,
+ *                 surface?: scalar|Param|null,
+ *             },
+ *         }>,
+ *         builtin_presets?: list<scalar|Param|null>,
+ *         kit_tokens?: bool|Param, // Emit the --nowo-ui-* tokens. False = only the token_aliases are written. // Default: true
+ *         token_aliases?: array<string, list<scalar|Param|null>>,
+ *         selectors?: array{ // Selectors of the three emitted blocks.
+ *             root?: scalar|Param|null, // Default: ":root"
+ *             light?: scalar|Param|null, // Default: ":root, [data-theme=\"light\"]"
+ *             dark?: scalar|Param|null, // Default: "[data-theme=\"dark\"]"
+ *         },
+ *         shadow_rgb_fallback?: scalar|Param|null, // --nowo-ui-shadow-rgb when the light ink colour is not hex ("r g b"). // Default: "15 23 42"
+ *     },
+ *     layouts?: array{ // Layouts the page scaffolds extend (Twig global nowo_ui_layout). Host layouts or one-file bridges must render the canonical nowo_ui_* blocks.
+ *         admin?: scalar|Param|null, // Default: "@NowoUiKit/layout/admin.html.twig"
+ *         guest?: scalar|Param|null, // Default: "@NowoUiKit/layout/guest.html.twig"
+ *     },
+ *     breadcrumbs?: array{ // Page header breadcrumbs: BreadcrumbKit (breadcrumb_render) when installed and enabled here, else the plain trail from PageHeader::breadcrumbs.
+ *         breadcrumb_kit?: bool|Param, // Use BreadcrumbKit when its breadcrumb_render() Twig function exists. // Default: true
+ *         collection?: scalar|Param|null, // BreadcrumbKit collection code (null = its default collection). PageHeader::breadcrumbCollection overrides it. // Default: null
+ *     },
+ *     theme?: array{ // Global theme (REQ-UI-003): semantic slot classes / attributes, partial overrides and --nowo-ui-* tokens, configured once for every bundle.
+ *         framework_defaults?: bool|Param, // false = slots print the semantic nowo-ui-* class and the host classes only (no UiKit framework defaults such as btn / badge / card). Per slot: classes.<slot>: {value: …, framework_defaults: false}. // Default: true
+ *         classes?: array<string, mixed>,
+ *         attributes?: array<string, array<string, mixed>>,
+ *         partials?: array<string, scalar|Param|null>,
+ *         tokens?: array<string, mixed>,
+ *         tokens_dark?: array<string, mixed>,
+ *         confirm_message_in_header?: bool|Param, // Confirm dialogs and the full-page confirm render the message inside the header, under the title (hosts whose dialog header is title + message). View\Confirm::messageInHeader wins when set. // Default: false
+ *         bundles?: array<string, array{ // Default: []
+ *             framework_defaults?: bool|Param, // Override of theme.framework_defaults for this bundle (unset = inherit).
+ *             classes?: array<string, mixed>,
+ *             attributes?: array<string, array<string, mixed>>,
+ *             partials?: array<string, scalar|Param|null>,
+ *             tokens?: array<string, mixed>,
+ *             tokens_dark?: array<string, mixed>,
+ *         }>,
+ *         pages?: array<string, array{ // Default: []
+ *             framework_defaults?: bool|Param, // Override of theme.framework_defaults for this page type (unset = inherit).
+ *             classes?: array<string, mixed>,
+ *             attributes?: array<string, array<string, mixed>>,
+ *             header_actions_in_filters?: bool|Param, // list only: render the page-header actions at the end of the filter row instead of the page header (ListPage::headerActionsInFilters wins when set; unset = false).
+ *         }>,
+ *     },
  * }
  * @psalm-type NowoFormKitConfig = array{
  *     type_map?: array<string, scalar|Param|null>,
  *     default_profile?: scalar|Param|null, // Name of the profile to use when no profile is specified (key in profiles) // Default: "default"
+ *     convention_requires_translation?: bool|Param, // Global default for profiles.<name>.convention_requires_translation: only apply auto help / placeholder convention keys that exist in the translator catalogue. Requires a translator implementing TranslatorBagInterface (no effect otherwise). Default: false. // Default: false
  *     css_framework?: scalar|Param|null, // CSS framework for CssClassUtilities (column merge + class ordering): bootstrap, tailwind, foundation, none. // Default: "bootstrap"
  *     stateless_csrf?: array{ // Give selected (usually anonymous/public) form types a stateless CSRF token id so rendering them does not start a session. Off by default.
  *         enabled?: bool|Param, // Default: false
@@ -1020,11 +1118,15 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     accessibility?: array{ // Accessibility helpers applied by kit form type extensions.
  *         unlabelled_choice_aria_label?: bool|Param, // When true (default), non-expanded ChoiceType fields (and subtypes such as EntityType) rendered with label: false and no aria-label/aria-labelledby get aria-label from their translated help, else their placeholder. // Default: true
  *     },
+ *     twig?: array{ // Twig helpers shipped by the bundle (registered only when twig/twig is installed).
+ *         csrf_action_form?: bool|Param, // When true (default), registers the csrf_action_form() Twig function (CSRF-only single-action POST forms). Set false if the host keeps its own function with that name. // Default: true
+ *     },
  *     profiles?: array<string, array{ // Default: []
  *         alias?: scalar|Param|null, // Alias for this profile (e.g. for reference in form types)
  *         translation_domain?: scalar|Param|null, // Default: "messages"
  *         auto_placeholder?: bool|Param, // When true (default), unset placeholders become {form}.{field}.placeholder translation keys. Set false for kits that only set explicit labels. // Default: true
  *         auto_help?: bool|Param, // When true (default), unset help becomes {form}.{field}.help translation keys. Set false to avoid raw missing-help keys in the UI. // Default: true
+ *         convention_requires_translation?: bool|Param|null, // When true, the auto help / placeholder convention keys are only applied if the key exists in the translator catalogue (current locale + fallbacks) for the field's translation domain. Never affects labels. Null (default) inherits the root convention_requires_translation. // Default: null
  *         required_label_suffix?: scalar|Param|null, // Appended to the label when the field is required (e.g. " *"). Empty or null to disable. // Default: null
  *         help_modal?: array{ // Default help modal configuration (used when the field option "help_modal" is enabled).
  *             framework?: scalar|Param|null, // Modal framework to use when opening from frontend. // Default: "bootstrap5"

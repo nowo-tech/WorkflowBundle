@@ -1,7 +1,8 @@
 nowo_workflow:
-    enabled: true
-    ui:
-        path: '/workflow'
+    web_ui:
+        path_prefix: '/workflow'
+        # null (default) = UiKit layout: nowo_ui_kit.layouts.admin → templates/layouts/admin.html.twig
+        layout_template: null
         default_locale: 'en'
         locales: ['en', 'es', 'fr', 'it']
     security:

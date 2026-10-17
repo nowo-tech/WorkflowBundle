@@ -3,18 +3,16 @@
 ```yaml
 # config/packages/nowo_workflow.yaml
 nowo_workflow:
-    enabled: true
     connection: default
     table_prefix: workflow_
-    ui:
-        path: '/workflow'
-        layout_template: '@NowoWorkflowBundle/layout.html.twig'  # set to your project layout in real apps
-        css_framework: bootstrap5   # bootstrap5 | bootstrap4 | tailwind | foundation | custom | none
-        icon_set: bootstrap-icons   # bootstrap-icons | tabler-icons | ux_icon | svg_inline | none
+    web_ui:
+        enabled: true
+        path_prefix: '/workflow'
+        layout_template: null       # null = UiKit layout (nowo_ui_kit.layouts.admin)
+        templates: {}               # per-page overrides: dashboard, index, show, new, edit
         list_page_size: 20          # 0 = load all (not recommended in production)
         default_locale: en
         locales: [en, es, fr, it]
-        required_roles: [ROLE_ADMIN]  # BC alias of security.access_roles
     security:
         access_roles: [ROLE_ADMIN]
         # access_checker: App\Security\WorkflowUiAccessChecker
@@ -23,108 +21,88 @@ nowo_workflow:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `enabled` | `true` | When `false`, every Workflow UI route (`nowo_workflow_*`) answers 404; UI access checks stay wired (fail-closed) |
 | `connection` | `default` | **Entity manager name** used by `nowo:workflow:sync-schema`. The bundle mapping (`NowoWorkflowBundle`) is always prepended to the **default** entity manager; to store workflow tables elsewhere, map `NowoWorkflowBundle` on that entity manager yourself and set this option to its name. |
-| `environments` | `[dev, test, prod]` | **Deprecated since 1.8, ignored.** Register the bundle only for the wanted environments in `config/bundles.php` instead. |
 | `table_prefix` | `workflow_` | Prefix for Doctrine table and constraint names (`workflow_definition` → `{prefix}definition`) |
-| `ui.path` | `/workflow` | Base path for CRUD UI (use as Symfony `access_control` path prefix) |
-| `ui.layout_template` | `@NowoWorkflowBundle/layout.html.twig` | Twig layout extended by UI pages (Twig global `nowo_workflow_layout_template`). **Host apps should set this to the project layout** (or a one-file bridge). The default layout is for demos / standalone installs only. |
-| `ui.css_framework` | `bootstrap5` | CSS stack for markup macros: `bootstrap`/`bootstrap5`, `bootstrap4`, `tailwind`, `foundation`, `custom`, `tabler` (alias of bootstrap5), `none`. With `custom`, templates rely on semantic `nowo-ui-*` classes. |
-| `ui.icon_set` | `bootstrap-icons` | Icon rendering for row actions: `bootstrap-icons`, `tabler-icons`, `ux_icon`, `svg_inline`, `none` (text labels only) |
-| `ui.list_page_size` | `20` | Definitions per page on dashboard and index (REQ-PERF-001). `0` = load all (not recommended in production). Query param `?page=` |
-| `ui.default_locale` | `en` | Default locale for the CRUD UI (applied only to `nowo_workflow_*` routes; host routes keep their locale) |
-| `ui.locales` | `en`, `es`, `fr`, `it` | Enabled locales for the locale switcher. `/locale/{_locale}` accepts exactly these values (any other locale answers 404). |
-| `ui.required_roles` | `ROLE_ADMIN` | **BC alias** of `security.access_roles` |
+| `web_ui.enabled` | `true` | When `false`, every Workflow UI route (`nowo_workflow_*`) answers 404; UI access checks stay wired (fail-closed). The registry keeps working. |
+| `web_ui.path_prefix` | `/workflow` | Base path of the UI routes (use it as Symfony `access_control` path prefix) |
+| `web_ui.layout_template` | `null` | Layout the pages extend. `null` = UiKit's `nowo_ui_kit.layouts.admin` (recommended: configure the layout once in UiKit). A custom value must render the UiKit canonical blocks (REQ-UI-003). |
+| `web_ui.templates.<page>` | bundle templates | Per-page template (`dashboard`, `index`, `show`, `new`, `edit`); see [TEMPLATES.md](TEMPLATES.md#per-page-overrides) |
+| `web_ui.list_page_size` | `20` | Definitions per page on the list (and rows of the dashboard card) (REQ-PERF-001). `0` = load all (not recommended in production). Query param `?page=` |
+| `web_ui.default_locale` | `en` | Default locale for the UI (applied only to `nowo_workflow_*` routes; host routes keep their locale) |
+| `web_ui.locales` | `en`, `es`, `fr`, `it` | Enabled UI locales (`/locale/{_locale}` accepts exactly these values, any other answers 404; Twig global `nowo_workflow_locales`). |
 | `security.access_roles` | `ROLE_ADMIN` | User must have **at least one** role. An empty list is **rejected** unless `security.access_checker` is set (your checker decides) or `security.allow_unauthenticated: true` (dev/demo only). |
 | `security.access_checker` | `null` | Optional service id implementing `WorkflowUiAccessCheckerInterface` |
 | `security.allow_unauthenticated` | `false` | **DEV/DEMO only.** When `false` (default), SecurityBundle (`security.authorization_checker`) is required. Never `true` in production. |
 
-Shipped translation catalogs: `en`, `es`, `fr`, `it`, `de`, `nl`, `pt`. Add `de`, `nl`, or `pt` to `ui.locales` to expose them in the switcher.
+Shipped translation catalogs: `en`, `es`, `fr`, `it`, `de`, `nl`, `pt`. Add `de`, `nl`, or `pt` to `web_ui.locales` to expose them.
 
-### Form themes
+The CSS stack, icon set and row-action display come from UiKit (`nowo_ui_kit.css_framework`, `icon_set`,
+`row_actions_display`); the form theme from the host (`twig.form_themes`) and the FormKit `workflow` profile
+(seeded with the classes of the UiKit stack when the host does not define it).
 
-With `ui.css_framework: bootstrap5` (or its aliases) / `bootstrap4`, the bundle applies `bootstrap_5_layout.html.twig` / `bootstrap_4_layout.html.twig` **only to its own forms** (`{% form_theme %}` in `workflow_definition/form.html.twig`, via the Twig global `nowo_workflow_form_themes`). It no longer adds anything to `twig.form_themes`, so host application forms keep the host's own theme. Other frameworks get no extra theme.
+### Deprecated keys (since 1.9, removed in 2.0)
 
-## Host layout integration (REQ-UI-001)
+Still read and mapped (a canonical key set explicitly wins); each one reports a deprecation:
 
-Preferred path — **do not** copy every CRUD Twig page:
+| Deprecated | Use instead |
+| --- | --- |
+| `enabled` | `web_ui.enabled` |
+| `ui.path` | `web_ui.path_prefix` |
+| `ui.layout_template` | `web_ui.layout_template` with a layout rendering the canonical blocks, or `nowo_ui_kit.layouts.admin`. While set, pages render through the deprecated `@NowoWorkflowBundle/base.html.twig` bridge into that 1.x layout; the removed default `@NowoWorkflowBundle/layout.html.twig` maps to the UiKit layout. |
+| `ui.css_framework` | `nowo_ui_kit.css_framework` (still seeded when the host does not set it; also re-enables the 1.x scoped Bootstrap form theme) |
+| `ui.icon_set` | `nowo_ui_kit.icon_set` (still seeded when the host does not set it) |
+| `ui.list_page_size`, `ui.default_locale`, `ui.locales` | `web_ui.list_page_size`, `web_ui.default_locale`, `web_ui.locales` |
+| `ui.required_roles` | `security.access_roles` |
+| `environments` (since 1.8) | register the bundle per environment in `config/bundles.php` |
 
-1. Set `ui.layout_template` to your project layout (e.g. `base.html.twig`).
-2. Set `ui.css_framework` to match the project (`bootstrap5`, `tailwind`, `foundation`, or `custom`).
-3. Ensure the project layout defines `stylesheets` / `javascripts` (or use a bridge) so bundle pages can stack with `{{ parent() }}`.
-4. Bundle pages extend `@NowoWorkflowBundle/base.html.twig`, which fills `nowo_ui_content` / `nowo_ui_styles` / `nowo_ui_scripts`.
+Deprecated Twig globals: `nowo_workflow_layout_template`, `nowo_workflow_css_framework`, `nowo_workflow_icon_set`,
+`nowo_workflow_form_themes`.
 
-### CSS framework examples
+## Host layout integration (REQ-UI-003)
 
-```yaml
-# Bootstrap 5 (default demo)
-nowo_workflow:
-    ui:
-        layout_template: 'base.html.twig'
-        css_framework: bootstrap5
-        icon_set: bootstrap-icons
-```
+Preferred path — configure UiKit once, **do not** copy Workflow pages:
 
-```yaml
-# Tailwind
-nowo_workflow:
-    ui:
-        layout_template: 'base.html.twig'
-        css_framework: tailwind
-        icon_set: none
-```
-
-```yaml
-# Foundation
-nowo_workflow:
-    ui:
-        layout_template: 'base.html.twig'
-        css_framework: foundation
-```
+1. Point `nowo_ui_kit.layouts.admin` at your layout or a one-file bridge that renders the UiKit canonical blocks
+   (`nowo_ui_document_title`, `nowo_ui_head`, `nowo_ui_styles`, `nowo_ui_page_header`, `nowo_ui_flashes`,
+   `nowo_ui_content`, `nowo_ui_modals`, `nowo_ui_scripts`) and loads UiKit's `nowo-ui.css` / `nowo-ui-confirm.js`.
+2. Theme `nowo_ui_kit.theme` (tokens + class map) once for every bundle.
+3. Run `php bin/console assets:install` (the pages load `bundles/nowoworkflow/…`).
 
 ```yaml
-# Own design system — style .nowo-ui-* in project CSS
-nowo_workflow:
-    ui:
-        layout_template: 'base.html.twig'
-        css_framework: custom
-        icon_set: svg_inline
-```
-
-### Bridge when content block names differ
-
-```yaml
-layout_template: 'admin/nowo_workflow_bridge.html.twig'
+# config/packages/nowo_ui_kit.yaml
+nowo_ui_kit:
+    css_framework: bootstrap5
+    layouts:
+        admin: 'layouts/admin.html.twig'
 ```
 
 ```twig
-{# templates/admin/nowo_workflow_bridge.html.twig #}
+{# templates/layouts/admin.html.twig — bridge into the project base #}
 {% extends 'base.html.twig' %}
-
+{% block title %}{% block nowo_ui_document_title %}{% endblock %}{% endblock %}
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ asset('css/nowo-ui.css', 'nowo_ui_kit') }}">
+    {{ nowo_ui_tokens() }}
+    {{ parent() }}
+    {% block nowo_ui_head %}{% endblock %}{% block nowo_ui_styles %}{% endblock %}
+{% endblock %}
 {% block body %}
-    {% block nowo_ui_content %}{% endblock %}
+    <main id="nowo-ui-content"{% if nowo_ui_bundle|default(null) %} data-nowo-ui-bundle="{{ nowo_ui_bundle }}"{% endif %}>
+        {% block nowo_ui_page_header %}{% endblock %}
+        {% block nowo_ui_flashes %}{{ include(nowo_ui_partial('flashes', nowo_ui_bundle|default(null)), {bundle: nowo_ui_bundle|default(null)}) }}{% endblock %}
+        {% block nowo_ui_content %}{% endblock %}
+    </main>
+    {% block nowo_ui_modals %}{% endblock %}
+{% endblock %}
+{% block javascripts %}
+    {{ parent() }}
+    <script src="{{ asset('js/nowo-ui-confirm.js', 'nowo_ui_kit') }}" defer></script>
+    {% block nowo_ui_scripts %}{% endblock %}
 {% endblock %}
 ```
 
-If the host layout is already `base.html.twig` with a `body` block, you can skip a project file and set:
-
-```yaml
-layout_template: '@NowoWorkflowBundle/layout_integrate_base.html.twig'
-```
-
-### Overridable Twig paths
-
-| Path under `templates/bundles/NowoWorkflowBundle/` | Role |
-| -------------------------------------------------- | ---- |
-| `layout.html.twig` | Demo full-page layout (CDN via `_framework_assets.*.twig`) |
-| `layout_integrate_base.html.twig` | Optional Nowo-to-Nowo bridge: `ui.layout_template: '@NowoWorkflowBundle/layout_integrate_base.html.twig'` when the host layout is `base.html.twig` and the content block is `body` |
-| `base.html.twig` | Page shell (`parent()` asset stacking) |
-| `dashboard/index.html.twig` | Dashboard (composes `@NowoUiKitBundle/macros/ui.html.twig`) |
-| `workflow_definition/index.html.twig` | Definition list |
-| `workflow_definition/form.html.twig` | Create/edit form |
-| `workflow_definition/show.html.twig` | Definition detail |
-
-Semantic CSS hooks: `nowo-ui-page-header`, `nowo-ui-toolbar`, `nowo-ui-table`, `nowo-ui-row-actions`, `nowo-ui-btn`, `nowo-ui-action--*`, `nowo-ui-modal`, `nowo-ui-flash`, `nowo-ui-empty`.
+The demo (`demo/symfony8/templates/layouts/admin.html.twig`, `config/packages/nowo_ui_kit.yaml`) is a complete
+example. Pages, data blocks, view models and assets: [TEMPLATES.md](TEMPLATES.md).
 
 ## Protecting the CRUD UI (REQ-UI-002)
 

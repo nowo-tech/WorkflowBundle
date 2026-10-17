@@ -12,13 +12,31 @@ Define Symfony Workflow state machines and workflows in the database, manage the
 
 This bundle is **FrankenPHP worker mode friendly**.
 
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/images/demo/flow-diagram.webp" alt="Workflow definition detail with the flow diagram of a branching state machine" />
+      <br /><sub>Definition detail — flow diagram of a branching state machine</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/images/demo/transition-editor.webp" alt="Transitions tab with the transition editor dialog and searchable place selects" />
+      <br /><sub>Transitions editor — dialog with searchable from / to places</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/images/demo/definitions.webp" alt="Workflow definitions list with match rules, priority, places and row actions" />
+      <br /><sub>Definitions list — match rules, priority and row actions</sub>
+    </td>
+  </tr>
+</table>
+
 ## Features
 
 - Persist workflow definitions (places, transitions, subject class, marking property) in Doctrine
 - Configurable Doctrine `table_prefix` for table and constraint names
 - Built-in admin UI at `/workflow` (configurable path), protected by default via `security.access_roles` / `WorkflowUiAccessCheckerInterface`
-- Configurable `ui.layout_template`, `ui.css_framework` (`bootstrap5`, `tailwind`, `foundation`, `custom`, …), `ui.icon_set`, and `ui.list_page_size`
-- UI translations for `en`, `es`, `fr`, `it`, `de`, `nl`, `pt` (enable extra locales in `ui.locales`)
+- Admin pages on the UiKit 2.0 page contract (REQ-UI-003): list, show, form, settings and dashboard scaffolds themed once by the host (`nowo_ui_kit.layouts` / `nowo_ui_kit.theme`), flow diagram and collection editors on native `<dialog>`s, no CDN assets — see [Templates](docs/TEMPLATES.md)
+- Configurable `web_ui.path_prefix`, `web_ui.layout_template`, `web_ui.templates.<page>` and `web_ui.list_page_size`
+- UI translations for `en`, `es`, `fr`, `it`, `de`, `nl`, `pt` (enable extra locales in `web_ui.locales`)
 - Runtime resolution via `DatabaseWorkflowRegistry` (Symfony Workflow component)
 - `WorkflowApplicator` helper to apply transitions and flush subjects
 - Demo with order approval (state machine) and document review (parallel workflow)
@@ -33,11 +51,9 @@ composer require nowo-tech/workflow-bundle
 ```yaml
 # config/packages/nowo_workflow.yaml
 nowo_workflow:
-    enabled: true
-    ui:
-        path: '/workflow'
-        layout_template: 'base.html.twig'  # project layout
-        css_framework: bootstrap5
+    web_ui:
+        path_prefix: '/workflow'
+        # layout_template: null → nowo_ui_kit.layouts.admin (your layout / bridge, set once in UiKit)
     security:
         access_roles: [ROLE_ADMIN]
 ```
@@ -55,6 +71,9 @@ make -C demo up-symfony8
 
 Open http://localhost:8022 — try the CRUD at `/workflow` and playgrounds for orders/documents.
 
+Playwright e2e and the README screenshots (REQ-DEMO-013): `make -C demo/symfony8 test-e2e` and
+`make -C demo/symfony8 demo-screenshots` (after `make -C demo/symfony8 reset-demo`).
+
 Smoke check (boot + HTTP 200):
 
 ```bash
@@ -65,6 +84,7 @@ make demo-smoke
 
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
+- [Templates (UiKit page contract)](docs/TEMPLATES.md)
 - [PSR evaluation (REQ-CS-007)](docs/PSR.md)
 - [Usage](docs/USAGE.md)
 - [Contributing](docs/CONTRIBUTING.md)

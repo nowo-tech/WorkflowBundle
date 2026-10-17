@@ -1,10 +1,7 @@
 nowo_workflow:
-    enabled: true
-    ui:
-        path: '/workflow'
-        layout_template: '@NowoWorkflowBundle/layout.html.twig'
-        css_framework: bootstrap5
-        icon_set: bootstrap-icons
+    web_ui:
+        path_prefix: '/workflow'
+        # layout_template: null   # default: nowo_ui_kit.layouts.admin (configure your layout once in UiKit)
         default_locale: 'en'
         locales: ['en', 'es', 'fr', 'it']
     security:

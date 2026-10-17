@@ -40,6 +40,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **UiKit 2.0 page contract (REQ-UI-003).** The admin pages extend UiKit scaffolds and receive view models from the
+  new `Nowo\WorkflowBundle\View\WorkflowPageFactory`: dashboard → `page/dashboard` (KPI tiles + definitions card),
+  definitions → `page/list` (view / edit / delete row actions, delete behind the UiKit confirm dialog, `Pagination`,
+  empty state, breadcrumbs), detail → `page/show` (detail sections, created / updated meta, flow diagram with
+  place / transition dialogs), new → `page/form`, edit → `page/settings` (one tab per section). See
+  [TEMPLATES.md](TEMPLATES.md).
+- Canonical configuration keys: `web_ui.enabled`, `web_ui.path_prefix`, `web_ui.layout_template` (default `null` →
+  `nowo_ui_kit.layouts.admin`), `web_ui.templates.<page>` (`dashboard`, `index`, `show`, `new`, `edit`),
+  `web_ui.list_page_size`, `web_ui.default_locale`, `web_ui.locales`.
+- Delete action on the definitions list rows and on the edit pages (same CSRF-protected `POST` route).
+- Bundle assets in `src/Resources/public/` (`assets:install` → `bundles/nowoworkflow/`): `css/nowo-workflow.css`
+  (diagram, dialogs and editors painted from `--nowo-ui-*` tokens), `js/nowo-workflow.js` (native `<dialog>`s and
+  collection editors) and Tom Select 2.4.3 (`vendor/tom-select/`, Apache-2.0) for the transitions editor.
+- Collection editors validate the entry inside the dialog (required fields) before applying it.
+- Real translations (7 locales) for the new labels and for the FormKit placeholder / help convention keys of every
+  form field.
+- `PageContractTest` (UiKit `PageContractTestCase`) over every page; demo Playwright e2e (`make -C demo/symfony8
+  test-e2e`) and WebP screenshots in `docs/images/demo/` (REQ-DEMO-013).
+
+### Changed
+
+- **Template contract:** every page template was rewritten on a UiKit scaffold (view model `page`, data blocks
+  only); `workflow_definition/form.html.twig` is now the *new* page only and the edit sections render
+  `workflow_definition/edit.html.twig`. Markup uses `nowo-ui-*` classes and UiKit theme slots, no framework
+  utility classes, no inline `<script>` / `<style>` / `onsubmit` / `confirm()`.
+- The dashboard shows KPI tiles and the first `web_ui.list_page_size` definitions (link to the full list) instead of a
+  paginated table.
+- Forms use the host form theme and the FormKit `workflow` profile; the profile is seeded with Bootstrap control
+  classes only on Bootstrap stacks (`nowo_ui_kit.css_framework`), semantic `nowo-ui-input` otherwise.
+- `PlaceMultiSelectType` no longer adds the Bootstrap `form-select` class.
+- Flash messages are translated by the controller (UiKit's flashes partial prints them as given).
+- Requires `nowo-tech/ui-kit-bundle` `^2.0`.
+
+### Deprecated
+
+- `enabled` → `web_ui.enabled`; `ui.path` → `web_ui.path_prefix`; `ui.layout_template` → `web_ui.layout_template`
+  / `nowo_ui_kit.layouts.admin` (still honoured through the deprecated `@NowoWorkflowBundle/base.html.twig` bridge);
+  `ui.list_page_size`, `ui.default_locale`, `ui.locales` → `web_ui.*`; `ui.required_roles` →
+  `security.access_roles`; `ui.css_framework` / `ui.icon_set` → `nowo_ui_kit.css_framework` / `icon_set`.
+- Twig globals `nowo_workflow_layout_template`, `nowo_workflow_css_framework`, `nowo_workflow_icon_set`,
+  `nowo_workflow_form_themes`; templates `base.html.twig`, `layout_integrate_base.html.twig`,
+  `_locale_switcher.html.twig`. All removed in 2.0.
+
+### Removed
+
+- Default CDN layout `layout.html.twig` and the 4-framework CDN switch (`_framework_assets.css.twig` /
+  `.js.twig`), local `_pagination.html.twig`, `workflow_definition/_edit_nav.html.twig`, the Bootstrap-modal
+  collection partials (`_match_rules_section`, `_places_section`, `_transitions_section`,
+  `_collection_manager.js.twig`) and the Tom Select CDN.
+
+### Fixed
+
+- The definitions list showed fewer rows than `list_page_size` (the page limit applied to fetch-joined rows); it now
+  paginates definitions (Doctrine `Paginator`).
+
 ## [1.8.2] - 2026-10-13
 
 ### Changed

@@ -18,6 +18,12 @@ make install
 
 Demos: `make -C demo up-symfony8` (FrankenPHP + PostgreSQL).
 
+Playwright (REQ-DEMO-013, official Playwright Docker image): `make -C demo/symfony8 reset-demo test-e2e` runs the
+admin happy paths; `make -C demo/symfony8 demo-screenshots` refreshes `docs/images/demo/*.webp`.
+
+Page contract (REQ-UI-003): `tests/Integration/PageContractTest.php` renders every admin page against UiKit's stub
+host layout and theme; pages, data blocks and view models are listed in [TEMPLATES.md](TEMPLATES.md).
+
 ## Quality checks
 
 ```bash
