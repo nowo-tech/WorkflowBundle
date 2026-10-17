@@ -347,6 +347,13 @@
         }
 
         dialog.querySelector('[data-dialog-apply]').addEventListener('click', function () {
+            // The entry is submitted with the page form later: report its invalid fields now, inside the dialog.
+            var invalid = active ? active.querySelector(':invalid') : null;
+            if (invalid && typeof invalid.reportValidity === 'function') {
+                invalid.reportValidity();
+
+                return;
+            }
             finish(true);
             closeDialog(dialog);
         });

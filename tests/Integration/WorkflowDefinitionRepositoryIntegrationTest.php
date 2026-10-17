@@ -96,6 +96,26 @@ final class WorkflowDefinitionRepositoryIntegrationTest extends TestCase
         self::assertSame('Invoice', $page2['items'][0]->getName());
     }
 
+    public function testPaginateByNameCountsDefinitionsNotJoinedRows(): void
+    {
+        $entityManager = IntegrationEntityManagerFactory::createSyncedInMemory();
+        $repository    = new WorkflowDefinitionRepository(new TestManagerRegistry($entityManager));
+        foreach (['Alpha', 'Beta', 'Gamma'] as $name) {
+            $definition = new WorkflowDefinition($name, strtolower($name), 'draft', 'App\\Entity\\Order');
+            foreach (['draft', 'review', 'done'] as $place) {
+                $definition->addPlace(new WorkflowPlace($place));
+            }
+            $entityManager->persist($definition);
+        }
+        $entityManager->flush();
+        $entityManager->clear();
+
+        $page = $repository->paginateByName(1, 2);
+
+        self::assertSame(['Alpha', 'Beta'], array_map(static fn (WorkflowDefinition $d): string => $d->getName(), $page['items']));
+        self::assertCount(3, $page['items'][0]->getPlaces());
+    }
+
     public function testPaginateByNameWithZeroPageSizeReturnsAll(): void
     {
         $page = $this->repository->paginateByName(1, 0);

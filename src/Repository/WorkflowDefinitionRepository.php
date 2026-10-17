@@ -6,9 +6,12 @@ namespace Nowo\WorkflowBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
+use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use SortDirection;
+
+use function iterator_to_array;
 
 /**
  * @extends ServiceEntityRepository<WorkflowDefinition>
@@ -89,12 +92,13 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
         $pages = max(1, (int) ceil($total / $pageSize));
         $page  = min($page, $pages);
 
-        /** @var list<WorkflowDefinition> $items */
-        $items = $this->createListQueryBuilder()
+        // Paginator: a plain LIMIT on the fetch-joined query would count joined rows, not definitions.
+        $query = $this->createListQueryBuilder()
             ->setFirstResult(($page - 1) * $pageSize)
             ->setMaxResults($pageSize)
-            ->getQuery()
-            ->getResult();
+            ->getQuery();
+        /** @var list<WorkflowDefinition> $items */
+        $items = iterator_to_array(new Paginator($query, true), false);
 
         return [
             'items'     => $items,

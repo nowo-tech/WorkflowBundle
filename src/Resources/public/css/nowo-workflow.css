@@ -237,3 +237,26 @@
   background: var(--nowo-ui-surface);
   color: var(--nowo-ui-text);
 }
+
+/* --- Layout details --- */
+.nowo-workflow-dashboard__definitions {
+  grid-column: 1 / -1;
+}
+
+.nowo-workflow-form-grid .nowo-ui-input,
+.nowo-workflow-dialog .nowo-ui-input {
+  width: 100%;
+  max-width: none;
+}
+
+/* TomSelect copies the select classes to its wrapper: keep the control as the only box. */
+.nowo-workflow-dialog .ts-wrapper.nowo-ui-input {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.nowo-workflow-collection .nowo-ui-cell--end {
+  text-align: end;
+}

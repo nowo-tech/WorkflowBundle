@@ -9,8 +9,11 @@ use Twig\Extension\AbstractExtension;
 use Twig\Extension\GlobalsInterface;
 
 /**
- * Deprecated 1.x Twig globals of the Workflow UI (removed in 2.0): the pages extend UiKit scaffolds (REQ-UI-003)
- * and read the layout, CSS stack and form theme from UiKit / FormKit. Only the deprecated
+ * Twig globals of the Workflow UI: {@code nowo_workflow_locales} (enabled UI locales, for host locale switchers).
+ *
+ * Deprecated since 1.9, removed in 2.0: {@code nowo_workflow_layout_template}, {@code nowo_workflow_css_framework},
+ * {@code nowo_workflow_icon_set} and {@code nowo_workflow_form_themes}. The pages extend UiKit scaffolds
+ * (REQ-UI-003) and read the layout, CSS stack and form theme from UiKit / FormKit; only the deprecated
  * {@code @NowoWorkflowBundle/base.html.twig} bridge reads {@code nowo_workflow_layout_template}.
  */
 final class WorkflowExtension extends AbstractExtension implements GlobalsInterface
