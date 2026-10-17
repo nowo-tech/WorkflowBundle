@@ -26,6 +26,8 @@ action:
   add_place: 'Zustand hinzufügen'
   add_transition: 'Übergang hinzufügen'
   add_match_rule: 'Regel hinzufügen'
+  create_continue: 'Anlegen und weiter'
+  remove: 'Entfernen'
 
 status:
   enabled: Aktiv
@@ -51,8 +53,9 @@ dashboard:
   title: 'Datenbankgesteuerte Symfony-Workflows'
   intro: 'Verwalten Sie Workflow-Definitionen in der Datenbank und nutzen Sie sie zur Laufzeit über %class%.'
   definitions: Definitionen
-  empty_prefix: 'Noch keine Workflow-Definitionen.'
-  empty_suffix: 'oder ausführen'
+  definitions_intro: '%shown% von %total% angezeigt, nach Name.'
+  view_all: 'Alle Definitionen anzeigen'
+  empty: 'Noch keine Workflow-Definitionen. Legen Sie eine an oder führen Sie %command% aus, um die Demo-Workflows zu laden.'
 
 definition:
   index_title: 'Workflow-Definitionen'
@@ -68,6 +71,14 @@ definition:
   initial_place: 'Anfangszustand'
   places_transitions: 'Zustände / Übergänge'
   confirm_delete: 'Diese Workflow-Definition löschen?'
+  empty_title: 'Noch keine Workflow-Definitionen'
+  empty_message: 'Legen Sie eine Definition an und ergänzen Sie danach Übereinstimmungsregeln, Zustände und Übergänge.'
+  confirm_delete_message: '„%name%“ wird mit allen Zuständen, Übergängen und Übereinstimmungsregeln gelöscht.'
+  match_default_label: 'Standard-Workflow'
+  created_at: 'Erstellt'
+  updated_at: 'Aktualisiert'
+  section:
+    general: 'Definition'
 
 table:
   name: Bezeichnung
@@ -85,7 +96,8 @@ collection:
   no_places: 'Noch keine Zustände. Klicken Sie auf „Zustand hinzufügen“, um einen zu erstellen.'
   no_transitions: 'Noch keine Übergänge. Klicken Sie auf „Übergang hinzufügen“, um einen zu erstellen.'
   no_match_rules: 'Noch keine Regeln. Leer lassen für Standard-Workflow, oder klicken Sie auf „Regel hinzufügen“.'
-  confirm_delete: 'Dieses Element entfernen? Speichern Sie das Formular, um die Änderungen zu übernehmen.'
+  confirm_delete: 'Das Element wird aus der Liste entfernt; speichern Sie das Formular, um die Änderung zu übernehmen.'
+  confirm_delete_title: 'Dieses Element entfernen?'
 
 modal:
   add_place: 'Zustand hinzufügen'
@@ -106,6 +118,8 @@ form:
     match_rules_list: 'Definieren Sie Parameterregeln zur Auswahl dieses Workflows. Leer lassen für einen Standard-Workflow.'
     transition_places: 'Optionen stammen aus dem Bereich Places. Konfigurieren Sie bei Bedarf zuerst die Zustände.'
     places_list: 'Verwalten Sie Workflow-Zustände. Änderungen werden beim Absenden des Formulars gespeichert.'
+    new_definition: 'Beginnen Sie mit den allgemeinen Angaben; Übereinstimmungsregeln, Zustände und Übergänge folgen danach.'
+    general: 'Bezeichnung, Slug, Subjekt-Bindung und Priorität des Workflows.'
   field:
     name: Bezeichnung
     slug: Slug
@@ -159,8 +173,65 @@ error:
   not_found_id: 'Workflow-Definition #%id% nicht gefunden.'
   not_found_slug: 'Workflow-Definition "%slug%" nicht gefunden.'
 
-pagination:
-  label: Paginierung
-  prev: Zurück
-  next: Weiter
-  page: 'Seite %page% von %pages%'
+kpi:
+  definitions: 'Definitionen'
+  definitions_hint: 'Liste öffnen'
+  enabled: 'Aktiv'
+  disabled: 'Inaktiv'
+
+workflow_definition_form:
+  name:
+    placeholder: 'Freigabe von Bestellungen'
+    help: 'Name in der Administration.'
+  slug:
+    placeholder: 'purchase_order'
+    help: 'Eindeutige Kennung im Code: Kleinbuchstaben, Ziffern und Unterstriche.'
+  type:
+    help: 'Zustandsautomat: genau ein aktueller Zustand. Workflow: mehrere Zustände gleichzeitig.'
+  initial_place:
+    placeholder: 'draft'
+    help: 'Startzustand eines neuen Subjekts; legen Sie ihn unter Zustände an.'
+  priority:
+    placeholder: '0'
+    help: 'Passen mehrere Workflows zu einem Subjekt, gewinnt die höhere Priorität.'
+  subject_class:
+    placeholder: 'App\Entity\PurchaseOrder'
+    help: 'Vollqualifizierte Klasse der Subjekte, die dieser Workflow steuert.'
+  marking_property:
+    placeholder: 'status'
+    help: 'Eigenschaft des Subjekts, die den aktuellen Zustand speichert.'
+  enabled:
+    help: 'Inaktive Workflows ignoriert die Registry.'
+  description:
+    placeholder: 'Wofür dieser Workflow dient…'
+    help: 'Optionale Hinweise für Administratoren.'
+
+workflow_match_rule:
+  parameter_key:
+    placeholder: 'department'
+    help: 'Kontextparameter, den der Resolver vergleicht.'
+  parameter_value:
+    placeholder: 'purchasing'
+    help: 'Wert, den der Parameter haben muss.'
+  sort_order:
+    placeholder: '0'
+    help: 'Anzeigereihenfolge der Regel.'
+
+workflow_place:
+  name:
+    placeholder: 'submitted'
+    help: 'Technischer Name für Übergänge und Markierung.'
+  label:
+    placeholder: 'Eingereicht'
+    help: 'Optionale Anzeigebezeichnung.'
+  sort_order:
+    placeholder: '0'
+    help: 'Position in Listen und im Diagramm.'
+
+workflow_transition:
+  name:
+    placeholder: 'submit'
+    help: 'Technischer Name zum Ausführen des Übergangs.'
+  label:
+    placeholder: 'Zur Freigabe einreichen'
+    help: 'Optionale Anzeigebezeichnung.'

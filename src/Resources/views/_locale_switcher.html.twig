@@ -1,16 +1,19 @@
-{% if nowo_workflow_locales|length > 1 %}
-    <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            {{ ('locale.' ~ app.request.locale)|trans({}, 'NowoWorkflowBundle') }}
-        </a>
-        <ul class="dropdown-menu dropdown-menu-end">
-            {% for locale in nowo_workflow_locales %}
-                <li>
-                    <a class="dropdown-item{% if app.request.locale == locale %} active{% endif %}" href="{{ path(locale_route|default('nowo_workflow_locale_switch'), {_locale: locale}) }}">
-                        {{ ('locale.' ~ locale)|trans({}, 'NowoWorkflowBundle') }}
-                    </a>
-                </li>
-            {% endfor %}
-        </ul>
-    </li>
+{#
+  Deprecated since 1.9, removed in 2.0 — include @NowoUiKitBundle/partials/_locale_switcher.html.twig (REQ-UI-003).
+
+  Locale switcher of the Workflow UI locales (nowo_workflow.web_ui.locales) rendered by UiKit's switcher.
+  Optional: locale_route (default nowo_workflow_locale_switch, receives {_locale}).
+#}
+{% set _current = app.request.locale %}
+{% set _locales = [] %}
+{% for locale in nowo_workflow_locales %}
+    {% set _locales = _locales|merge([{
+        code: locale,
+        label: ('locale.' ~ locale)|trans({}, 'NowoWorkflowBundle'),
+        href: path(locale_route|default('nowo_workflow_locale_switch'), {_locale: locale}),
+        current: locale == _current,
+    }]) %}
+{% endfor %}
+{% if _locales|length > 1 %}
+    {{ include('@NowoUiKitBundle/partials/_locale_switcher.html.twig', {locales: _locales, current: _current}, false) }}
 {% endif %}

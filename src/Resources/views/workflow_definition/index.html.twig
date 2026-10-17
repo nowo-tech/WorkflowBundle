@@ -1,69 +1,34 @@
-{% extends '@NowoWorkflowBundle/base.html.twig' %}
-{% import '@NowoUiKitBundle/macros/ui.html.twig' as ui %}
+{#
+  Workflow definitions list — UiKit page/list (REQ-UI-003).
 
-{% block title %}{{ 'page.definitions'|trans({}, 'NowoWorkflowBundle') }}{% endblock %}
+  Variable: page (View\ListPage: columns name, slug, matchRules, priority, places, transitions; row actions view,
+  edit, delete with confirm; pagination; empty state). Data block: nowo_ui_list_row (cells).
+#}
+{% extends '@NowoUiKit/page/list.html.twig' %}
 
-{% block nowo_ui_content %}
-    <div class="{{ ui.page_header(nowo_workflow_css_framework) }}">
-        <h1 class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}h2 mb-0{% elseif nowo_workflow_css_framework == 'tailwind' %}text-2xl font-semibold{% endif %}">{{ 'definition.index_title'|trans({}, 'NowoWorkflowBundle') }}</h1>
-        <div class="{{ ui.toolbar(nowo_workflow_css_framework) }}">
-            <a href="{{ path('nowo_workflow_definition_new') }}" class="{{ ui.btn('primary', null, nowo_workflow_css_framework) }}">{{ 'nav.new_definition'|trans({}, 'NowoWorkflowBundle') }}</a>
-        </div>
-    </div>
+{% block nowo_ui_styles %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('bundles/nowoworkflow/css/nowo-workflow.css') }}">
+{% endblock %}
 
-    <div class="{{ ui.card(nowo_workflow_css_framework) }} {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}shadow-sm{% elseif nowo_workflow_css_framework == 'tailwind' %}overflow-hidden shadow-sm{% endif %}">
-        <div class="{{ ui.table_wrap(nowo_workflow_css_framework) }}">
-            <table class="{{ ui.table(nowo_workflow_css_framework) }} {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}mb-0{% endif %}">
-                <thead class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}table-light{% elseif nowo_workflow_css_framework == 'tailwind' %}bg-slate-50{% endif %}">
-                    <tr>
-                        <th>{{ 'table.name'|trans({}, 'NowoWorkflowBundle') }}</th>
-                        <th>{{ 'table.slug'|trans({}, 'NowoWorkflowBundle') }}</th>
-                        <th>{{ 'table.match_rules'|trans({}, 'NowoWorkflowBundle') }}</th>
-                        <th>{{ 'table.priority'|trans({}, 'NowoWorkflowBundle') }}</th>
-                        <th>{{ 'table.places'|trans({}, 'NowoWorkflowBundle') }}</th>
-                        <th>{{ 'table.transitions'|trans({}, 'NowoWorkflowBundle') }}</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for definition in definitions %}
-                        <tr>
-                            <td class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}fw-semibold{% elseif nowo_workflow_css_framework == 'tailwind' %}font-semibold{% endif %}">{{ definition.name }}</td>
-                            <td><code>{{ definition.slug }}</code></td>
-                            <td>
-                                {% if definition.defaultMatcher %}
-                                    <span class="{{ ui.badge('info', nowo_workflow_css_framework) }}">{{ 'status.default'|trans({}, 'NowoWorkflowBundle') }}</span>
-                                {% else %}
-                                    {{ definition.matchRules|length }}
-                                {% endif %}
-                            </td>
-                            <td>{{ definition.priority }}</td>
-                            <td>{{ definition.places|length }}</td>
-                            <td>{{ definition.transitions|length }}</td>
-                            <td class="{% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}text-end{% elseif nowo_workflow_css_framework == 'tailwind' %}text-right{% endif %}">
-                                {{ include('@NowoUiKitBundle/partials/_row_actions.html.twig', {
-                                    framework: nowo_workflow_css_framework,
-                                    actions: [
-                                        {
-                                            kind: 'view',
-                                            href: path('nowo_workflow_definition_show', {id: definition.id}),
-                                            label: 'action.show'|trans({}, 'NowoWorkflowBundle'),
-                                        },
-                                        {
-                                            kind: 'edit',
-                                            href: path('nowo_workflow_definition_edit', {id: definition.id}),
-                                            label: 'action.edit'|trans({}, 'NowoWorkflowBundle'),
-                                        },
-                                    ],
-                                }) }}
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr><td colspan="7"><div class="{{ ui.empty(nowo_workflow_css_framework) }} {% if nowo_workflow_css_framework in ['bootstrap5', 'bootstrap4'] %}text-center py-4{% elseif nowo_workflow_css_framework == 'tailwind' %}px-4 py-8 text-center{% endif %}">{{ 'definition.none_found'|trans({}, 'NowoWorkflowBundle') }}</div></td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {{ include('@NowoWorkflowBundle/_pagination.html.twig') }}
+{% block nowo_ui_list_row %}
+    {% set _b = page.bundle %}
+    {% set _d = 'NowoWorkflowBundle' %}
+    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--start" data-label="{{ 'table.name'|trans({}, _d) }}">
+        <a class="nowo-workflow-name" href="{{ path('nowo_workflow_definition_show', {id: row.id}) }}">{{ row.name }}</a>
+        {% if not row.enabled %}
+            <span class="{{ nowo_ui_class('badge_neutral', _b) }}">{{ 'status.disabled'|trans({}, _d) }}</span>
+        {% endif %}
+    </td>
+    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--start" data-label="{{ 'table.slug'|trans({}, _d) }}"><code>{{ row.slug }}</code></td>
+    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--start" data-label="{{ 'table.match_rules'|trans({}, _d) }}" data-nowo-ui-priority="2">
+        {% if row.defaultMatcher %}
+            <span class="{{ nowo_ui_class('badge_info', _b) }}">{{ 'status.default'|trans({}, _d) }}</span>
+        {% else %}
+            {{ row.matchRules|length }}
+        {% endif %}
+    </td>
+    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--end" data-label="{{ 'table.priority'|trans({}, _d) }}" data-nowo-ui-priority="3">{{ row.priority }}</td>
+    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--end" data-label="{{ 'table.places'|trans({}, _d) }}" data-nowo-ui-priority="2">{{ row.places|length }}</td>
+    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--end" data-label="{{ 'table.transitions'|trans({}, _d) }}" data-nowo-ui-priority="2">{{ row.transitions|length }}</td>
 {% endblock %}

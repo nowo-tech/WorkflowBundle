@@ -9,7 +9,9 @@ use Twig\Extension\AbstractExtension;
 use Twig\Extension\GlobalsInterface;
 
 /**
- * Exposes workflow UI globals to Twig templates.
+ * Deprecated 1.x Twig globals of the Workflow UI (removed in 2.0): the pages extend UiKit scaffolds (REQ-UI-003)
+ * and read the layout, CSS stack and form theme from UiKit / FormKit. Only the deprecated
+ * {@code @NowoWorkflowBundle/base.html.twig} bridge reads {@code nowo_workflow_layout_template}.
  */
 final class WorkflowExtension extends AbstractExtension implements GlobalsInterface
 {
@@ -18,6 +20,7 @@ final class WorkflowExtension extends AbstractExtension implements GlobalsInterf
         private readonly string $layoutTemplate,
         private readonly string $cssFramework,
         private readonly string $iconSet,
+        private readonly ?string $formThemeFramework = null,
     ) {
     }
 
@@ -29,7 +32,8 @@ final class WorkflowExtension extends AbstractExtension implements GlobalsInterf
             'nowo_workflow_layout_template' => $this->layoutTemplate,
             'nowo_workflow_css_framework'   => $this->cssFramework,
             'nowo_workflow_icon_set'        => $this->iconSet,
-            'nowo_workflow_form_themes'     => self::formThemesFor($this->cssFramework),
+            // Applied to the Workflow forms only while the deprecated ui.css_framework is set (1.x behaviour).
+            'nowo_workflow_form_themes' => $this->formThemeFramework === null ? [] : self::formThemesFor($this->formThemeFramework),
         ];
     }
 

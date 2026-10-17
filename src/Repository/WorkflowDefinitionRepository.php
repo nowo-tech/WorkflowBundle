@@ -31,6 +31,11 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
         return $this->findBy(['enabled' => true], ['name' => 'ASC']);
     }
 
+    public function countEnabled(): int
+    {
+        return $this->count(['enabled' => true]);
+    }
+
     /**
      * @param list<string>|string|null $subjectClass One class, a class hierarchy (IN), or null for all
      *

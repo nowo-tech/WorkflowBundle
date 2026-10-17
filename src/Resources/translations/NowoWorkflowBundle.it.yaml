@@ -26,6 +26,8 @@ action:
   add_place: 'Aggiungi stato'
   add_transition: 'Aggiungi transizione'
   add_match_rule: 'Aggiungi regola'
+  create_continue: 'Crea e continua'
+  remove: 'Rimuovi'
 
 status:
   enabled: Attivo
@@ -51,8 +53,9 @@ dashboard:
   title: 'Workflow Symfony guidati dal database'
   intro: 'Gestisci le definizioni di workflow nel database e usale a runtime tramite %class%.'
   definitions: Definizioni
-  empty_prefix: 'Nessuna definizione di workflow ancora.'
-  empty_suffix: 'oppure esegui'
+  definitions_intro: '%shown% di %total% mostrate, per nome.'
+  view_all: 'Vedi tutte le definizioni'
+  empty: 'Nessuna definizione di workflow ancora. Creane una oppure esegui %command% per caricare i workflow di esempio.'
 
 definition:
   index_title: 'Definizioni di workflow'
@@ -68,6 +71,14 @@ definition:
   initial_place: 'Stato iniziale'
   places_transitions: 'Stati / transizioni'
   confirm_delete: 'Eliminare questa definizione di workflow?'
+  empty_title: 'Nessuna definizione di workflow ancora'
+  empty_message: 'Crea una definizione, poi aggiungi le sue regole di corrispondenza, gli stati e le transizioni.'
+  confirm_delete_message: '«%name%» verrà eliminata con i suoi stati, transizioni e regole di corrispondenza.'
+  match_default_label: 'Workflow predefinito'
+  created_at: 'Creata'
+  updated_at: 'Aggiornata'
+  section:
+    general: 'Definizione'
 
 table:
   name: Nome
@@ -85,7 +96,8 @@ collection:
   no_places: 'Nessuno stato ancora. Clicca «Aggiungi stato» per crearne uno.'
   no_transitions: 'Nessuna transizione ancora. Clicca «Aggiungi transizione» per crearne una.'
   no_match_rules: 'Nessuna regola ancora. Lascia vuoto per un workflow predefinito, o clicca «Aggiungi regola».'
-  confirm_delete: 'Rimuovere questo elemento? Salva il modulo per persistere le modifiche.'
+  confirm_delete: 'L''elemento esce dall''elenco; salva il modulo per rendere permanente la modifica.'
+  confirm_delete_title: 'Rimuovere questo elemento?'
 
 modal:
   add_place: 'Aggiungi stato'
@@ -106,6 +118,8 @@ form:
     match_rules_list: 'Definisci regole sui parametri per selezionare questo workflow. Lascia vuoto per un workflow predefinito.'
     transition_places: 'Le opzioni provengono dalla sezione Places. Configura prima gli stati se necessario.'
     places_list: 'Gestisci gli stati del workflow. Le modifiche si salvano inviando il modulo.'
+    new_definition: 'Inizia dalle impostazioni generali; regole di corrispondenza, stati e transizioni vengono dopo.'
+    general: 'Nome, slug, soggetto associato e priorità del workflow.'
   field:
     name: Nome
     slug: Slug
@@ -159,8 +173,65 @@ error:
   not_found_id: 'Definizione di workflow #%id% non trovata.'
   not_found_slug: 'Definizione di workflow "%slug%" non trovata.'
 
-pagination:
-  label: Paginazione
-  prev: Precedente
-  next: Successiva
-  page: 'Pagina %page% di %pages%'
+kpi:
+  definitions: 'Definizioni'
+  definitions_hint: 'Apri l''elenco'
+  enabled: 'Attive'
+  disabled: 'Disattive'
+
+workflow_definition_form:
+  name:
+    placeholder: 'Approvazione ordini di acquisto'
+    help: 'Nome mostrato nell''amministrazione.'
+  slug:
+    placeholder: 'purchase_order'
+    help: 'Identificativo univoco usato nel codice: minuscole, cifre e trattini bassi.'
+  type:
+    help: 'Macchina a stati: un solo stato corrente. Workflow: più stati contemporaneamente.'
+  initial_place:
+    placeholder: 'draft'
+    help: 'Stato iniziale di un nuovo soggetto; aggiungilo in Stati.'
+  priority:
+    placeholder: '0'
+    help: 'Vince la priorità più alta quando più workflow corrispondono a un soggetto.'
+  subject_class:
+    placeholder: 'App\Entity\PurchaseOrder'
+    help: 'Classe completa dei soggetti gestiti da questo workflow.'
+  marking_property:
+    placeholder: 'status'
+    help: 'Proprietà del soggetto che memorizza lo stato o gli stati correnti.'
+  enabled:
+    help: 'Il registro ignora i workflow disattivati.'
+  description:
+    placeholder: 'A cosa serve questo workflow…'
+    help: 'Note facoltative per gli amministratori.'
+
+workflow_match_rule:
+  parameter_key:
+    placeholder: 'department'
+    help: 'Parametro di contesto confrontato dal resolver.'
+  parameter_value:
+    placeholder: 'purchasing'
+    help: 'Valore che il parametro deve avere.'
+  sort_order:
+    placeholder: '0'
+    help: 'Ordine di visualizzazione della regola.'
+
+workflow_place:
+  name:
+    placeholder: 'submitted'
+    help: 'Nome tecnico usato dalle transizioni e dalla marcatura.'
+  label:
+    placeholder: 'Inviato'
+    help: 'Etichetta visualizzata facoltativa.'
+  sort_order:
+    placeholder: '0'
+    help: 'Posizione negli elenchi e nel diagramma.'
+
+workflow_transition:
+  name:
+    placeholder: 'submit'
+    help: 'Nome tecnico usato per applicare la transizione.'
+  label:
+    placeholder: 'Invia per approvazione'
+    help: 'Etichetta visualizzata facoltativa.'

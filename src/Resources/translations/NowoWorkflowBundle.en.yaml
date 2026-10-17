@@ -26,6 +26,8 @@ action:
   add_place: 'Add place'
   add_transition: 'Add transition'
   add_match_rule: 'Add match rule'
+  create_continue: 'Create and continue'
+  remove: 'Remove'
 
 status:
   enabled: Enabled
@@ -51,8 +53,9 @@ dashboard:
   title: 'Database-driven Symfony Workflows'
   intro: 'Manage workflow definitions stored in the database and use them at runtime via %class%.'
   definitions: Definitions
-  empty_prefix: 'No workflow definitions yet.'
-  empty_suffix: 'or run'
+  definitions_intro: 'Showing %shown% of %total%, by name.'
+  view_all: 'View all definitions'
+  empty: 'No workflow definitions yet. Create one, or run %command% to load the demo workflows.'
 
 definition:
   index_title: 'Workflow definitions'
@@ -68,6 +71,14 @@ definition:
   initial_place: 'Initial place'
   places_transitions: 'Places / transitions'
   confirm_delete: 'Delete this workflow definition?'
+  empty_title: 'No workflow definitions yet'
+  empty_message: 'Create a definition, then add its match rules, places and transitions.'
+  confirm_delete_message: 'This removes “%name%” with its places, transitions and match rules.'
+  match_default_label: 'Default workflow'
+  created_at: 'Created'
+  updated_at: 'Updated'
+  section:
+    general: 'Definition'
 
 table:
   name: Name
@@ -85,7 +96,8 @@ collection:
   no_places: 'No places yet. Click “Add place” to create one.'
   no_transitions: 'No transitions yet. Click “Add transition” to create one.'
   no_match_rules: 'No match rules yet. Leave empty for a default workflow, or click “Add match rule”.'
-  confirm_delete: 'Remove this item? Save the form to persist changes.'
+  confirm_delete: 'The item leaves the list; save the form to persist the change.'
+  confirm_delete_title: 'Remove this item?'
 
 modal:
   add_place: 'Add place'
@@ -106,6 +118,8 @@ form:
     match_rules_list: 'Define parameter rules to select this workflow. Leave the list empty for a default workflow.'
     transition_places: 'Options are taken from the Places section. Configure places first if needed.'
     places_list: 'Manage workflow states. Changes are saved when you submit the form.'
+    new_definition: 'Start with the general settings; match rules, places and transitions come next.'
+    general: 'Name, slug, subject binding and priority of the workflow.'
   field:
     name: Name
     slug: Slug
@@ -159,8 +173,65 @@ error:
   not_found_id: 'Workflow definition #%id% not found.'
   not_found_slug: 'Workflow definition "%slug%" not found.'
 
-pagination:
-  label: Pagination
-  prev: Previous
-  next: Next
-  page: 'Page %page% of %pages%'
+kpi:
+  definitions: 'Definitions'
+  definitions_hint: 'Open the list'
+  enabled: 'Enabled'
+  disabled: 'Disabled'
+
+workflow_definition_form:
+  name:
+    placeholder: 'Purchase order approval'
+    help: 'Name shown in the admin.'
+  slug:
+    placeholder: 'purchase_order'
+    help: 'Unique id used in code: lowercase letters, digits and underscores.'
+  type:
+    help: 'State machine: one current place. Workflow: several places at once.'
+  initial_place:
+    placeholder: 'draft'
+    help: 'Place a new subject starts in; add it under Places.'
+  priority:
+    placeholder: '0'
+    help: 'The higher priority wins when several workflows match a subject.'
+  subject_class:
+    placeholder: 'App\Entity\PurchaseOrder'
+    help: 'Fully qualified class of the subjects this workflow drives.'
+  marking_property:
+    placeholder: 'status'
+    help: 'Subject property that stores the current place(s).'
+  enabled:
+    help: 'Disabled workflows are ignored by the registry.'
+  description:
+    placeholder: 'What this workflow is for…'
+    help: 'Optional notes for administrators.'
+
+workflow_match_rule:
+  parameter_key:
+    placeholder: 'department'
+    help: 'Context parameter compared by the resolver.'
+  parameter_value:
+    placeholder: 'purchasing'
+    help: 'Value the parameter must equal.'
+  sort_order:
+    placeholder: '0'
+    help: 'Display order of the rule.'
+
+workflow_place:
+  name:
+    placeholder: 'submitted'
+    help: 'Machine name used by transitions and the marking.'
+  label:
+    placeholder: 'Submitted'
+    help: 'Optional display label.'
+  sort_order:
+    placeholder: '0'
+    help: 'Position in lists and in the diagram.'
+
+workflow_transition:
+  name:
+    placeholder: 'submit'
+    help: 'Machine name used to apply the transition.'
+  label:
+    placeholder: 'Submit for approval'
+    help: 'Optional display label.'

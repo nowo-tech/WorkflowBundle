@@ -24,6 +24,19 @@ enum WorkflowDefinitionFormSection: string
         };
     }
 
+    /**
+     * Intro (help) translation key of the section on the edit page.
+     */
+    public function helpKey(): string
+    {
+        return match ($this) {
+            self::General     => 'form.help.general',
+            self::MatchRules  => 'form.help.match_rules_list',
+            self::Places      => 'form.help.places_list',
+            self::Transitions => 'form.help.transition_places',
+        };
+    }
+
     public function titleKey(): string
     {
         return match ($this) {

@@ -1,0 +1,63 @@
+{#
+  Place / transition dialogs of the flow diagram (native <dialog>, UiKit confirm_* slots for the dialog chrome;
+  opened and closed by nowo-workflow.js through data-workflow-dialog-open / data-workflow-dialog-close).
+
+  Required: graph (WorkflowGraphPresenter::present()), bundle.
+#}
+{% set _d = 'NowoWorkflowBundle' %}
+{% for place in graph.places %}
+    {% set _id = 'workflow-place-' ~ loop.index0 %}
+    {% set _items = [{label: 'diagram.modal.name'|trans({}, _d), value: place.name, href: null}] %}
+    {% if place.label %}
+        {% set _items = _items|merge([{label: 'diagram.modal.label'|trans({}, _d), value: place.label, href: null}]) %}
+    {% endif %}
+    {% set _items = _items|merge([{label: 'diagram.modal.sort_order'|trans({}, _d), value: place.sortOrder ~ '', href: null}]) %}
+    {% embed '@NowoWorkflowBundle/workflow_definition/_dialog.html.twig' with {id: _id, bundle: bundle} %}
+        {% block title %}
+            {{ place.displayLabel }}
+            {% if place.isInitial %}<span class="{{ nowo_ui_class('badge_success', bundle) }}">{{ 'status.initial'|trans({}, 'NowoWorkflowBundle') }}</span>{% endif %}
+        {% endblock %}
+        {% block body %}
+            {{ include(nowo_ui_partial('detail_list', bundle), {items: _items, bundle: bundle}, false) }}
+            {% for _direction in ['incoming', 'outgoing'] %}
+                {% set _transitions = attribute(place, _direction) %}
+                {% if _transitions %}
+                    <h3 class="nowo-workflow-dialog__subtitle">{{ ('diagram.modal.' ~ _direction)|trans({}, 'NowoWorkflowBundle') }}</h3>
+                    <ul class="nowo-workflow-dialog__list">
+                        {% for transition in _transitions %}
+                            <li>
+                                <button type="button" class="{{ nowo_ui_class('btn_link', bundle) }}" data-workflow-dialog-open="workflow-transition-{{ transition.transitionIndex }}">{{ transition.transitionLabel }}</button>
+                                <span class="{{ nowo_ui_class('muted', bundle) }}">
+                                    {{ (_direction == 'incoming' ? 'diagram.transition_from' : 'diagram.transition_to')|trans({}, 'NowoWorkflowBundle') }}
+                                    {% for _place in (_direction == 'incoming' ? transition.fromPlaces : transition.toPlaces) %}<code>{{ _place }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endfor %}
+            {% if place.incoming is empty and place.outgoing is empty %}
+                <p class="{{ nowo_ui_class('muted', bundle) }}">{{ 'diagram.modal.no_transitions'|trans({}, 'NowoWorkflowBundle') }}</p>
+            {% endif %}
+        {% endblock %}
+    {% endembed %}
+{% endfor %}
+
+{% for transition in graph.transitions %}
+    {% set _id = 'workflow-transition-' ~ loop.index0 %}
+    {% set _items = [{label: 'diagram.modal.name'|trans({}, _d), value: transition.name, href: null}] %}
+    {% if transition.label %}
+        {% set _items = _items|merge([{label: 'diagram.modal.label'|trans({}, _d), value: transition.label, href: null}]) %}
+    {% endif %}
+    {% set _items = _items|merge([
+        {label: 'diagram.modal.from'|trans({}, _d), value: transition.fromPlaces|join(', '), href: null},
+        {label: 'diagram.modal.to'|trans({}, _d), value: transition.toPlaces|join(', '), href: null},
+    ]) %}
+    {% embed '@NowoWorkflowBundle/workflow_definition/_dialog.html.twig' with {id: _id, bundle: bundle} %}
+        {% block title %}{{ transition.displayLabel }}{% endblock %}
+        {% block body %}
+            {{ include(nowo_ui_partial('detail_list', bundle), {items: _items, bundle: bundle}, false) }}
+            <p class="{{ nowo_ui_class('muted', bundle) }}">{{ (graph.type == 'state_machine' ? 'diagram.modal.state_machine_help' : 'diagram.modal.workflow_help')|trans({}, 'NowoWorkflowBundle') }}</p>
+        {% endblock %}
+    {% endembed %}
+{% endfor %}

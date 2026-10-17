@@ -1,0 +1,239 @@
+/*
+ * NowoWorkflowBundle admin UI (REQ-UI-003): bundle-specific components only (flow diagram, collection editors,
+ * dialogs, form grid), painted from the UiKit --nowo-ui-* tokens. Page chrome comes from the UiKit scaffolds and
+ * the host theme.
+ */
+
+/* --- Form grid (general fields) --- */
+.nowo-workflow-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  gap: 0 1rem;
+}
+
+.nowo-workflow-form-grid__wide {
+  grid-column: 1 / -1;
+}
+
+/* --- Names in lists --- */
+.nowo-workflow-name {
+  font-weight: 600;
+}
+
+/* --- Dialogs (UiKit confirm chrome, wider and with regular body text) --- */
+.nowo-workflow-dialog .nowo-ui-confirm__panel {
+  width: min(34rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 4rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.nowo-workflow-dialog--wide .nowo-ui-confirm__panel {
+  width: min(48rem, calc(100vw - 2rem));
+}
+
+.nowo-workflow-dialog .nowo-workflow-dialog__body {
+  color: var(--nowo-ui-text);
+  overflow-y: auto;
+}
+
+.nowo-workflow-dialog__subtitle {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.nowo-workflow-dialog__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.375rem;
+}
+
+/* --- Collection editors --- */
+.nowo-workflow-collection__toolbar {
+  justify-content: flex-end;
+}
+
+.nowo-workflow-collection [data-collection-entries][hidden],
+.nowo-workflow-collection [data-collection-empty][hidden] {
+  display: none;
+}
+
+/* --- Flow diagram --- */
+.nowo-workflow-diagram__viewport {
+  overflow-x: auto;
+  padding: 0.5rem;
+}
+
+.nowo-workflow-diagram__linear,
+.nowo-workflow-diagram__grid {
+  display: flex;
+  align-items: center;
+  min-width: max-content;
+}
+
+.nowo-workflow-diagram__column,
+.nowo-workflow-diagram__bridge {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.nowo-workflow-diagram__bridge {
+  min-width: 7.5rem;
+  padding: 0 0.35rem;
+}
+
+.nowo-workflow-diagram__link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 7.5rem;
+}
+
+.nowo-workflow-diagram__spacer {
+  width: 7.5rem;
+  height: 1px;
+}
+
+.nowo-workflow-diagram__state {
+  width: 10.5rem;
+  min-height: 4.75rem;
+  padding: 0.75rem;
+  border: 2px solid var(--nowo-ui-primary);
+  border-radius: var(--nowo-ui-radius, 0.75rem);
+  background: var(--nowo-ui-surface);
+  color: var(--nowo-ui-text);
+  box-shadow: 0 0.25rem 0.75rem rgba(15, 23, 42, 0.08);
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nowo-workflow-diagram__state:hover,
+.nowo-workflow-diagram__state:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1rem rgba(15, 23, 42, 0.12);
+  outline: 2px solid var(--nowo-ui-primary);
+  outline-offset: 2px;
+}
+
+.nowo-workflow-diagram__state--initial {
+  border-color: var(--nowo-ui-success-border, var(--nowo-ui-success-text));
+  background: var(--nowo-ui-success-bg);
+}
+
+.nowo-workflow-diagram__state-title {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.nowo-workflow-diagram__state-name {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--nowo-ui-muted);
+}
+
+.nowo-workflow-diagram__transition {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--nowo-ui-border-strong, var(--nowo-ui-border));
+  border-radius: 999px;
+  background: var(--nowo-ui-surface);
+  color: var(--nowo-ui-text);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.nowo-workflow-diagram__transition:hover,
+.nowo-workflow-diagram__transition:focus-visible {
+  background: var(--nowo-ui-surface-muted);
+  outline: 2px solid var(--nowo-ui-primary);
+  outline-offset: 2px;
+}
+
+.nowo-workflow-diagram__line {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--nowo-ui-muted);
+}
+
+.nowo-workflow-diagram__line::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid var(--nowo-ui-muted);
+  border-bottom: 2px solid var(--nowo-ui-muted);
+  transform: translateY(-50%) rotate(-45deg);
+}
+
+.nowo-workflow-diagram__back-edges {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--nowo-ui-border);
+}
+
+.nowo-workflow-diagram__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--nowo-ui-border);
+  list-style: none;
+  font-size: 0.85rem;
+  color: var(--nowo-ui-muted);
+}
+
+.nowo-workflow-diagram__dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-right: 0.25rem;
+  border-radius: 999px;
+  vertical-align: -1px;
+}
+
+.nowo-workflow-diagram__dot--initial {
+  border: 2px solid var(--nowo-ui-success-border, var(--nowo-ui-success-text));
+  background: var(--nowo-ui-success-bg);
+}
+
+.nowo-workflow-diagram__dot--place {
+  border: 2px solid var(--nowo-ui-primary);
+  background: var(--nowo-ui-surface);
+}
+
+.nowo-workflow-diagram__dot--transition {
+  border: 2px solid var(--nowo-ui-border-strong, var(--nowo-ui-border));
+  border-radius: 0.25rem;
+  background: var(--nowo-ui-surface);
+}
+
+/* --- TomSelect (vendored, optional) on the UiKit tokens --- */
+.nowo-workflow-collection .ts-control,
+.nowo-workflow-dialog .ts-control {
+  border-color: var(--nowo-ui-border-strong, var(--nowo-ui-border));
+  border-radius: var(--nowo-ui-radius, 0.375rem);
+  background: var(--nowo-ui-surface);
+  color: var(--nowo-ui-text);
+}
+
+.nowo-workflow-dialog .ts-dropdown {
+  background: var(--nowo-ui-surface);
+  color: var(--nowo-ui-text);
+}

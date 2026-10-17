@@ -1,0 +1,10 @@
+{#
+  General fields of a workflow definition in a responsive grid (new page and the "General" edit tab).
+  Required: form (FormView of WorkflowDefinitionFormType, section general).
+#}
+<div class="nowo-workflow-form-grid">
+    {% for _field in ['name', 'slug', 'type', 'initialPlace', 'priority', 'subjectClass', 'markingProperty', 'enabled'] %}
+        {{ form_row(attribute(form, _field)) }}
+    {% endfor %}
+    <div class="nowo-workflow-form-grid__wide">{{ form_row(form.description) }}</div>
+</div>

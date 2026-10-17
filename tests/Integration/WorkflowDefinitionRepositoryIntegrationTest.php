@@ -53,6 +53,11 @@ final class WorkflowDefinitionRepositoryIntegrationTest extends TestCase
         self::assertSame('Invoice', $definitions[1]->getName());
     }
 
+    public function testCountEnabled(): void
+    {
+        self::assertSame(2, $this->repository->countEnabled());
+    }
+
     public function testFindEnabledCandidatesFiltersBySubjectClass(): void
     {
         $definitions = $this->repository->findEnabledCandidates('App\\Entity\\Order');

@@ -1,14 +1,14 @@
 nowo_workflow_dashboard:
     resource: '../../Controller/DashboardController.php'
     type: attribute
-    prefix: '%nowo_workflow.ui.path%'
+    prefix: '%nowo_workflow.web_ui.path_prefix%'
 
 nowo_workflow_definitions:
     resource: '../../Controller/WorkflowDefinitionController.php'
     type: attribute
-    prefix: '%nowo_workflow.ui.path%'
+    prefix: '%nowo_workflow.web_ui.path_prefix%'
 
 nowo_workflow_locale:
     resource: '../../Controller/LocaleController.php'
     type: attribute
-    prefix: '%nowo_workflow.ui.path%'
+    prefix: '%nowo_workflow.web_ui.path_prefix%'

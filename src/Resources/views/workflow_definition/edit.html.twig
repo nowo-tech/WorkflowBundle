@@ -1,0 +1,95 @@
+{#
+  Edit a workflow definition — UiKit page/settings (REQ-UI-003): one tab per section (general, match rules,
+  places, transitions); each tab is its own form (links between tabs, the current one carries the form).
+
+  Variables: page (View\SettingsPage), definition (WorkflowDefinition), section (WorkflowDefinitionFormSection).
+  Data block: nowo_ui_settings_section (general fields grid, or the collection editor of the section).
+#}
+{% extends '@NowoUiKit/page/settings.html.twig' %}
+
+{% block nowo_ui_styles %}
+    {{ parent() }}
+    {% if section.value == 'transitions' %}
+        <link rel="stylesheet" href="{{ asset('bundles/nowoworkflow/vendor/tom-select/tom-select.default.min.css') }}">
+    {% endif %}
+    <link rel="stylesheet" href="{{ asset('bundles/nowoworkflow/css/nowo-workflow.css') }}">
+{% endblock %}
+
+{% block nowo_ui_settings_section %}
+    {% if section.form %}
+        {% set _b = page.bundle %}
+        {% set form = section.form %}
+        {% if nowo_workflow_form_themes|default([]) is not empty %}
+            {% form_theme form with nowo_workflow_form_themes %}
+        {% endif %}
+        {{ form_start(form, {attr: {id: 'workflow-definition-form', class: nowo_ui_class('form', _b), 'data-nowo-ui-region': 'form'}|merge(nowo_ui_theme.attributesFor('form', _b, {}, nowo_ui_page_type))}) }}
+            {% if section.id == 'general' %}
+                {{ include('@NowoWorkflowBundle/workflow_definition/_general_fields.html.twig', {form: form}, false) }}
+            {% else %}
+                {% set _collections = {
+                    match_rules: {
+                        field: 'matchRules',
+                        add: 'action.add_match_rule',
+                        empty: 'collection.no_match_rules',
+                        title_add: 'modal.add_match_rule',
+                        title_edit: 'modal.edit_match_rule',
+                        columns: [
+                            {field: 'parameterKey', label: 'form.field.parameter_key', format: 'code'},
+                            {field: 'parameterValue', label: 'form.field.parameter_value', format: 'code'},
+                            {field: 'sortOrder', label: 'form.field.order', format: 'text'},
+                        ],
+                    },
+                    places: {
+                        field: 'places',
+                        add: 'action.add_place',
+                        empty: 'collection.no_places',
+                        title_add: 'modal.add_place',
+                        title_edit: 'modal.edit_place',
+                        columns: [
+                            {field: 'name', label: 'table.name', format: 'code'},
+                            {field: 'label', label: 'form.field.label', format: 'text'},
+                            {field: 'sortOrder', label: 'form.field.order', format: 'text'},
+                        ],
+                    },
+                    transitions: {
+                        field: 'transitions',
+                        add: 'action.add_transition',
+                        empty: 'collection.no_transitions',
+                        title_add: 'modal.add_transition',
+                        title_edit: 'modal.edit_transition',
+                        columns: [
+                            {field: 'name', label: 'table.name', format: 'code'},
+                            {field: 'label', label: 'form.field.label', format: 'text'},
+                            {field: 'fromPlaces', label: 'form.field.from_places', format: 'list'},
+                            {field: 'toPlaces', label: 'form.field.to_places', format: 'list'},
+                        ],
+                    },
+                } %}
+                {{ include('@NowoWorkflowBundle/workflow_definition/_collection_section.html.twig', {
+                    collection: attribute(form, _collections[section.id].field),
+                    config: _collections[section.id],
+                    key: section.id,
+                    place_names: section.id == 'transitions' ? definition.placeNames : [],
+                    bundle: _b,
+                }, false) }}
+            {% endif %}
+            {% for child in form %}
+                {% if not child.rendered %}
+                    {{ form_row(child) }}
+                {% endif %}
+            {% endfor %}
+            <div class="{{ nowo_ui_class('form_actions', _b) }}"{{ nowo_ui_attrs('form_actions', _b) }}>
+                <button type="submit" class="{{ nowo_ui_class('btn_primary', _b) }}">{{ section.submitLabel|nowo_ui_trans }}</button>
+                <a class="{{ nowo_ui_class('btn_secondary', _b) }}" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.cancel'|trans({}, 'NowoWorkflowBundle') }}</a>
+            </div>
+        {{ form_end(form) }}
+    {% endif %}
+{% endblock %}
+
+{% block nowo_ui_scripts %}
+    {{ parent() }}
+    {% if section.value == 'transitions' %}
+        <script src="{{ asset('bundles/nowoworkflow/vendor/tom-select/tom-select.complete.min.js') }}" defer></script>
+    {% endif %}
+    <script src="{{ asset('bundles/nowoworkflow/js/nowo-workflow.js') }}" defer></script>
+{% endblock %}

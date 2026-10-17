@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
+use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
@@ -11,13 +12,20 @@ use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 
 use function array_key_exists;
+use function in_array;
 use function is_array;
+use function is_string;
 
 /**
  * Loads bundle services and exposes configuration as container parameters.
  */
 final class NowoWorkflowExtension extends Extension implements PrependExtensionInterface
 {
+    /**
+     * Value of the deprecated nowo_workflow_layout_template global when no 1.x layout is configured.
+     */
+    public const UI_KIT_ADMIN_LAYOUT = '@NowoUiKit/layout/admin.html.twig';
+
     public function prepend(ContainerBuilder $container): void
     {
         $this->prependFormKitDefaults($container);
@@ -36,9 +44,8 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ]);
         }
 
-        // Form themes are applied only to the bundle's own forms ({% form_theme %} in
-        // workflow_definition/form.html.twig via the nowo_workflow_form_themes global);
-        // never prepend twig.form_themes globally (it would restyle every host form).
+        // Never prepend twig.form_themes globally (it would restyle every host form): the Workflow forms render with
+        // the host form theme and the FormKit "workflow" profile (REQ-UI-003).
 
         if ($container->hasExtension('framework')) {
             $container->prependExtensionConfig('framework', [
@@ -52,10 +59,6 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
 
         $this->prependUiKitDefaults($container);
     }
-
-    /**
-     * Seed nowo_ui_kit from ui.css_framework / icon_set when host has not set UiKit (REQ-UI-001-kit).
-     */
 
     /**
      * When FormKit is installed, register the workflow profile. Forms select it via #[FormKitConfig].
@@ -79,41 +82,15 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             }
         }
 
-        $seed = [];
+        $seed      = [];
+        $framework = $this->resolvedCssFramework($container);
 
         if (!$hostHasCssFramework) {
-            $seed['css_framework'] = 'bootstrap';
+            $seed['css_framework'] = self::formKitCssFramework($framework);
         }
 
         if (!$hostHasProfile) {
-            $seed['profiles'] = [
-                'workflow' => [
-                    'alias'              => 'workflow',
-                    'translation_domain' => 'NowoWorkflowBundle',
-                    'defaults'           => [
-                        'attr'     => ['class' => 'nowo-ui-input form-control'],
-                        'row_attr' => ['class' => 'mb-2'],
-                    ],
-                    'field_types' => [
-                        'checkbox' => [
-                            'attr'     => ['class' => 'form-check-input'],
-                            'row_attr' => ['class' => 'form-check mb-2'],
-                        ],
-                        'choice' => [
-                            'attr' => ['class' => 'form-select'],
-                        ],
-                        'entity' => [
-                            'attr' => ['class' => 'form-select'],
-                        ],
-                        'file' => [
-                            'attr' => ['class' => 'nowo-ui-input form-control'],
-                        ],
-                        'textarea' => [
-                            'attr' => ['class' => 'nowo-ui-input form-control'],
-                        ],
-                    ],
-                ],
-            ];
+            $seed['profiles'] = ['workflow' => self::formKitProfile($framework)];
         }
 
         if ($seed !== []) {
@@ -121,6 +98,94 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         }
     }
 
+    /**
+     * FormKit profile of the Workflow forms: Bootstrap control classes on Bootstrap stacks, semantic nowo-ui-* classes
+     * only on any other stack (the host theme styles them).
+     *
+     * @return array<string, mixed>
+     */
+    public static function formKitProfile(string $cssFramework): array
+    {
+        if (!self::isBootstrap($cssFramework)) {
+            return [
+                'alias'              => 'workflow',
+                'translation_domain' => 'NowoWorkflowBundle',
+                'defaults'           => ['attr' => ['class' => 'nowo-ui-input']],
+            ];
+        }
+
+        return [
+            'alias'              => 'workflow',
+            'translation_domain' => 'NowoWorkflowBundle',
+            'defaults'           => [
+                'attr'     => ['class' => 'nowo-ui-input form-control'],
+                'row_attr' => ['class' => 'mb-2'],
+            ],
+            'field_types' => [
+                'checkbox' => [
+                    'attr'     => ['class' => 'form-check-input'],
+                    'row_attr' => ['class' => 'form-check mb-2'],
+                ],
+                'choice' => [
+                    'attr' => ['class' => 'form-select'],
+                ],
+                'entity' => [
+                    'attr' => ['class' => 'form-select'],
+                ],
+                'file' => [
+                    'attr' => ['class' => 'nowo-ui-input form-control'],
+                ],
+                'textarea' => [
+                    'attr' => ['class' => 'nowo-ui-input form-control'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * FormKit css_framework (bootstrap, tailwind, foundation, none) of a UiKit css_framework.
+     */
+    public static function formKitCssFramework(string $cssFramework): string
+    {
+        return match (true) {
+            self::isBootstrap($cssFramework)                          => 'bootstrap',
+            in_array($cssFramework, ['tailwind', 'foundation'], true) => $cssFramework,
+            default                                                   => 'none',
+        };
+    }
+
+    private static function isBootstrap(string $cssFramework): bool
+    {
+        return in_array($cssFramework, ['bootstrap', 'bootstrap5', 'bootstrap4', 'tabler'], true);
+    }
+
+    /**
+     * CSS stack the Workflow pages render with: the host's nowo_ui_kit.css_framework, else the deprecated
+     * ui.css_framework, else UiKit's default (bootstrap5).
+     */
+    private function resolvedCssFramework(ContainerBuilder $container): string
+    {
+        $framework = null;
+        if ($container->hasExtension('nowo_ui_kit')) {
+            foreach ($container->getExtensionConfig('nowo_ui_kit') as $cfg) {
+                if (is_array($cfg) && is_string($cfg['css_framework'] ?? null)) {
+                    $framework = $cfg['css_framework'];
+                }
+            }
+        }
+
+        if ($framework === null) {
+            $legacy    = $this->processedConfig($container)['ui']['css_framework'] ?? null;
+            $framework = is_string($legacy) ? $legacy : 'bootstrap5';
+        }
+
+        return $framework;
+    }
+
+    /**
+     * Seeds nowo_ui_kit.css_framework / icon_set from the deprecated ui.css_framework / ui.icon_set when the host
+     * sets them and does not configure UiKit itself (REQ-UI-003: the CSS stack is inherited from nowo_ui_kit).
+     */
     private function prependUiKitDefaults(ContainerBuilder $container): void
     {
         if (!$container->hasExtension('nowo_ui_kit')) {
@@ -145,21 +210,30 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             return;
         }
 
-        $config   = $this->processConfiguration(new Configuration(), $container->getExtensionConfig(Configuration::ALIAS));
-        $ui       = is_array($config['ui'] ?? null) ? $config['ui'] : [];
+        $ui       = $this->processedConfig($container)['ui'];
         $defaults = [];
 
-        if (!$hostHasCssFramework) {
-            $fw                        = (string) ($ui['css_framework'] ?? 'bootstrap5');
-            $defaults['css_framework'] = $fw === 'bootstrap' || $fw === 'tabler' ? 'bootstrap5' : $fw;
+        if (!$hostHasCssFramework && is_string($ui['css_framework'] ?? null)) {
+            $defaults['css_framework'] = $ui['css_framework'];
         }
-        if (!$hostHasIconSet) {
-            $defaults['icon_set'] = (string) ($ui['icon_set'] ?? 'bootstrap-icons');
+        if (!$hostHasIconSet && is_string($ui['icon_set'] ?? null)) {
+            $defaults['icon_set'] = $ui['icon_set'];
         }
 
         if ($defaults !== []) {
             $container->prependExtensionConfig('nowo_ui_kit', $defaults);
         }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function processedConfig(ContainerBuilder $container): array
+    {
+        /** @var array<string, mixed> $config */
+        $config = (new Processor())->processConfiguration(new Configuration(), $container->getExtensionConfig(Configuration::ALIAS));
+
+        return $config;
     }
 
     public function load(array $configs, ContainerBuilder $container): void
@@ -168,19 +242,36 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $loader->load('services.yaml');
 
         $config = $this->processConfiguration(new Configuration(), $configs);
+        $webUi  = $config['web_ui'];
+        $ui     = $config['ui'];
 
-        $container->setParameter(Configuration::ALIAS . '.enabled', $config['enabled']);
+        $container->setParameter(Configuration::ALIAS . '.enabled', $webUi['enabled']);
         $container->setParameter(Configuration::ALIAS . '.environments', $config['environments']);
         $container->setParameter(Configuration::ALIAS . '.connection', $config['connection']);
         $container->setParameter(Configuration::ALIAS . '.table_prefix', $config['table_prefix']);
-        $container->setParameter(Configuration::ALIAS . '.ui.path', $config['ui']['path']);
-        $container->setParameter(Configuration::ALIAS . '.ui.layout_template', $config['ui']['layout_template']);
-        $container->setParameter(Configuration::ALIAS . '.ui.css_framework', $config['ui']['css_framework']);
-        $container->setParameter(Configuration::ALIAS . '.ui.icon_set', $config['ui']['icon_set']);
-        $container->setParameter(Configuration::ALIAS . '.ui.list_page_size', $config['ui']['list_page_size']);
-        $container->setParameter(Configuration::ALIAS . '.ui.default_locale', $config['ui']['default_locale']);
-        $container->setParameter(Configuration::ALIAS . '.ui.locales', $config['ui']['locales']);
-        $container->setParameter(Configuration::ALIAS . '.ui.required_roles', $config['ui']['required_roles']);
+
+        $container->setParameter(Configuration::ALIAS . '.web_ui.enabled', $webUi['enabled']);
+        $container->setParameter(Configuration::ALIAS . '.web_ui.path_prefix', $webUi['path_prefix']);
+        $container->setParameter(Configuration::ALIAS . '.web_ui.layout_template', $webUi['layout_template']);
+        $container->setParameter(Configuration::ALIAS . '.web_ui.templates', $webUi['templates']);
+        $container->setParameter(Configuration::ALIAS . '.web_ui.list_page_size', $webUi['list_page_size']);
+        $container->setParameter(Configuration::ALIAS . '.web_ui.default_locale', $webUi['default_locale']);
+        $container->setParameter(Configuration::ALIAS . '.web_ui.locales', $webUi['locales']);
+
+        // Deprecated 1.x parameters (mirrors of the canonical values), removed in 2.0.
+        $legacyLayout = Configuration::legacyLayout($config);
+        $cssFramework = is_string($ui['css_framework'] ?? null) ? $ui['css_framework'] : null;
+        $iconSet      = is_string($ui['icon_set'] ?? null) ? $ui['icon_set'] : null;
+        $container->setParameter(Configuration::ALIAS . '.ui.path', $webUi['path_prefix']);
+        $container->setParameter(Configuration::ALIAS . '.ui.layout_template', $legacyLayout ?? self::UI_KIT_ADMIN_LAYOUT);
+        $container->setParameter(Configuration::ALIAS . '.ui.css_framework', $cssFramework ?? 'bootstrap5');
+        $container->setParameter(Configuration::ALIAS . '.ui.css_framework_override', $cssFramework);
+        $container->setParameter(Configuration::ALIAS . '.ui.icon_set', $iconSet ?? 'bootstrap-icons');
+        $container->setParameter(Configuration::ALIAS . '.ui.list_page_size', $webUi['list_page_size']);
+        $container->setParameter(Configuration::ALIAS . '.ui.default_locale', $webUi['default_locale']);
+        $container->setParameter(Configuration::ALIAS . '.ui.locales', $webUi['locales']);
+        $container->setParameter(Configuration::ALIAS . '.ui.required_roles', $config['security']['access_roles']);
+
         $container->setParameter(Configuration::ALIAS . '.security.access_roles', $config['security']['access_roles']);
         $container->setParameter(Configuration::ALIAS . '.security.access_checker', $config['security']['access_checker']);
         $container->setParameter(Configuration::ALIAS . '.security.allow_unauthenticated', $config['security']['allow_unauthenticated']);

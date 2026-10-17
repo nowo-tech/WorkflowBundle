@@ -1,10 +1,39 @@
-{# Optional one-file bridge (REQ-UI-001): set ui.layout_template to this template.
-   Host chrome keeps stylesheets/javascripts; bundle pages stack with {{ parent() }}.
-   Copy to the app if base.html.twig uses a content block other than body. #}
+{#
+  Deprecated since 1.9, removed in 2.0 — prefer a bridge of your own set as nowo_ui_kit.layouts.admin (REQ-UI-003).
+
+  One-file bridge into the project base.html.twig: renders every UiKit canonical block inside base.html.twig's
+  title / stylesheets / body / javascripts blocks. Usable as nowo_ui_kit.layouts.admin or
+  nowo_workflow.web_ui.layout_template; copy it to the app when base.html.twig uses other block names.
+#}
 {% extends 'base.html.twig' %}
 
+{% block title %}{% block nowo_ui_document_title %}{% endblock %}{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    {% block nowo_ui_head %}{% endblock %}
+    {% block nowo_ui_styles %}
+        <link rel="stylesheet" href="{{ asset('css/nowo-ui.css', 'nowo_ui_kit') }}">
+        {{ nowo_ui_tokens() }}
+    {% endblock %}
+{% endblock %}
+
 {% block body %}
-    {% block nowo_ui_page_header %}{% endblock %}
-    {% block nowo_ui_content %}{% endblock %}
+    <main class="{{ nowo_ui_class('content', nowo_ui_bundle|default(null)) }}" id="nowo-ui-content"{% if nowo_ui_bundle|default(null) %} data-nowo-ui-bundle="{{ nowo_ui_bundle }}"{% endif %}>
+        {% block nowo_ui_page_header %}{% endblock %}
+        {% block nowo_ui_flashes %}
+            {{ include(nowo_ui_partial('flashes', nowo_ui_bundle|default(null)), {bundle: nowo_ui_bundle|default(null)}) }}
+        {% endblock %}
+        {% block nowo_ui_content %}{% endblock %}
+    </main>
     {% block nowo_ui_modals %}{% endblock %}
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {% block nowo_ui_scripts %}
+        {% for _script in ['nowo-ui-modal', 'nowo-ui-confirm', 'nowo-ui-toast', 'nowo-ui-tabs'] %}
+            <script src="{{ asset('js/' ~ _script ~ '.js', 'nowo_ui_kit') }}" defer></script>
+        {% endfor %}
+    {% endblock %}
 {% endblock %}

@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Unit\Controller;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
+use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
@@ -14,11 +15,14 @@ use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use Nowo\WorkflowBundle\Tests\Support\ControllerContainerFactory;
+use Nowo\WorkflowBundle\Tests\Support\WorkflowPageFixtures;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Session\FlashBagAwareSessionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Translation\IdentityTranslator;
@@ -33,7 +37,62 @@ final class WorkflowDefinitionControllerTest extends TestCase
 
         $response = $controller->index(Request::create('/definitions'));
 
-        self::assertSame('index', $response->getContent());
+        self::assertSame('index:0', $response->getContent());
+    }
+
+    public function testIndexUsesTheConfiguredTemplate(): void
+    {
+        $controller = $this->createController(definitions: [$this->definitionWithId(1)], templates: ['index' => 'host/workflow_index.html.twig']);
+
+        self::assertSame('host-index:1', $controller->index(Request::create('/definitions'))->getContent());
+    }
+
+    public function testMissingTemplateKeyFallsBackToTheBundleTemplate(): void
+    {
+        $controller = $this->createController(templates: []);
+
+        self::assertSame('index:0', $controller->index(Request::create('/definitions'))->getContent());
+    }
+
+    public function testEditSectionRendersTheSettingsPageOfTheSection(): void
+    {
+        $definition = $this->definitionWithId(2);
+        $controller = $this->createController(definitionById: $definition);
+
+        self::assertSame('edit:transitions:order', $controller->editTransitions(Request::create('/definitions/2/edit/transitions'), 2)->getContent());
+        self::assertSame('edit:places:order', $controller->editPlaces(Request::create('/definitions/2/edit/places'), 2)->getContent());
+        self::assertSame('edit:match_rules:order', $controller->editMatchRules(Request::create('/definitions/2/edit/match-rules'), 2)->getContent());
+    }
+
+    public function testInvalidSubmissionAnswers422(): void
+    {
+        $definition = $this->definitionWithId(2);
+        $controller = $this->createController(definitionById: $definition);
+        $request    = Request::create('/definitions/2/edit/general', 'POST', [
+            'workflow_definition_form' => ['priority' => 'not-a-number'] + $this->generalFormData('order', 'Order'),
+        ]);
+
+        $response = $controller->editGeneral($request, 2);
+
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $response->getStatusCode());
+    }
+
+    public function testFlashMessagesAreTranslated(): void
+    {
+        $definition = $this->definitionWithId(4);
+        $container  = ControllerContainerFactory::create();
+        $controller = $this->createController(definitionById: $definition);
+        $controller->setContainer($container);
+
+        $controller->delete(Request::create('/definitions/4/delete', 'POST', ['_token' => 'valid']), 4);
+
+        $requestStack = $container->get('request_stack');
+        self::assertInstanceOf(RequestStack::class, $requestStack);
+        $request = $requestStack->getCurrentRequest();
+        self::assertNotNull($request);
+        $session = $request->getSession();
+        self::assertInstanceOf(FlashBagAwareSessionInterface::class, $session);
+        self::assertSame(['success' => ['flash.deleted']], $session->getFlashBag()->all());
     }
 
     public function testEditRedirectsToGeneralSection(): void
@@ -53,7 +112,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
 
         $response = $controller->show(7);
 
-        self::assertSame('show', $response->getContent());
+        self::assertSame('show:Order:1', $response->getContent());
     }
 
     public function testShowBySlugUsesSlugLookup(): void
@@ -63,7 +122,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
 
         $response = $controller->showBySlug('order');
 
-        self::assertSame('show', $response->getContent());
+        self::assertSame('show:Order:1', $response->getContent());
     }
 
     public function testShowThrowsWhenDefinitionMissing(): void
@@ -124,7 +183,8 @@ final class WorkflowDefinitionControllerTest extends TestCase
 
         $response = $controller->editGeneral($request, 2);
 
-        self::assertSame('form', $response->getContent());
+        self::assertSame('edit:general:order', $response->getContent());
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
     }
 
     public function testEditGeneralPostUpdatesDefinition(): void
@@ -151,7 +211,8 @@ final class WorkflowDefinitionControllerTest extends TestCase
 
         $response = $controller->new($request);
 
-        self::assertSame('form', $response->getContent());
+        self::assertSame('form:page.new_definition', $response->getContent());
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
     }
 
     public function testNewPostPersistsDefinition(): void
@@ -303,6 +364,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
 
     /**
      * @param list<WorkflowDefinition> $definitions
+     * @param array<string, string> $templates
      */
     private function createController(
         array $definitions = [],
@@ -311,6 +373,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
         ?EntityManagerInterface $entityManager = null,
         ?DatabaseWorkflowRegistry $registry = null,
         ?ManagerRegistry $managerRegistry = null,
+        array $templates = Configuration::DEFAULT_TEMPLATES,
     ): WorkflowDefinitionController {
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('paginateByName')->willReturn([
@@ -342,8 +405,10 @@ final class WorkflowDefinitionControllerTest extends TestCase
             ),
             $graphPresenter,
             new IdentityTranslator(),
+            WorkflowPageFixtures::factory(),
             20,
             $managerRegistry,
+            $templates,
         );
         $controller->setContainer(ControllerContainerFactory::create());
 

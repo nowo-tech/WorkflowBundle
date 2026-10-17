@@ -21,7 +21,7 @@ final class PlaceMultiSelectType extends AbstractType
             'multiple' => true,
             'required' => false,
             'attr'     => [
-                'class' => 'form-select nowo-place-multiselect',
+                'class' => 'nowo-ui-input nowo-place-multiselect',
             ],
         ]);
         $resolver->setRequired(['choices']);

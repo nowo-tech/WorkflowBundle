@@ -26,6 +26,8 @@ action:
   add_place: 'Status toevoegen'
   add_transition: 'Overgang toevoegen'
   add_match_rule: 'Regel toevoegen'
+  create_continue: 'Aanmaken en doorgaan'
+  remove: 'Verwijderen'
 
 status:
   enabled: Actief
@@ -51,8 +53,9 @@ dashboard:
   title: 'Databasegestuurde Symfony-workflows'
   intro: 'Beheer workflowdefinities in de database en gebruik ze tijdens runtime via %class%.'
   definitions: Definities
-  empty_prefix: 'Nog geen workflowdefinities.'
-  empty_suffix: 'of voer uit'
+  definitions_intro: '%shown% van %total% getoond, op naam.'
+  view_all: 'Alle definities bekijken'
+  empty: 'Nog geen workflowdefinities. Maak er een aan of voer %command% uit om de demo-workflows te laden.'
 
 definition:
   index_title: 'Workflowdefinities'
@@ -68,6 +71,14 @@ definition:
   initial_place: 'Initiële status'
   places_transitions: 'Statussen / overgangen'
   confirm_delete: 'Deze workflowdefinitie verwijderen?'
+  empty_title: 'Nog geen workflowdefinities'
+  empty_message: 'Maak een definitie aan en voeg daarna de overeenkomstregels, statussen en overgangen toe.'
+  confirm_delete_message: '“%name%” wordt verwijderd met de statussen, overgangen en overeenkomstregels.'
+  match_default_label: 'Standaardworkflow'
+  created_at: 'Aangemaakt'
+  updated_at: 'Bijgewerkt'
+  section:
+    general: 'Definitie'
 
 table:
   name: Naam
@@ -85,7 +96,8 @@ collection:
   no_places: 'Nog geen statussen. Klik op «Status toevoegen» om er een te maken.'
   no_transitions: 'Nog geen overgangen. Klik op «Overgang toevoegen» om er een te maken.'
   no_match_rules: 'Nog geen regels. Laat leeg voor standaardworkflow, of klik op «Regel toevoegen».'
-  confirm_delete: 'Dit item verwijderen? Sla het formulier op om wijzigingen te bewaren.'
+  confirm_delete: 'Het item verdwijnt uit de lijst; sla het formulier op om de wijziging te bewaren.'
+  confirm_delete_title: 'Dit item verwijderen?'
 
 modal:
   add_place: 'Status toevoegen'
@@ -106,6 +118,8 @@ form:
     match_rules_list: 'Definieer parameterregels om deze workflow te selecteren. Laat leeg voor een standaardworkflow.'
     transition_places: 'Opties komen uit de sectie Places. Configureer indien nodig eerst de statussen.'
     places_list: 'Beheer workflowstatussen. Wijzigingen worden opgeslagen bij het verzenden van het formulier.'
+    new_definition: 'Begin met de algemene instellingen; overeenkomstregels, statussen en overgangen volgen daarna.'
+    general: 'Naam, slug, gekoppeld subject en prioriteit van de workflow.'
   field:
     name: Naam
     slug: Slug
@@ -159,8 +173,65 @@ error:
   not_found_id: 'Workflowdefinitie #%id% niet gevonden.'
   not_found_slug: 'Workflowdefinitie "%slug%" niet gevonden.'
 
-pagination:
-  label: Paginering
-  prev: Vorige
-  next: Volgende
-  page: 'Pagina %page% van %pages%'
+kpi:
+  definitions: 'Definities'
+  definitions_hint: 'Lijst openen'
+  enabled: 'Actief'
+  disabled: 'Inactief'
+
+workflow_definition_form:
+  name:
+    placeholder: 'Goedkeuring van inkooporders'
+    help: 'Naam in het beheer.'
+  slug:
+    placeholder: 'purchase_order'
+    help: 'Unieke id in de code: kleine letters, cijfers en underscores.'
+  type:
+    help: 'Toestandsmachine: één huidige status. Workflow: meerdere statussen tegelijk.'
+  initial_place:
+    placeholder: 'draft'
+    help: 'Status waarin een nieuw subject start; voeg hem toe onder Statussen.'
+  priority:
+    placeholder: '0'
+    help: 'De hoogste prioriteit wint als meerdere workflows bij een subject passen.'
+  subject_class:
+    placeholder: 'App\Entity\PurchaseOrder'
+    help: 'Volledige klasse van de subjecten die deze workflow aanstuurt.'
+  marking_property:
+    placeholder: 'status'
+    help: 'Eigenschap van het subject die de huidige status(sen) bewaart.'
+  enabled:
+    help: 'Het register negeert inactieve workflows.'
+  description:
+    placeholder: 'Waarvoor deze workflow dient…'
+    help: 'Optionele notities voor beheerders.'
+
+workflow_match_rule:
+  parameter_key:
+    placeholder: 'department'
+    help: 'Contextparameter die de resolver vergelijkt.'
+  parameter_value:
+    placeholder: 'purchasing'
+    help: 'Waarde die de parameter moet hebben.'
+  sort_order:
+    placeholder: '0'
+    help: 'Weergavevolgorde van de regel.'
+
+workflow_place:
+  name:
+    placeholder: 'submitted'
+    help: 'Technische naam voor overgangen en de markering.'
+  label:
+    placeholder: 'Ingediend'
+    help: 'Optioneel weergavelabel.'
+  sort_order:
+    placeholder: '0'
+    help: 'Positie in lijsten en in het diagram.'
+
+workflow_transition:
+  name:
+    placeholder: 'submit'
+    help: 'Technische naam om de overgang toe te passen.'
+  label:
+    placeholder: 'Ter goedkeuring indienen'
+    help: 'Optioneel weergavelabel.'

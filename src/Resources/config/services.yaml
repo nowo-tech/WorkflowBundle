@@ -3,7 +3,8 @@ services:
         autowire: true
         autoconfigure: true
         bind:
-            $listPageSize: '%nowo_workflow.ui.list_page_size%'
+            $listPageSize: '%nowo_workflow.web_ui.list_page_size%'
+            $templates: '%nowo_workflow.web_ui.templates%'
 
     Nowo\WorkflowBundle\:
         resource: '../../'
@@ -22,8 +23,8 @@ services:
 
     Nowo\WorkflowBundle\Service\LocaleManager:
         arguments:
-            $enabledLocales: '%nowo_workflow.ui.locales%'
-            $defaultLocale: '%nowo_workflow.ui.default_locale%'
+            $enabledLocales: '%nowo_workflow.web_ui.locales%'
+            $defaultLocale: '%nowo_workflow.web_ui.default_locale%'
 
     Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker: ~
 
@@ -35,13 +36,20 @@ services:
 
     Nowo\WorkflowBundle\EventListener\WorkflowUiAccessSubscriber:
         arguments:
-            $enabled: '%nowo_workflow.enabled%'
+            $enabled: '%nowo_workflow.web_ui.enabled%'
 
+    # Deprecated 1.x Twig globals (nowo_workflow_layout_template, nowo_workflow_css_framework…), removed in 2.0.
     Nowo\WorkflowBundle\Twig\WorkflowExtension:
         arguments:
             $layoutTemplate: '%nowo_workflow.ui.layout_template%'
             $cssFramework: '%nowo_workflow.ui.css_framework%'
             $iconSet: '%nowo_workflow.ui.icon_set%'
+            $formThemeFramework: '%nowo_workflow.ui.css_framework_override%'
+
+    # UiKit view models of the admin pages (REQ-UI-003).
+    Nowo\WorkflowBundle\View\WorkflowPageFactory:
+        arguments:
+            $layout: '%nowo_workflow.web_ui.layout_template%'
 
     Nowo\WorkflowBundle\Doctrine\TableNamePrefixer:
         arguments:

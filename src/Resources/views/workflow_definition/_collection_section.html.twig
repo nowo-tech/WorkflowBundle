@@ -1,0 +1,92 @@
+{#
+  Collection editor of a workflow definition section (match rules, places, transitions): a table of the entries,
+  an add button, one <dialog> editor (the entry's fields move into it while editing) and a remove confirmation
+  (UiKit confirm partial). Behaviour: nowo-workflow.js (no inline script, no confirm()).
+
+  Required: collection (CollectionType FormView), config ({add, empty, title_add, title_edit, columns: list of
+  {field, label, format: text|code|list}}), key (section id), bundle.
+  Optional: place_names (transition place choices for the searchable multiselect).
+#}
+{% set _d = 'NowoWorkflowBundle' %}
+{% set _columns = [] %}
+{% for column in config.columns %}
+    {% set _columns = _columns|merge([{field: column.field, format: column.format, label: column.label|trans({}, _d)}]) %}
+{% endfor %}
+{% set _dialog = 'workflow-' ~ key ~ '-editor' %}
+{% set _remove = 'workflow-' ~ key ~ '-remove' %}
+<div
+    class="nowo-workflow-collection"
+    data-workflow-collection="{{ key }}"
+    data-form-prefix="{{ collection.vars.full_name }}"
+    data-prototype="{{ form_widget(collection.vars.prototype)|e('html_attr') }}"
+    data-index="{{ collection|length }}"
+    data-columns="{{ _columns|json_encode|e('html_attr') }}"
+    data-dialog-id="{{ _dialog }}"
+    data-remove-dialog-id="{{ _remove }}"
+    data-place-names="{{ place_names|default([])|json_encode|e('html_attr') }}"
+    data-place-placeholder="{{ 'form.placeholder.select_places'|trans({}, _d) }}"
+    data-testid="workflow-collection-{{ key }}"
+>
+    <div class="{{ nowo_ui_class('toolbar', bundle) }} nowo-workflow-collection__toolbar">
+        <button type="button" class="{{ nowo_ui_class('btn_primary', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}" data-collection-add>{{ config.add|trans({}, _d) }}</button>
+    </div>
+
+    <div class="{{ nowo_ui_class('table_wrap', bundle) }}"{{ nowo_ui_attrs('table_wrap', bundle) }}>
+        <table class="{{ nowo_ui_class('table', bundle) }}"{{ nowo_ui_attrs('table', bundle) }}>
+            <thead class="{{ nowo_ui_class('table_head', bundle) }}">
+                <tr class="{{ nowo_ui_class('table_head_row', bundle) }}">
+                    {% for column in _columns %}
+                        <th scope="col" class="{{ nowo_ui_class('table_head_cell', bundle) }}">{{ column.label }}</th>
+                    {% endfor %}
+                    <th scope="col" class="{{ nowo_ui_class('table_head_cell', bundle) }} {{ nowo_ui_class('table_actions_head', bundle) }} nowo-ui-cell--end">{{ 'table.actions'|trans({}, _d) }}</th>
+                </tr>
+            </thead>
+            <tbody data-collection-table></tbody>
+        </table>
+    </div>
+    <p class="{{ nowo_ui_class('empty', bundle) }}" data-collection-empty hidden>{{ config.empty|trans({}, _d) }}</p>
+
+    <template data-collection-row>
+        <tr class="{{ nowo_ui_class('table_row', bundle) }}">
+            <td class="{{ nowo_ui_class('table_cell', bundle) }}" data-collection-cell></td>
+            <td class="{{ nowo_ui_class('table_cell', bundle) }} {{ nowo_ui_class('table_actions_cell', bundle) }} nowo-ui-cell--end">
+                <div class="{{ nowo_ui_class('row_actions', bundle) }}">
+                    <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}" data-row-edit>{{ 'action.edit'|trans({}, _d) }}</button>
+                    <button type="button" class="{{ nowo_ui_class('btn_danger', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}" data-row-delete>{{ 'action.delete'|trans({}, _d) }}</button>
+                </div>
+            </td>
+        </tr>
+    </template>
+
+    <div data-collection-entries hidden>
+        {% for entry in collection %}
+            <div data-collection-entry="{{ loop.index0 }}">{{ form_widget(entry) }}</div>
+        {% endfor %}
+    </div>
+
+    {% embed '@NowoWorkflowBundle/workflow_definition/_dialog.html.twig' with {
+        id: _dialog,
+        bundle: bundle,
+        size: key == 'transitions' ? 'wide' : null,
+        title_attr: {'data-title-add': config.title_add|trans({}, _d), 'data-title-edit': config.title_edit|trans({}, _d)},
+        body_attr: {'data-dialog-body': true},
+    } %}
+        {% block footer %}
+            <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }}" data-dialog-cancel>{{ 'action.cancel'|trans({}, 'NowoWorkflowBundle') }}</button>
+            <button type="button" class="{{ nowo_ui_class('btn_primary', bundle) }}" data-dialog-apply>{{ 'action.apply'|trans({}, 'NowoWorkflowBundle') }}</button>
+        {% endblock %}
+    {% endembed %}
+
+    {% set _remove_body %}<p class="nowo-ui-confirm__message">{{ 'collection.confirm_delete'|trans({}, _d) }}</p>{% endset %}
+    {% set _remove_footer %}
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }}" data-nowo-confirm-close data-workflow-dialog-close>{{ 'action.cancel'|trans({}, _d) }}</button>
+        <button type="button" class="{{ nowo_ui_class('btn_danger', bundle) }}" data-collection-remove-confirm>{{ 'action.remove'|trans({}, _d) }}</button>
+    {% endset %}
+    {{ include(nowo_ui_partial('confirm', bundle), {
+        id: _remove,
+        title: 'collection.confirm_delete_title'|trans({}, _d),
+        body: _remove_body,
+        footer: _remove_footer,
+        bundle: bundle,
+    }, false) }}
+</div>

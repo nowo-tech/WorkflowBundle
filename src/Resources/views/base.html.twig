@@ -1,18 +1,33 @@
-{# Bundle page shell: extends configured host/demo layout and stacks assets with parent(). #}
+{#
+  Deprecated since 1.9, removed in 2.0 — 1.x layout bridge (REQ-UI-003 BC).
+
+  Used as web_ui.layout_template while a host still sets the deprecated nowo_workflow.ui.layout_template: extends
+  that 1.x layout (global nowo_workflow_layout_template) and maps the UiKit canonical blocks into its title /
+  stylesheets / body / javascripts blocks, as the 1.x bundle shell did. Migrate by pointing
+  nowo_ui_kit.layouts.admin (or nowo_workflow.web_ui.layout_template) at a layout that renders the canonical blocks.
+#}
 {% extends nowo_workflow_layout_template %}
+
+{% block title %}{% block nowo_ui_document_title %}{% endblock %}{% endblock %}
 
 {% block stylesheets %}
     {{ parent() }}
+    {% block nowo_ui_head %}{% endblock %}
     {% block nowo_ui_styles %}{% endblock %}
 {% endblock %}
 
 {% block body %}
-    {% block nowo_ui_page_header %}{% endblock %}
-    {% block nowo_ui_content %}{% endblock %}
+    <div class="nowo-ui-content"{% if nowo_ui_bundle|default(null) %} data-nowo-ui-bundle="{{ nowo_ui_bundle }}"{% endif %}>
+        {% block nowo_ui_page_header %}{% endblock %}
+        {% block nowo_ui_flashes %}{% endblock %}
+        {% block nowo_ui_content %}{% endblock %}
+    </div>
     {% block nowo_ui_modals %}{% endblock %}
 {% endblock %}
 
 {% block javascripts %}
     {{ parent() }}
-    {% block nowo_ui_scripts %}{% endblock %}
+    {% block nowo_ui_scripts %}
+        <script src="{{ asset('js/nowo-ui-confirm.js', 'nowo_ui_kit') }}" defer></script>
+    {% endblock %}
 {% endblock %}

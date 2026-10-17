@@ -31,10 +31,12 @@ final class ControllerContainerFactory
     public static function create(array $overrides = []): Container
     {
         $twig = new Environment(new ArrayLoader([
-            '@NowoWorkflowBundle/dashboard/index.html.twig'           => 'dashboard',
-            '@NowoWorkflowBundle/workflow_definition/index.html.twig' => 'index',
-            '@NowoWorkflowBundle/workflow_definition/show.html.twig'  => 'show',
-            '@NowoWorkflowBundle/workflow_definition/form.html.twig'  => 'form',
+            '@NowoWorkflowBundle/dashboard/index.html.twig'           => 'dashboard:{{ page.kpis|length }}:{{ definitions|length }}/{{ total }}',
+            '@NowoWorkflowBundle/workflow_definition/index.html.twig' => 'index:{{ page.rows|length }}',
+            '@NowoWorkflowBundle/workflow_definition/show.html.twig'  => 'show:{{ page.header.title }}:{{ graph.places|length }}',
+            '@NowoWorkflowBundle/workflow_definition/form.html.twig'  => 'form:{{ page.header.title.key }}',
+            '@NowoWorkflowBundle/workflow_definition/edit.html.twig'  => 'edit:{{ page.current }}:{{ definition.slug }}',
+            'host/workflow_index.html.twig'                           => 'host-index:{{ page.rows|length }}',
         ]));
 
         $router = new StubUrlGenerator();
