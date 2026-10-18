@@ -24,6 +24,7 @@
     data-dialog-id="{{ _dialog }}"
     data-remove-dialog-id="{{ _remove }}"
     data-place-names="{{ place_names|default([])|json_encode|e('html_attr') }}"
+    data-code-class="{{ nowo_ui_class('code', bundle) }}"
     data-place-placeholder="{{ 'form.placeholder.select_places'|trans({}, _d) }}"
     data-testid="workflow-collection-{{ key }}"
 >

@@ -197,17 +197,19 @@
         root.setAttribute('data-index', String(entries.length));
     }
 
-    function formatCell(value, format) {
+    // codeClass: the UiKit `code` slot classes (data-code-class on the collection root).
+    function formatCell(value, format, codeClass) {
+        var open = codeClass ? '<code class="' + escapeHtml(codeClass) + '">' : '<code>';
         if (Array.isArray(value)) {
             return value.length === 0 ? '—' : value.map(function (item) {
-                return '<code>' + escapeHtml(item) + '</code>';
+                return open + escapeHtml(item) + '</code>';
             }).join(', ');
         }
         if (value === '') {
             return '—';
         }
 
-        return format === 'code' ? '<code>' + escapeHtml(value) + '</code>' : escapeHtml(value);
+        return format === 'code' ? open + escapeHtml(value) + '</code>' : escapeHtml(value);
     }
 
     function createCollection(root) {
@@ -243,7 +245,7 @@
                     var cell = cellTemplate.cloneNode(false);
                     cell.removeAttribute('data-collection-cell');
                     cell.setAttribute('data-label', column.label);
-                    cell.innerHTML = formatCell(fieldValue(entry, column.field), column.format);
+                    cell.innerHTML = formatCell(fieldValue(entry, column.field), column.format, root.getAttribute('data-code-class') || '');
                     row.insertBefore(cell, actionsCell);
                 });
                 row.querySelector('[data-row-edit]').setAttribute('data-row-edit', String(index));

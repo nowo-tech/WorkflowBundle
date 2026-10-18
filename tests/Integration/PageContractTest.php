@@ -193,6 +193,7 @@ final class PageContractTest extends PageContractTestCase
         ]));
         self::assertStringContainsString('data-workflow-collection="transitions"', $transitions->html);
         self::assertStringContainsString('data-prototype=', $transitions->html);
+        self::assertStringContainsString('data-code-class="nowo-ui-code', $transitions->html, 'JS-built code cells use the UiKit code slot');
         self::assertStringContainsString('id="workflow-transitions-editor"', $transitions->html);
         self::assertStringContainsString('id="workflow-transitions-remove"', $transitions->html);
         self::assertStringContainsString('nowo-ui-dialog--lg', $transitions->html);
