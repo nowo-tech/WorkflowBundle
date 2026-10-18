@@ -34,7 +34,7 @@ This bundle is **FrankenPHP worker mode friendly**.
 - Persist workflow definitions (places, transitions, subject class, marking property) in Doctrine
 - Configurable Doctrine `table_prefix` for table and constraint names
 - Built-in admin UI at `/workflow` (configurable path), protected by default via `security.access_roles` / `WorkflowUiAccessCheckerInterface`
-- Admin pages on the UiKit 2.0 page contract (REQ-UI-003): list, show, form, settings and dashboard scaffolds themed once by the host (`nowo_ui_kit.layouts` / `nowo_ui_kit.theme`), flow diagram and collection editors on native `<dialog>`s, no CDN assets — see [Templates](docs/TEMPLATES.md)
+- Admin pages on the UiKit 2.1 page contract (REQ-UI-003): list, show, form, settings and dashboard scaffolds themed once by the host (`nowo_ui_kit.layouts` / `nowo_ui_kit.theme`), flow diagram and collection editors on native `<dialog>`s, no CDN assets — see [Templates](docs/TEMPLATES.md)
 - Configurable `web_ui.path_prefix`, `web_ui.layout_template`, `web_ui.templates.<page>` and `web_ui.list_page_size`
 - UI translations for `en`, `es`, `fr`, `it`, `de`, `nl`, `pt` (enable extra locales in `web_ui.locales`)
 - Runtime resolution via `DatabaseWorkflowRegistry` (Symfony Workflow component)

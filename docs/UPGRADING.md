@@ -57,8 +57,8 @@
 
 ## Unreleased
 
-From **1.8.2** — admin pages on the UiKit 2.0 page contract (REQ-UI-003). Minor release: the old configuration keeps
-working (deprecated), but the page markup changed.
+From **1.8.2** — admin pages on the UiKit page contract (REQ-UI-003); requires `nowo-tech/ui-kit-bundle` **^2.1**.
+Minor release: the old configuration keeps working (deprecated), but the page markup changed.
 
 ```bash
 composer update nowo-tech/workflow-bundle nowo-tech/ui-kit-bundle -W
@@ -84,10 +84,17 @@ What a host may notice:
 - Removed templates: `layout.html.twig`, `_framework_assets.css.twig`, `_framework_assets.js.twig`,
   `_pagination.html.twig`, `workflow_definition/_edit_nav.html.twig`, `_match_rules_section.html.twig`,
   `_places_section.html.twig`, `_transitions_section.html.twig`, `_collection_manager.js.twig`.
-- Dialogs are native `<dialog>`s (UiKit `confirm_*` slots): Bootstrap JS is no longer needed. The delete confirmation
-  needs UiKit's `nowo-ui-confirm.js` in your layout (UiKit layouts load it).
+- Dialogs are native `<dialog>`s: the diagram and collection editor dialogs render UiKit's `dialog` partial (slots
+  `dialog`, `dialog_header`, `dialog_title`, `dialog_body`, `dialog_footer`; sizes `md` / `lg`) and open through
+  `data-nowo-ui-dialog-open` (`nowo-ui-dialog.js`, loaded by UiKit layouts and by the show / edit pages); the delete
+  confirmation uses the UiKit `confirm` partial and needs `nowo-ui-confirm.js` in your layout (UiKit layouts load
+  it). Bootstrap JS is no longer needed. CSS aimed at `.nowo-workflow-dialog` or `[data-workflow-dialog]` must
+  target the UiKit dialog slots (`nowo_ui_kit.theme.bundles.NowoWorkflowBundle`) instead.
+- Form controls carry `nowo-ui-input nowo-ui-input--full` (UiKit 2.1 `input_full` slot; plus `form-control` on
+  Bootstrap stacks); the bundle CSS no longer overrides `.nowo-ui-input`.
 - Assets load from `bundles/nowoworkflow/` (run `assets:install`); Tom Select is bundled, no CDN.
-- Forms no longer apply `bootstrap_5_layout.html.twig` on their own unless the deprecated `ui.css_framework` is set:
+- Forms no longer apply `bootstrap_5_layout.html.twig` on their own unless the deprecated `ui.css_framework` is set
+  (then through `FormPage::$formThemes` / `SettingsSection::$formThemes`, not `form_theme` in the templates):
   configure `twig.form_themes` (or the FormKit `workflow` profile) for your stack.
 
 Migrating overrides: delete copies under `templates/bundles/NowoWorkflowBundle/` and theme the view types once in

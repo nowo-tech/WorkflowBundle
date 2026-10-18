@@ -23,7 +23,7 @@ nowo_workflow:
 
 ## Layout and assets (UiKit page contract)
 
-The admin pages extend UiKit 2.0 scaffolds: point `nowo_ui_kit.layouts.admin` at your layout or a one-file bridge
+The admin pages extend UiKit 2.1 scaffolds: point `nowo_ui_kit.layouts.admin` at your layout or a one-file bridge
 (see [CONFIGURATION.md](CONFIGURATION.md#host-layout-integration-req-ui-003)) and publish the bundle assets:
 
 ```bash

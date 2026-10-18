@@ -1,6 +1,6 @@
 # Templates
 
-Workflow admin pages on the UiKit 2.0 page contract (REQ-UI-003). Every page extends a UiKit scaffold
+Workflow admin pages on the UiKit 2.1 page contract (REQ-UI-003). Every page extends a UiKit scaffold
 (`@NowoUiKit/page/*`), receives a view model built by `Nowo\WorkflowBundle\View\WorkflowPageFactory` (labels are
 `Label`s of the `NowoWorkflowBundle` domain) and fills only data blocks. The layout is the host's
 `nowo_ui_kit.layouts.admin` (or `nowo_workflow.web_ui.layout_template`); the theme is `nowo_ui_kit.theme`.
@@ -22,8 +22,8 @@ Workflow admin pages on the UiKit 2.0 page contract (REQ-UI-003). Every page ext
 | Dashboard | `dashboard/index.html.twig` | `page/dashboard` | `DashboardPage` (header + create action; KPI tiles definitions / enabled / disabled); extra context `definitions`, `total` | `nowo_ui_dashboard_cards` (definitions card: name, type, subject, status), `nowo_ui_styles` |
 | Definitions list | `workflow_definition/index.html.twig` | `page/list` | `ListPage` (columns name, slug, matchRules, priority, places, transitions; row actions view, edit, delete with `Confirm`; `Pagination`; `EmptyState` with create action; breadcrumbs) | `nowo_ui_list_row`, `nowo_ui_styles` |
 | Definition detail | `workflow_definition/show.html.twig` | `page/show` | `ShowPage` (header edit + delete with `Confirm`; sections general, runtime binding, match rules; meta created / updated); extra context `definition`, `graph` | `nowo_ui_show_sections` (flow diagram, then the sections), `nowo_ui_modals` (place / transition dialogs), `nowo_ui_styles`, `nowo_ui_scripts` |
-| New definition | `workflow_definition/form.html.twig` | `page/form` | `FormPage` (general section form, submit "Create and continue", cancel to the list) | `nowo_ui_form_body` (general fields grid, then the REQ-TWIG-003 loop), `nowo_ui_styles` |
-| Edit definition | `workflow_definition/edit.html.twig` | `page/settings` | `SettingsPage` (one `SettingsSection` tab per section: general, match_rules, places, transitions; the current one carries the form; header view + delete with `Confirm`); extra context `definition`, `section` | `nowo_ui_settings_section` (general fields grid or the collection editor + submit / cancel), `nowo_ui_styles`, `nowo_ui_scripts` |
+| New definition | `workflow_definition/form.html.twig` | `page/form` | `FormPage` (general section form, submit "Create and continue", cancel to the list; `formThemes` while the deprecated `ui.css_framework` is set) | `nowo_ui_form_body` (general fields grid, then the REQ-TWIG-003 loop), `nowo_ui_styles` |
+| Edit definition | `workflow_definition/edit.html.twig` | `page/settings` | `SettingsPage` (one `SettingsSection` tab per section: general, match_rules, places, transitions; the current one carries the form and its `formThemes`; header view + delete with `Confirm`); extra context `definition`, `section` | `nowo_ui_settings_section` (general fields grid or the collection editor + submit / cancel), `nowo_ui_styles`, `nowo_ui_scripts` |
 
 Every page sets `attributes: {data-testid: workflow-…}` on the scaffold root (`workflow-dashboard`,
 `workflow-definitions`, `workflow-definition-show`, `workflow-definition-new`, `workflow-definition-edit`).
@@ -39,10 +39,9 @@ Bundle-specific content of the data blocks (no chrome, theme slots only):
 | Partial | Used by | Role |
 | --- | --- | --- |
 | `workflow_definition/_flow_diagram.html.twig` | show | flow diagram card (`card`, `card_*`, `badge_neutral`, `btn_secondary`, `toolbar`, `muted` slots; `nowo-workflow-diagram__*` classes) |
-| `workflow_definition/_flow_dialogs.html.twig` | show | one `<dialog>` per place / transition (detail list through `nowo_ui_partial('detail_list')`) |
-| `workflow_definition/_dialog.html.twig` | show, edit | native `<dialog>` shell with the `confirm_*` slots (blocks `title`, `body`, `footer`) |
+| `workflow_definition/_flow_dialogs.html.twig` | show | one UiKit `dialog` partial per place / transition (embedded, block `nowo_ui_dialog_body`; detail list through `nowo_ui_partial('detail_list')`); transition links in a place dialog carry `data-workflow-dialog-swap` |
 | `workflow_definition/_general_fields.html.twig` | new, edit (general) | general fields in a responsive grid |
-| `workflow_definition/_collection_section.html.twig` | edit (match rules, places, transitions) | collection editor: table (`table*` slots), row template, editor dialog, remove confirmation through `nowo_ui_partial('confirm')` |
+| `workflow_definition/_collection_section.html.twig` | edit (match rules, places, transitions) | collection editor: table (`table*` slots), row template, editor dialog through `nowo_ui_partial('dialog')` (`lg` for transitions; `data-title-add` / `data-title-edit` on the `<dialog>`), remove confirmation through `nowo_ui_partial('confirm')` |
 
 ## Assets
 
@@ -50,11 +49,13 @@ Shipped under `src/Resources/public/` (`php bin/console assets:install` → `bun
 
 | Asset | Loaded by | Role |
 | --- | --- | --- |
-| `css/nowo-workflow.css` | every page (`nowo_ui_styles`) | diagram, dialogs, collection editors, form grid — painted from `--nowo-ui-*` tokens |
-| `js/nowo-workflow.js` | show, edit (`nowo_ui_scripts`) | `<dialog>` open / close, collection editors (no framework JS, no inline handlers, no `confirm()`) |
+| `css/nowo-workflow.css` | every page (`nowo_ui_styles`) | diagram, dialog content, collection editors, form grid — painted from `--nowo-ui-*` tokens; no overrides of UiKit classes |
+| `js/nowo-workflow.js` | show, edit (`nowo_ui_scripts`) | collection editors, `data-workflow-dialog-swap` (close the current dialog before the UiKit opener opens the next one) — no framework JS, no inline handlers, no `confirm()` |
 | `vendor/tom-select/` (2.4.3, Apache-2.0, `LICENSE`) | edit → transitions tab | searchable place multiselect; optional (native `<select multiple>` without it) |
 
-The delete confirmations use UiKit's `nowo-ui-confirm.js`, which the host layout loads (UiKit layouts do).
+The delete confirmations use UiKit's `nowo-ui-confirm.js`, which the host layout loads (UiKit layouts do). The
+dialogs use UiKit's `nowo-ui-dialog.js`: UiKit layouts load it, and the show / edit pages add it to
+`nowo_ui_scripts` too (it installs once) for host layouts that print their own script list.
 
 ## Per-page overrides
 
