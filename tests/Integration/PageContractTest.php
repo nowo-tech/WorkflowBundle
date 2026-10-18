@@ -6,15 +6,10 @@ namespace Nowo\WorkflowBundle\Tests\Integration;
 
 use Nowo\UiKitBundle\Test\PageContractTestCase;
 use Nowo\UiKitBundle\Test\PageFixture;
-use Nowo\UiKitBundle\Test\RenderedPage;
-use Nowo\UiKitBundle\View\FormPage;
-use Nowo\UiKitBundle\View\SettingsPage;
 use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use Nowo\WorkflowBundle\Tests\Support\WorkflowPageFixtures;
-use ReflectionProperty;
-use Symfony\Component\Form\FormView;
 
 use function dirname;
 
@@ -204,40 +199,6 @@ final class PageContractTest extends PageContractTestCase
             'legacy/base.html.twig' => '<title>{% block title %}{% endblock %}</title>{% block stylesheets %}{% endblock %}<main class="legacy">{% block body %}{% endblock %}</main>{% block javascripts %}{% endblock %}',
             'base.html.twig'        => '<title>{% block title %}{% endblock %}</title>{% block stylesheets %}{% endblock %}{% block body %}{% endblock %}{% block javascripts %}{% endblock %}',
         ];
-    }
-
-    /**
-     * The base test case resets the fixtures' FormViews between renders but not the collection prototypes
-     * ({@code vars.prototype}), which the collection editors render once per page.
-     */
-    protected function renderPage(PageFixture $fixture, string $framework = 'none'): RenderedPage
-    {
-        foreach ($fixture->context as $value) {
-            if ($value instanceof SettingsPage || $value instanceof FormPage) {
-                foreach ($value instanceof SettingsPage ? $value->sections : [$value] as $holder) {
-                    $form = $holder->form ?? null;
-                    if ($form instanceof FormView) {
-                        self::resetPrototypes($form);
-                    }
-                }
-            }
-        }
-
-        return parent::renderPage($fixture, $framework);
-    }
-
-    private static function resetPrototypes(FormView $view, bool $inPrototype = false): void
-    {
-        if ($inPrototype) {
-            (new ReflectionProperty(FormView::class, 'rendered'))->setValue($view, false);
-        }
-        $prototype = $view->vars['prototype'] ?? null;
-        if ($prototype instanceof FormView) {
-            self::resetPrototypes($prototype, true);
-        }
-        foreach ($view->children as $child) {
-            self::resetPrototypes($child, $inPrototype);
-        }
     }
 
     protected static function templatePaths(): array
