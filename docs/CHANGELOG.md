@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.9.2] - 2026-10-18](#192---2026-10-18)
 - [[1.9.1] - 2026-10-18](#191---2026-10-18)
 - [[1.9.0] - 2026-10-18](#190---2026-10-18)
 - [[1.8.2] - 2026-10-13](#182---2026-10-13)
@@ -42,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-10-18
+
+Requires UiKit ^2.2; workarounds made unnecessary by 2.2 removed. See [UPGRADING](UPGRADING.md#to-192).
+
 ### Changed
 
 - Requires `nowo-tech/ui-kit-bundle` **^2.2** (default-theme polish: table header hierarchy, striped rows, numeric
@@ -54,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`btn_danger_solid`).
 - `layout_integrate_base.html.twig` and the deprecated 1.x bridge `base.html.twig` print the UiKit runtimes through
   the UiKit `scripts` partial (the 1.x bridge loaded only the confirm runtime). Demo host layout likewise.
+
+[1.9.2]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.9.2
 
 ## [1.9.1] - 2026-10-18
 
