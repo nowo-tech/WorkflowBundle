@@ -15,16 +15,16 @@ This bundle is **FrankenPHP worker mode friendly**.
 <table>
   <tr>
     <td align="center" width="33%">
-      <img src="docs/images/demo/flow-diagram.webp" alt="Workflow definition detail with the flow diagram of a branching state machine" />
+      <img src="docs/images/demo/definitions.webp" alt="Workflow definitions list in the demo admin: name, slug, match rules (default badge), priority, place and transition counts, view/edit/delete actions" />
+      <br /><sub>Definitions list — match rules, priority and row actions</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/images/demo/flow-diagram.webp" alt="Definition detail page with the flow diagram of a branching state machine, return/loop transitions, definition, runtime binding and match rules cards" />
       <br /><sub>Definition detail — flow diagram of a branching state machine</sub>
     </td>
     <td align="center" width="33%">
-      <img src="docs/images/demo/transition-editor.webp" alt="Transitions tab with the transition editor dialog and searchable place selects" />
+      <img src="docs/images/demo/transition-editor.webp" alt="Transitions tab of the definition editor with the Edit transition dialog open: name, label and searchable from / to place selects" />
       <br /><sub>Transitions editor — dialog with searchable from / to places</sub>
-    </td>
-    <td align="center" width="33%">
-      <img src="docs/images/demo/definitions.webp" alt="Workflow definitions list with match rules, priority, places and row actions" />
-      <br /><sub>Definitions list — match rules, priority and row actions</sub>
     </td>
   </tr>
 </table>
