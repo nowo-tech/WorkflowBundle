@@ -13,6 +13,10 @@ use function in_array;
 
 /**
  * Builds graph data for the workflow detail visualization.
+ *
+ * Layout: a single chain of places renders as a linear `sequence`; any other graph goes through
+ * {@see WorkflowGraphLayout} (ranks from the initial place, `columns` per rank, forward `bridges` per source rank,
+ * true `backEdges` only, and the SVG `diagram` geometry).
  */
 final class WorkflowGraphPresenter
 {
@@ -44,7 +48,9 @@ final class WorkflowGraphPresenter
      *         sequence: list<array<string, mixed>>|null,
      *         columns: list<array{index: int, places: list<array<string, mixed>>}>,
      *         bridges: list<list<array{transitionIndex: int, transitionLabel: string, fromPlace: string, toPlace: string}>>,
-     *         backEdges: list<array{transitionIndex: int, transitionLabel: string, fromPlace: string, toPlace: string}>
+     *         backEdges: list<array{transitionIndex: int, transitionLabel: string, fromPlace: string, toPlace: string}>,
+     *         ranks: array<string, int>,
+     *         diagram: array<string, mixed>|null
      *     }
      * }
      */
@@ -86,7 +92,9 @@ final class WorkflowGraphPresenter
      *     sequence: list<array<string, mixed>>|null,
      *     columns: list<array{index: int, places: list<array<string, mixed>>}>,
      *     bridges: list<list<array{transitionIndex: int, transitionLabel: string, fromPlace: string, toPlace: string}>>,
-     *     backEdges: list<array{transitionIndex: int, transitionLabel: string, fromPlace: string, toPlace: string}>
+     *     backEdges: list<array{transitionIndex: int, transitionLabel: string, fromPlace: string, toPlace: string}>,
+     *     ranks: array<string, int>,
+     *     diagram: array<string, mixed>|null
      * }
      */
     private function buildLayout(array $places, array $transitions, string $initialPlace, array $placeByName): array
@@ -98,19 +106,12 @@ final class WorkflowGraphPresenter
                 'columns'   => [],
                 'bridges'   => [],
                 'backEdges' => [],
+                'ranks'     => [],
+                'diagram'   => null,
             ];
         }
 
-        $columnByPlace         = $this->assignColumns($places, $transitions, $initialPlace);
-        $columns               = $this->groupIntoColumns($places, $columnByPlace);
-        [$bridges, $backEdges] = $this->buildEdgeGroups($transitions, $columnByPlace);
-
-        return [
-            'sequence'  => null,
-            'columns'   => $columns,
-            'bridges'   => $bridges,
-            'backEdges' => $backEdges,
-        ];
+        return ['sequence' => null] + (new WorkflowGraphLayout())->layout($places, $transitions, $initialPlace);
     }
 
     /**
@@ -187,140 +188,6 @@ final class WorkflowGraphPresenter
         }
 
         return count($visited) === count($places) ? $sequence : null;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $places
-     * @param list<array<string, mixed>> $transitions
-     *
-     * @return array<string, int>
-     */
-    private function assignColumns(array $places, array $transitions, string $initialPlace): array
-    {
-        if ($places === []) {
-            return [];
-        }
-
-        $maxColumn     = count($places) - 1;
-        $columnByPlace = [$initialPlace => 0];
-        $queue         = [$initialPlace];
-
-        while ($queue !== []) {
-            $from       = array_shift($queue);
-            $fromColumn = $columnByPlace[$from];
-
-            foreach ($transitions as $transition) {
-                if (!in_array($from, $transition['fromPlaces'], true)) {
-                    continue;
-                }
-
-                foreach ($transition['toPlaces'] as $to) {
-                    if (isset($columnByPlace[$to])) {
-                        continue;
-                    }
-
-                    $columnByPlace[$to] = min($fromColumn + 1, $maxColumn);
-                    $queue[]            = $to;
-                }
-            }
-        }
-
-        foreach ($places as $place) {
-            $columnByPlace[$place['name']] ??= 0;
-        }
-
-        return $columnByPlace;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $places
-     * @param array<string, int> $columnByPlace
-     *
-     * @return list<array{index: int, places: list<array<string, mixed>>}>
-     */
-    private function groupIntoColumns(array $places, array $columnByPlace): array
-    {
-        $maxColumn = $columnByPlace === [] ? 0 : max($columnByPlace);
-        $grouped   = array_fill(0, $maxColumn + 1, []);
-
-        foreach ($places as $place) {
-            $grouped[$columnByPlace[$place['name']]][] = $place;
-        }
-
-        $columns = [];
-        foreach ($grouped as $index => $columnPlaces) {
-            usort(
-                $columnPlaces,
-                static fn (array $a, array $b): int => $a['sortOrder'] <=> $b['sortOrder'] ?: strcmp($a['name'], $b['name']),
-            );
-
-            $columns[] = [
-                'index'  => $index,
-                'places' => $columnPlaces,
-            ];
-        }
-
-        return $columns;
-    }
-
-    /**
-     * @param list<array<string, mixed>> $transitions
-     * @param array<string, int> $columnByPlace
-     *
-     * @return array{
-     *     0: list<list<array{transitionIndex: int, transitionLabel: string, fromPlace: string, toPlace: string}>>,
-     *     1: list<array{transitionIndex: int, transitionLabel: string, fromPlace: string, toPlace: string}>
-     * }
-     */
-    private function buildEdgeGroups(array $transitions, array $columnByPlace): array
-    {
-        $maxColumn = $columnByPlace === [] ? 0 : max($columnByPlace);
-        $bridges   = array_fill(0, max(0, $maxColumn), []);
-        $backEdges = [];
-
-        foreach ($transitions as $index => $transition) {
-            foreach ($transition['fromPlaces'] as $from) {
-                foreach ($transition['toPlaces'] as $to) {
-                    if (!isset($columnByPlace[$from], $columnByPlace[$to])) {
-                        continue;
-                    }
-
-                    $edge = [
-                        'transitionIndex' => $index,
-                        'transitionLabel' => $transition['displayLabel'],
-                        'fromPlace'       => $from,
-                        'toPlace'         => $to,
-                    ];
-
-                    $fromColumn = $columnByPlace[$from];
-                    $toColumn   = $columnByPlace[$to];
-
-                    if ($toColumn <= $fromColumn) {
-                        $backEdges[] = $edge;
-                        continue;
-                    }
-
-                    if ($toColumn === $fromColumn + 1 && isset($bridges[$fromColumn])) {
-                        $bridges[$fromColumn][] = $edge;
-                    }
-                }
-            }
-        }
-
-        foreach ($bridges as &$bridge) {
-            usort(
-                $bridge,
-                static fn (array $a, array $b): int => [$a['fromPlace'], $a['toPlace']] <=> [$b['fromPlace'], $b['toPlace']],
-            );
-        }
-        unset($bridge);
-
-        usort(
-            $backEdges,
-            static fn (array $a, array $b): int => [$a['fromPlace'], $a['toPlace']] <=> [$b['fromPlace'], $b['toPlace']],
-        );
-
-        return [$bridges, $backEdges];
     }
 
     /**

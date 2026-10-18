@@ -58,6 +58,12 @@
 
 ## Unreleased
 
+No configuration change. Hosts that override `@NowoWorkflowBundle/workflow_definition/_flow_diagram.html.twig`:
+the branching diagram is now an SVG built from `graph.layout.diagram` (`nodes` with `x`/`y`/`width`/`height`,
+`edges` with `path`, `labelLeft`/`labelTop`/`labelWidth`/`labelHeight`); the old flex markup (`__grid`, `__column`,
+`__bridge`, `__spacer` classes and their CSS) is gone. `graph.layout.columns`, `bridges` and `backEdges` are still
+provided (now from the corrected ranking: `backEdges` holds only true loops).
+
 ## To 1.9.0
 
 From **1.8.2**:

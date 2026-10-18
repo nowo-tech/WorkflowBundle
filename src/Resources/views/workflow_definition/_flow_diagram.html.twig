@@ -19,7 +19,7 @@
                 <div class="nowo-workflow-diagram__linear">
                     {% for item in graph.layout.sequence %}
                         {% if item.type == 'place' %}
-                            {{ _self.place_node(item.place) }}
+                            {{ _self.place_node(item.place, bundle) }}
                         {% else %}
                             <div class="nowo-workflow-diagram__link">
                                 {{ _self.transition_pill(item.transitionIndex, item.transitionLabel) }}
@@ -28,46 +28,50 @@
                         {% endif %}
                     {% endfor %}
                 </div>
-            {% else %}
-                <div class="nowo-workflow-diagram__grid">
-                    {% for column in graph.layout.columns %}
-                        {% if not loop.first %}
-                            <div class="nowo-workflow-diagram__bridge">
-                                {% set _edges = graph.layout.bridges[column.index - 1]|default([]) %}
-                                {% if _edges is empty %}
-                                    <div class="nowo-workflow-diagram__spacer"></div>
-                                {% else %}
-                                    {% for edge in _edges %}
-                                        <div class="nowo-workflow-diagram__link">
-                                            {{ _self.transition_pill(edge.transitionIndex, edge.transitionLabel) }}
-                                            <span class="nowo-workflow-diagram__line" aria-hidden="true"></span>
-                                        </div>
-                                    {% endfor %}
-                                {% endif %}
-                            </div>
-                        {% endif %}
-                        <div class="nowo-workflow-diagram__column">
-                            {% for place in column.places %}
-                                {{ _self.place_node(place) }}
-                            {% endfor %}
-                        </div>
+            {% elseif graph.layout.diagram.nodes|default([]) is not empty %}
+                {% set _diagram = graph.layout.diagram %}
+                {% set _labels = {} %}
+                {% for place in graph.places %}{% set _labels = _labels|merge({(place.name): place.displayLabel}) %}{% endfor %}
+                {# Layered layout (WorkflowGraphLayout): one connector per edge, ending at its target place; places and
+                   transition labels are HTML buttons in foreignObject boxes so they stay focusable dialog openers. #}
+                <svg class="nowo-workflow-diagram__svg" width="{{ _diagram.width }}" height="{{ _diagram.height }}" viewBox="0 0 {{ _diagram.width }} {{ _diagram.height }}" role="group" aria-label="{{ 'diagram.title'|trans({}, _d) }}" data-testid="workflow-flow-svg">
+                    <defs>
+                        <marker id="nowo-workflow-diagram-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+                            <path class="nowo-workflow-diagram__arrow" d="M0,0 L10,5 L0,10 z"></path>
+                        </marker>
+                    </defs>
+                    <g class="nowo-workflow-diagram__edges" aria-hidden="true">
+                        {% for edge in _diagram.edges %}
+                            <path class="nowo-workflow-diagram__edge" data-edge="{{ loop.index0 }}" d="{{ edge.path }}" marker-end="url(#nowo-workflow-diagram-arrow)" data-from="{{ edge.fromPlace }}" data-to="{{ edge.toPlace }}" data-transition="{{ edge.transitionIndex }}"></path>
+                        {% endfor %}
+                    </g>
+                    {% for node in _diagram.nodes %}
+                        <foreignObject class="nowo-workflow-diagram__box" x="{{ node.x }}" y="{{ node.y }}" width="{{ node.width }}" height="{{ node.height }}" data-place="{{ node.place.name }}">
+                            {{ _self.place_node(node.place, bundle) }}
+                        </foreignObject>
                     {% endfor %}
-                </div>
-
-                {% if graph.layout.backEdges %}
-                    <div class="nowo-workflow-diagram__back-edges">
-                        <p class="{{ nowo_ui_class('muted', bundle) }}">{{ 'diagram.back_edges'|trans({}, _d) }}</p>
-                        <div class="{{ nowo_ui_class('toolbar', bundle) }}">
-                            {% for edge in graph.layout.backEdges %}
-                                <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}" data-nowo-ui-dialog-open="workflow-transition-{{ edge.transitionIndex }}">
-                                    <code>{{ edge.fromPlace }}</code> → {{ edge.transitionLabel }} → <code>{{ edge.toPlace }}</code>
-                                </button>
-                            {% endfor %}
-                        </div>
-                    </div>
-                {% endif %}
+                    {% for edge in _diagram.edges %}
+                        <foreignObject class="nowo-workflow-diagram__label-box" data-edge="{{ loop.index0 }}" x="{{ edge.labelLeft }}" y="{{ edge.labelTop }}" width="{{ edge.labelWidth }}" height="{{ edge.labelHeight }}" data-from="{{ edge.fromPlace }}" data-to="{{ edge.toPlace }}">
+                            {{ _self.transition_pill(edge.transitionIndex, edge.transitionLabel, _labels[edge.fromPlace] ~ ' → ' ~ _labels[edge.toPlace]) }}
+                        </foreignObject>
+                    {% endfor %}
+                </svg>
             {% endif %}
         </div>
+
+        {% if graph.layout.backEdges %}
+            {# True back-edges only (target ranked at or before the source): drawn as a list, not as connectors. #}
+            <div class="nowo-workflow-diagram__back-edges" data-testid="workflow-flow-back-edges">
+                <p class="{{ nowo_ui_class('muted', bundle) }}">{{ 'diagram.back_edges'|trans({}, _d) }}</p>
+                <div class="{{ nowo_ui_class('toolbar', bundle) }}">
+                    {% for edge in graph.layout.backEdges %}
+                        <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}" data-nowo-ui-dialog-open="workflow-transition-{{ edge.transitionIndex }}">
+                            <code class="{{ nowo_ui_class('code', bundle) }}">{{ edge.fromPlace }}</code> → {{ edge.transitionLabel }} → <code class="{{ nowo_ui_class('code', bundle) }}">{{ edge.toPlace }}</code>
+                        </button>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
 
         <ul class="nowo-workflow-diagram__legend">
             <li><span class="nowo-workflow-diagram__dot nowo-workflow-diagram__dot--initial" aria-hidden="true"></span> {{ 'diagram.legend.initial'|trans({}, _d) }}</li>
@@ -77,13 +81,13 @@
     </div>
 </section>
 
-{% macro place_node(place) %}
+{% macro place_node(place, bundle = null) %}
     <button type="button" class="nowo-workflow-diagram__state{% if place.isInitial %} nowo-workflow-diagram__state--initial{% endif %}" data-nowo-ui-dialog-open="workflow-place-{{ place.index }}">
         <span class="nowo-workflow-diagram__state-title">{{ place.displayLabel }}</span>
-        <span class="nowo-workflow-diagram__state-name"><code>{{ place.name }}</code></span>
+        <span class="nowo-workflow-diagram__state-name"><code class="{{ nowo_ui_class('code', bundle) }}">{{ place.name }}</code></span>
     </button>
 {% endmacro %}
 
-{% macro transition_pill(index, label) %}
-    <button type="button" class="nowo-workflow-diagram__transition" data-nowo-ui-dialog-open="workflow-transition-{{ index }}">{{ label }}</button>
+{% macro transition_pill(index, label, route = null) %}
+    <button type="button" class="nowo-workflow-diagram__transition" data-nowo-ui-dialog-open="workflow-transition-{{ index }}"{% if route %} title="{{ route }}"{% endif %}>{{ label }}</button>
 {% endmacro %}

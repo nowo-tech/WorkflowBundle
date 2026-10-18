@@ -97,6 +97,29 @@ final class WorkflowPageFixtures
         return $definition;
     }
 
+    /**
+     * Change request review (as seeded by DemoSeedService): branching state machine with two loops and a cancel
+     * transition from both draft and review.
+     */
+    public static function changeRequestReview(int $id = 4): WorkflowDefinition
+    {
+        $definition = new WorkflowDefinition('Change request review (branching)', 'change_request_review', 'draft', 'App\\Entity\\DemoChangeRequest', WorkflowType::StateMachine);
+        foreach (['draft', 'review', 'changes_needed', 'approved', 'rejected', 'cancelled'] as $i => $name) {
+            $definition->addPlace(new WorkflowPlace($name, ucfirst(str_replace('_', ' ', $name)), $i));
+        }
+        $definition->addTransition(new WorkflowTransition('submit', ['draft'], ['review'], 'Submit for review'));
+        $definition->addTransition(new WorkflowTransition('approve', ['review'], ['approved'], 'Approve'));
+        $definition->addTransition(new WorkflowTransition('reject', ['review'], ['rejected'], 'Reject'));
+        $definition->addTransition(new WorkflowTransition('request_changes', ['review'], ['changes_needed'], 'Request changes'));
+        $definition->addTransition(new WorkflowTransition('resubmit', ['changes_needed'], ['review'], 'Resubmit'));
+        $definition->addTransition(new WorkflowTransition('reopen', ['rejected'], ['draft'], 'Reopen'));
+        $definition->addTransition(new WorkflowTransition('cancel_from_draft', ['draft'], ['cancelled'], 'Cancel'));
+        $definition->addTransition(new WorkflowTransition('cancel_from_review', ['review'], ['cancelled'], 'Cancel'));
+        self::setId($definition, $id);
+
+        return $definition;
+    }
+
     public static function emptyDefinition(int $id = 3): WorkflowDefinition
     {
         $definition = new WorkflowDefinition('Expense claim', 'expense_claim', 'draft', 'App\\Entity\\Expense');

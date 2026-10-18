@@ -4,6 +4,7 @@
  * - Dialogs: the UiKit `dialog` partial and js/nowo-ui-dialog.js open / close them (data-nowo-ui-dialog-open,
  *   data-nowo-ui-dialog-close, Esc, backdrop click). An opener with data-workflow-dialog-swap closes the dialog it
  *   sits in first (place → transition in the flow diagram), so one dialog is open at a time.
+ * - Flow diagram: hovering / focusing a transition label highlights its own connector (shared data-edge).
  * - Collection editors ([data-workflow-collection]): table of the CollectionType entries, add / edit in the UiKit
  *   dialog (the entry's fields move into it), remove behind the UiKit confirm dialog, optional TomSelect
  *   multiselects (loaded by the transitions page from the bundle's vendor/tom-select assets).
@@ -31,6 +32,23 @@
             closeDialog(opener.closest('dialog'));
         }
     }, true);
+
+    function highlightEdge(event, active) {
+        var target = event.target;
+        var box = target instanceof Element ? target.closest('.nowo-workflow-diagram__label-box[data-edge]') : null;
+        var svg = box ? box.closest('svg') : null;
+        var edge = svg ? svg.querySelector('.nowo-workflow-diagram__edge[data-edge="' + box.getAttribute('data-edge') + '"]') : null;
+        if (edge) {
+            edge.classList.toggle('is-active', active);
+        }
+    }
+
+    ['mouseover', 'focusin'].forEach(function (type) {
+        document.addEventListener(type, function (event) { highlightEdge(event, true); });
+    });
+    ['mouseout', 'focusout'].forEach(function (type) {
+        document.addEventListener(type, function (event) { highlightEdge(event, false); });
+    });
 
     var tomSelects = new WeakMap();
 

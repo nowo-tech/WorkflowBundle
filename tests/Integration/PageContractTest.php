@@ -12,6 +12,7 @@ use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use Nowo\WorkflowBundle\Tests\Support\WorkflowPageFixtures;
 
 use function dirname;
+use function sprintf;
 
 /**
  * REQ-UI-003 page contract: every Workflow admin page renders through a UiKit scaffold inside the stub host layout
@@ -55,6 +56,12 @@ final class PageContractTest extends PageContractTestCase
             'page'       => $pages->show($review),
             'definition' => $review,
             'graph'      => $presenter->present($review),
+        ]);
+        $branching = WorkflowPageFixtures::changeRequestReview();
+        yield 'show (branching state machine)' => new PageFixture(self::VIEWS . 'workflow_definition/show.html.twig', [
+            'page'       => $pages->show($branching),
+            'definition' => $branching,
+            'graph'      => $presenter->present($branching),
         ]);
         yield 'show (no places)' => new PageFixture(self::VIEWS . 'workflow_definition/show.html.twig', [
             'page'       => $pages->show($empty),
@@ -102,6 +109,51 @@ final class PageContractTest extends PageContractTestCase
         }
         self::assertStringContainsString('data-nowo-ui-region="tabs"', $edit->html);
         self::assertStringContainsString('/nowo_workflow_definition_show?id=1', $edit->html);
+    }
+
+    public function testDefinitionsListEndAlignsNumbersAndPaintsTheDefaultBadgeNeutral(): void
+    {
+        $page = $this->renderPage(new PageFixture(self::VIEWS . 'workflow_definition/index.html.twig', [
+            'page' => WorkflowPageFixtures::factory()->index(WorkflowPageFixtures::result([WorkflowPageFixtures::purchaseOrder(), WorkflowPageFixtures::documentReview()])),
+        ]));
+
+        foreach (['Match rules', 'Priority', 'Places', 'Transitions'] as $label) {
+            self::assertMatchesRegularExpression(sprintf('#<th scope="col" class="[^"]*nowo-ui-cell--end"[^>]*>\s*%s#', $label), $page->html, $label . ' header');
+            self::assertSame(2, substr_count($page->html, sprintf('nowo-ui-cell--end" data-label="%s"', $label)), $label . ' cells');
+        }
+        self::assertMatchesRegularExpression('#<span class="nowo-ui-badge nowo-ui-badge--neutral[^"]*">Default</span>#', $page->html);
+        self::assertStringNotContainsString('nowo-ui-badge--info', $page->html);
+        self::assertStringContainsString('<code class="nowo-ui-code', $page->html);
+    }
+
+    public function testBranchingFlowDiagramDrawsOneConnectorPerEdgeToItsTarget(): void
+    {
+        $definition = WorkflowPageFixtures::changeRequestReview();
+        $graph      = (new WorkflowGraphPresenter())->present($definition);
+        $page       = $this->renderPage(new PageFixture(self::VIEWS . 'workflow_definition/show.html.twig', [
+            'page'       => WorkflowPageFixtures::factory()->show($definition),
+            'definition' => $definition,
+            'graph'      => $graph,
+        ]));
+        $html = $page->html;
+
+        self::assertStringContainsString('data-testid="workflow-flow-svg"', $html);
+        self::assertSame(6, substr_count($html, 'class="nowo-workflow-diagram__edge"'), 'one connector per forward edge');
+        self::assertSame(6, substr_count($html, 'class="nowo-workflow-diagram__box"'), 'one box per place');
+
+        self::assertNotNull($graph['layout']['diagram']);
+        foreach ($graph['layout']['diagram']['edges'] as $i => $edge) {
+            // The connector, its label and the label's title all name the same target place.
+            self::assertMatchesRegularExpression(sprintf('#<path class="nowo-workflow-diagram__edge" data-edge="%d" d="%s" marker-end="[^"]+" data-from="%s" data-to="%s"#', $i, preg_quote($edge['path'], '#'), $edge['fromPlace'], $edge['toPlace']), $html);
+            self::assertMatchesRegularExpression(sprintf('#data-edge="%d" x="[\d.]+" y="[\d.]+" width="%d" height="28" data-from="%s" data-to="%s">\s*<button type="button" class="nowo-workflow-diagram__transition" data-nowo-ui-dialog-open="workflow-transition-%d" title="[^"]+ → %s">%s</button>#u', $i, $edge['labelWidth'], $edge['fromPlace'], $edge['toPlace'], $edge['transitionIndex'], ucfirst(str_replace('_', ' ', $edge['toPlace'])), $edge['transitionLabel']), $html);
+        }
+
+        self::assertMatchesRegularExpression('#data-testid="workflow-flow-back-edges"#', $html);
+        self::assertSame(1, preg_match('#data-testid="workflow-flow-back-edges".*?</div>\s*</div>#s', $html, $loops));
+        self::assertSame(2, substr_count($loops[0], 'data-nowo-ui-dialog-open'), 'only Resubmit and Reopen are loops');
+        self::assertStringContainsString('Resubmit', $loops[0]);
+        self::assertStringContainsString('Reopen', $loops[0]);
+        self::assertStringNotContainsString('Cancel', $loops[0]);
     }
 
     public function testDeleteGoesThroughTheUiKitConfirmDialog(): void

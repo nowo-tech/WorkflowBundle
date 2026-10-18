@@ -10,7 +10,6 @@ use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use PHPUnit\Framework\TestCase;
-use ReflectionMethod;
 
 use function count;
 
@@ -178,21 +177,23 @@ final class WorkflowGraphPresenterTest extends TestCase
         self::assertSame([], $graph['layout']['backEdges']);
     }
 
-    public function testBuildEdgeGroupsSkipsEdgesWithUnknownColumns(): void
+    public function testBranchingLayoutCarriesRanksAndDiagramWhileLinearFlowsDoNot(): void
     {
-        $presenter = new WorkflowGraphPresenter();
-        $method    = new ReflectionMethod(WorkflowGraphPresenter::class, 'buildEdgeGroups');
-        $method->setAccessible(true);
+        $linear = new WorkflowDefinition('Linear', 'linear', 'draft', 'App\\Entity\\X', WorkflowType::StateMachine);
+        $linear->addPlace(new WorkflowPlace('draft', 'Draft', 0));
+        $linear->addPlace(new WorkflowPlace('done', 'Done', 1));
+        $linear->addTransition(new WorkflowTransition('finish', ['draft'], ['done'], 'Finish'));
 
-        [$bridges, $backEdges] = $method->invoke($presenter, [
-            [
-                'displayLabel' => 'External',
-                'fromPlaces'   => ['review'],
-                'toPlaces'     => ['missing'],
-            ],
-        ], ['review' => 1]);
+        $layout = (new WorkflowGraphPresenter())->present($linear)['layout'];
+        self::assertNotNull($layout['sequence']);
+        self::assertSame([], $layout['ranks']);
+        self::assertNull($layout['diagram']);
 
-        self::assertSame([], $bridges[0] ?? []);
-        self::assertSame([], $backEdges);
+        $linear->addTransition(new WorkflowTransition('skip', ['draft'], ['done'], 'Skip'));
+        $layout = (new WorkflowGraphPresenter())->present($linear)['layout'];
+        self::assertNull($layout['sequence']);
+        self::assertSame(['draft' => 0, 'done' => 1], $layout['ranks']);
+        self::assertNotNull($layout['diagram']);
+        self::assertCount(2, $layout['diagram']['edges']);
     }
 }
