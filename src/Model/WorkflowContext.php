@@ -39,7 +39,7 @@ final readonly class WorkflowContext
                 continue;
             }
 
-            $normalized[(string) $key] = self::normalizeValue((string) $key, $value);
+            $normalized[(string) $key] = $this->normalizeValue((string) $key, $value);
         }
 
         $this->parameters = $normalized;
@@ -77,7 +77,7 @@ final readonly class WorkflowContext
         return new self($subjectClass, $this->parameters);
     }
 
-    private static function normalizeValue(string $key, mixed $value): string
+    private function normalizeValue(string $key, mixed $value): string
     {
         if (is_bool($value)) {
             return $value ? 'true' : 'false';

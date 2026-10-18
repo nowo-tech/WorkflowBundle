@@ -38,7 +38,7 @@ final class LocaleController extends AbstractController
         $this->localeManager->setLocale($_locale);
 
         $referer = $request->headers->get('referer');
-        if (is_string($referer) && self::isSafeRedirectTarget($referer, $request)) {
+        if (is_string($referer) && $this->isSafeRedirectTarget($referer, $request)) {
             return $this->redirect($referer);
         }
 
@@ -48,7 +48,7 @@ final class LocaleController extends AbstractController
     /**
      * Accepts only same-host absolute URLs or local paths (no scheme-relative "//host" or backslash tricks).
      */
-    private static function isSafeRedirectTarget(string $target, Request $request): bool
+    private function isSafeRedirectTarget(string $target, Request $request): bool
     {
         if ($target === '' || preg_match('/[\\\\\x00-\x1F]/', $target) === 1) {
             return false;

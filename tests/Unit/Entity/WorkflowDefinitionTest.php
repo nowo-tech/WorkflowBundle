@@ -51,7 +51,7 @@ final class WorkflowDefinitionTest extends TestCase
 
         self::assertTrue($definition->matchesContext(new WorkflowContext(WorkflowSubjectChild::class)));
         self::assertTrue($definition->matchesContext(new WorkflowContext(ProxySubject::class)));
-        self::assertTrue($definition->matchesContext(new WorkflowContext(null)));
+        self::assertTrue($definition->matchesContext(new WorkflowContext()));
 
         $child = new WorkflowDefinition('Child', 'child', 'draft', WorkflowSubjectChild::class);
         self::assertFalse($child->matchesContext(new WorkflowContext(WorkflowSubjectBase::class)));
