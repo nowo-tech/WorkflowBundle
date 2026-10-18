@@ -32,7 +32,7 @@
                                 <button type="button" class="{{ nowo_ui_class('btn_link', bundle) }}" data-nowo-ui-dialog-open="workflow-transition-{{ transition.transitionIndex }}" data-workflow-dialog-swap>{{ transition.transitionLabel }}</button>
                                 <span class="{{ nowo_ui_class('muted', bundle) }}">
                                     {{ (_direction == 'incoming' ? 'diagram.transition_from' : 'diagram.transition_to')|trans({}, _d) }}
-                                    {% for _place in (_direction == 'incoming' ? transition.fromPlaces : transition.toPlaces) %}<code>{{ _place }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+                                    {% for _place in (_direction == 'incoming' ? transition.fromPlaces : transition.toPlaces) %}<code class="{{ nowo_ui_class('code', bundle) }}">{{ _place }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
                                 </span>
                             </li>
                         {% endfor %}

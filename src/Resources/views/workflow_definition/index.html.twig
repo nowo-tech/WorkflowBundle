@@ -1,7 +1,8 @@
 {#
   Workflow definitions list — UiKit page/list (REQ-UI-003).
 
-  Variable: page (View\ListPage: columns name, slug, matchRules, priority, places, transitions; row actions view,
+  Variable: page (View\ListPage: columns name, slug, matchRules, priority, places, transitions — the four numeric
+  columns end-aligned, cells keep the column's nowo-ui-cell--<align>; row actions view,
   edit, delete with confirm; pagination; empty state). Data block: nowo_ui_list_row (cells).
 #}
 {% extends '@NowoUiKit/page/list.html.twig' %}
@@ -20,10 +21,10 @@
             <span class="{{ nowo_ui_class('badge_neutral', _b) }}">{{ 'status.disabled'|trans({}, _d) }}</span>
         {% endif %}
     </td>
-    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--start" data-label="{{ 'table.slug'|trans({}, _d) }}"><code>{{ row.slug }}</code></td>
-    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--start" data-label="{{ 'table.match_rules'|trans({}, _d) }}" data-nowo-ui-priority="2">
+    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--start" data-label="{{ 'table.slug'|trans({}, _d) }}"><code class="{{ nowo_ui_class('code', _b) }}">{{ row.slug }}</code></td>
+    <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--end" data-label="{{ 'table.match_rules'|trans({}, _d) }}" data-nowo-ui-priority="2">
         {% if row.defaultMatcher %}
-            <span class="{{ nowo_ui_class('badge_info', _b) }}">{{ 'status.default'|trans({}, _d) }}</span>
+            <span class="{{ nowo_ui_class('badge_neutral', _b) }}">{{ 'status.default'|trans({}, _d) }}</span>
         {% else %}
             {{ row.matchRules|length }}
         {% endif %}

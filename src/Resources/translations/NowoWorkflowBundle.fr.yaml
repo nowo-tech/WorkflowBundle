@@ -32,7 +32,7 @@ action:
 status:
   enabled: Activé
   disabled: Désactivé
-  default: par défaut
+  default: Par défaut
   initial: État initial
 
 workflow_type:

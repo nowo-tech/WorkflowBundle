@@ -44,7 +44,7 @@
                                         <a class="nowo-workflow-name" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ definition.name }}</a>
                                     </td>
                                     <td class="{{ nowo_ui_class('table_cell', _b) }}" data-label="{{ 'table.type'|trans({}, _d) }}">{{ ('workflow_type.' ~ definition.type.value)|trans({}, _d) }}</td>
-                                    <td class="{{ nowo_ui_class('table_cell', _b) }}" data-label="{{ 'table.subject'|trans({}, _d) }}"><code>{{ definition.subjectClass }}</code></td>
+                                    <td class="{{ nowo_ui_class('table_cell', _b) }}" data-label="{{ 'table.subject'|trans({}, _d) }}"><code class="{{ nowo_ui_class('code', _b) }}">{{ definition.subjectClass }}</code></td>
                                     <td class="{{ nowo_ui_class('table_cell', _b) }}" data-label="{{ 'table.status'|trans({}, _d) }}">
                                         <span class="{{ nowo_ui_class(definition.enabled ? 'badge_success' : 'badge_neutral', _b) }}">{{ (definition.enabled ? 'status.enabled' : 'status.disabled')|trans({}, _d) }}</span>
                                     </td>

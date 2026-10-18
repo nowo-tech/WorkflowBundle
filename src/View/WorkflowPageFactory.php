@@ -96,7 +96,7 @@ final class WorkflowPageFactory
             [
                 new Column('name', self::label('table.name'), required: true),
                 new Column('slug', self::label('table.slug')),
-                new Column('matchRules', self::label('table.match_rules'), priority: 2),
+                new Column('matchRules', self::label('table.match_rules'), align: 'end', priority: 2),
                 new Column('priority', self::label('table.priority'), align: 'end', priority: 3),
                 new Column('places', self::label('table.places'), align: 'end', priority: 2),
                 new Column('transitions', self::label('table.transitions'), align: 'end', priority: 2),
