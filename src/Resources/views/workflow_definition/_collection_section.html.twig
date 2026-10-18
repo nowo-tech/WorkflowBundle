@@ -83,7 +83,7 @@
     {% set _remove_body %}<p class="nowo-ui-confirm__message">{{ 'collection.confirm_delete'|trans({}, _d) }}</p>{% endset %}
     {% set _remove_footer %}
         <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }}" data-nowo-confirm-close>{{ 'action.cancel'|trans({}, _d) }}</button>
-        <button type="button" class="{{ nowo_ui_class('btn_danger', bundle) }}" data-collection-remove-confirm>{{ 'action.remove'|trans({}, _d) }}</button>
+        <button type="button" class="{{ nowo_ui_class('btn_danger_solid', bundle) }}" data-collection-remove-confirm>{{ 'action.remove'|trans({}, _d) }}</button>
     {% endset %}
     {{ include(nowo_ui_partial('confirm', bundle), {
         id: _remove,

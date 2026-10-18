@@ -2,8 +2,8 @@
  * NowoWorkflowBundle admin UI behaviour (REQ-UI-003): no framework JS, no inline handlers, no confirm().
  *
  * - Dialogs: the UiKit `dialog` partial and js/nowo-ui-dialog.js open / close them (data-nowo-ui-dialog-open,
- *   data-nowo-ui-dialog-close, Esc, backdrop click). An opener with data-workflow-dialog-swap closes the dialog it
- *   sits in first (place → transition in the flow diagram), so one dialog is open at a time.
+ *   data-nowo-ui-dialog-close, Esc, backdrop click). Place → transition links in the flow diagram swap dialogs
+ *   through the UiKit 2.2 data-nowo-ui-dialog-replace opener (one dialog open at a time, focus handed over).
  * - Flow diagram: hovering / focusing a transition label highlights its own connector (shared data-edge).
  * - Collection editors ([data-workflow-collection]): table of the CollectionType entries, add / edit in the UiKit
  *   dialog (the entry's fields move into it), remove behind the UiKit confirm dialog, optional TomSelect
@@ -23,15 +23,6 @@
             dialog.close();
         }
     }
-
-    // Capture phase: runs before the UiKit opener (bubble phase on document) opens the target dialog.
-    document.addEventListener('click', function (event) {
-        var target = event.target;
-        var opener = target instanceof Element ? target.closest('[data-workflow-dialog-swap][data-nowo-ui-dialog-open]') : null;
-        if (opener) {
-            closeDialog(opener.closest('dialog'));
-        }
-    }, true);
 
     function highlightEdge(event, active) {
         var target = event.target;

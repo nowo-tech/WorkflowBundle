@@ -39,7 +39,7 @@ Bundle-specific content of the data blocks (no chrome, theme slots only):
 | Partial | Used by | Role |
 | --- | --- | --- |
 | `workflow_definition/_flow_diagram.html.twig` | show | flow diagram card (`card`, `card_*`, `badge_neutral`, `btn_secondary`, `toolbar`, `muted`, `code` slots; `nowo-workflow-diagram__*` classes): linear definitions as a row (`graph.layout.sequence`), branching ones as an SVG from `graph.layout.diagram` (`WorkflowGraphLayout`: ranks from the initial place, one connector per edge ending at its target, place / transition buttons in `foreignObject`s), true loops listed under it (`graph.layout.backEdges`) |
-| `workflow_definition/_flow_dialogs.html.twig` | show | one UiKit `dialog` partial per place / transition (embedded, block `nowo_ui_dialog_body`; detail list through `nowo_ui_partial('detail_list')`); transition links in a place dialog carry `data-workflow-dialog-swap` |
+| `workflow_definition/_flow_dialogs.html.twig` | show | one UiKit `dialog` partial per place / transition (embedded, block `nowo_ui_dialog_body`; detail list through `nowo_ui_partial('detail_list')`); transition links in a place dialog carry `data-nowo-ui-dialog-replace` (UiKit 2.2: the place dialog closes, the transition dialog opens, focus returns to the diagram) |
 | `workflow_definition/_general_fields.html.twig` | new, edit (general) | general fields in a responsive grid |
 | `workflow_definition/_collection_section.html.twig` | edit (match rules, places, transitions) | collection editor: table (`table*` slots), row template, editor dialog through `nowo_ui_partial('dialog')` (`lg` for transitions; `data-title-add` / `data-title-edit` on the `<dialog>`), remove confirmation through `nowo_ui_partial('confirm')` |
 
@@ -50,7 +50,7 @@ Shipped under `src/Resources/public/` (`php bin/console assets:install` → `bun
 | Asset | Loaded by | Role |
 | --- | --- | --- |
 | `css/nowo-workflow.css` | every page (`nowo_ui_styles`) | diagram, dialog content, collection editors, form grid — painted from `--nowo-ui-*` tokens; no overrides of UiKit classes |
-| `js/nowo-workflow.js` | show, edit (`nowo_ui_scripts`) | collection editors, `data-workflow-dialog-swap` (close the current dialog before the UiKit opener opens the next one) — no framework JS, no inline handlers, no `confirm()` |
+| `js/nowo-workflow.js` | show, edit (`nowo_ui_scripts`) | collection editors, transition-label edge highlight — no framework JS, no inline handlers, no `confirm()` |
 | `vendor/tom-select/` (2.4.3, Apache-2.0, `LICENSE`) | edit → transitions tab | searchable place multiselect; optional (native `<select multiple>` without it) |
 
 The delete confirmations use UiKit's `nowo-ui-confirm.js`, which the host layout loads (UiKit layouts do). The

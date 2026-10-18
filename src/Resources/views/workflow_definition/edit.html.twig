@@ -12,6 +12,8 @@
     {{ parent() }}
     {% if section.value == 'transitions' %}
         <link rel="stylesheet" href="{{ asset('bundles/nowoworkflow/vendor/tom-select/tom-select.default.min.css') }}">
+        {# UiKit 2.2: Tom Select chips / focus ring from the primary token (after the Tom Select stylesheet). #}
+        <link rel="stylesheet" href="{{ asset('css/nowo-ui-tom-select.css', 'nowo_ui_kit') }}">
     {% endif %}
     <link rel="stylesheet" href="{{ asset('bundles/nowoworkflow/css/nowo-workflow.css') }}">
 {% endblock %}

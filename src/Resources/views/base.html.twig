@@ -28,6 +28,7 @@
 {% block javascripts %}
     {{ parent() }}
     {% block nowo_ui_scripts %}
-        <script src="{{ asset('js/nowo-ui-confirm.js', 'nowo_ui_kit') }}" defer></script>
+        {# UiKit 2.2 `scripts` partial (was: the confirm runtime only; dialogs and tabs need theirs too). #}
+        {% if nowo_ui_scripts_enabled ?? true %}{{ include(nowo_ui_partial('scripts', nowo_ui_bundle|default(null))) }}{% endif %}
     {% endblock %}
 {% endblock %}

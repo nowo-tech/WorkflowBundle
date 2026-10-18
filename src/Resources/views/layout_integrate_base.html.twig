@@ -32,8 +32,7 @@
 {% block javascripts %}
     {{ parent() }}
     {% block nowo_ui_scripts %}
-        {% for _script in ['nowo-ui-modal', 'nowo-ui-confirm', 'nowo-ui-dialog', 'nowo-ui-toast', 'nowo-ui-tabs'] %}
-            <script src="{{ asset('js/' ~ _script ~ '.js', 'nowo_ui_kit') }}" defer></script>
-        {% endfor %}
+        {# UiKit 2.2 `scripts` partial: every UiKit runtime, kept in step with the installed UiKit. #}
+        {% if nowo_ui_scripts_enabled ?? true %}{{ include(nowo_ui_partial('scripts', nowo_ui_bundle|default(null))) }}{% endif %}
     {% endblock %}
 {% endblock %}

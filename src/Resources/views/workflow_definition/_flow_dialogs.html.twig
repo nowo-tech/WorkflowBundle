@@ -1,7 +1,7 @@
 {#
   Place / transition dialogs of the flow diagram: the UiKit `dialog` partial (native <dialog>, opened by
   data-nowo-ui-dialog-open and closed by data-nowo-ui-dialog-close / Esc / a backdrop click, js/nowo-ui-dialog.js).
-  The transition links of a place dialog also carry data-workflow-dialog-swap (nowo-workflow.js): the place dialog
+  The transition links of a place dialog also carry data-nowo-ui-dialog-replace (UiKit 2.2): the place dialog
   closes before the transition dialog opens, so one dialog is open at a time.
 
   Required: graph (WorkflowGraphPresenter::present()), bundle.
@@ -29,7 +29,7 @@
                     <ul class="nowo-workflow-dialog__list">
                         {% for transition in _transitions %}
                             <li>
-                                <button type="button" class="{{ nowo_ui_class('btn_link', bundle) }}" data-nowo-ui-dialog-open="workflow-transition-{{ transition.transitionIndex }}" data-workflow-dialog-swap>{{ transition.transitionLabel }}</button>
+                                <button type="button" class="{{ nowo_ui_class('btn_link', bundle) }}" data-nowo-ui-dialog-open="workflow-transition-{{ transition.transitionIndex }}" data-nowo-ui-dialog-replace>{{ transition.transitionLabel }}</button>
                                 <span class="{{ nowo_ui_class('muted', bundle) }}">
                                     {{ (_direction == 'incoming' ? 'diagram.transition_from' : 'diagram.transition_to')|trans({}, _d) }}
                                     {% for _place in (_direction == 'incoming' ? transition.fromPlaces : transition.toPlaces) %}<code class="{{ nowo_ui_class('code', bundle) }}">{{ _place }}</code>{% if not loop.last %}, {% endif %}{% endfor %}

@@ -172,7 +172,8 @@ final class PageContractTest extends PageContractTestCase
         self::assertStringNotContainsString('onsubmit', $page->html);
         self::assertSame(5, substr_count($page->html, 'data-nowo-ui-dialog aria-labelledby'), 'one UiKit dialog per place and per transition');
         self::assertStringContainsString('data-nowo-ui-dialog-open="workflow-place-0"', $page->html);
-        self::assertStringContainsString('data-workflow-dialog-swap', $page->html);
+        self::assertStringContainsString('data-nowo-ui-dialog-replace', $page->html);
+        self::assertStringNotContainsString('data-workflow-dialog-swap', $page->html);
         self::assertMatchesRegularExpression('#id="workflow-place-0-title"[^>]*>\s*Draft\s*<span class="nowo-ui-badge#', $page->html, 'initial badge in the title');
         self::assertStringNotContainsString('&lt;span', $page->html);
         self::assertStringContainsString('/assets/js/nowo-ui-dialog.js', $page->html);
