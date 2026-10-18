@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.9.0] - 2026-10-18](#190---2026-10-18)
 - [[1.8.2] - 2026-10-13](#182---2026-10-13)
 - [[1.8.1] - 2026-10-13](#181---2026-10-13)
 - [[1.8.0] - 2026-10-13](#180---2026-10-13)
@@ -39,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-06-10](#100---2026-06-10)
 
 ## [Unreleased]
+
+## [1.9.0] - 2026-10-18
+
+Workflow UI on the UiKit 2.1 standard page contract (REQ-UI-003): dashboard, list, show, form and settings scaffolds, UiKit native dialogs, no CDN assets (Tom Select vendored); deprecated `ui.*` keys mapped to `web_ui.*` / `security.*`. See [UPGRADING](UPGRADING.md#to-190).
 
 ### Added
 
@@ -107,6 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The definitions list showed fewer rows than `list_page_size` (the page limit applied to fetch-joined rows); it now
   paginates definitions (Doctrine `Paginator`).
+
+[1.9.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.9.0
 
 ## [1.8.2] - 2026-10-13
 

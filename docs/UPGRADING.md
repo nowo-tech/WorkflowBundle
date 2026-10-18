@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.9.0](#to-190)
   - [Template contract](#template-contract)
   - [Configuration](#configuration)
 - [From 1.8.1 to 1.8.2](#from-181-to-182)
@@ -56,6 +57,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.9.0
+
+From **1.8.2**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 From **1.8.2** — admin pages on the UiKit page contract (REQ-UI-003); requires `nowo-tech/ui-kit-bundle` **^2.1**.
 Minor release: the old configuration keeps working (deprecated), but the page markup changed.
