@@ -1039,16 +1039,16 @@
         },
         {
             "name": "nowo-tech/ui-kit-bundle",
-            "version": "v2.0.1",
+            "version": "v2.1.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/UiKitBundle.git",
-                "reference": "b9a7073223f8dd4c5fe4b1c101912752c7fe2210"
+                "reference": "f0abbd4536811d0c91e4f91473745f6af9f44cd2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/b9a7073223f8dd4c5fe4b1c101912752c7fe2210",
-                "reference": "b9a7073223f8dd4c5fe4b1c101912752c7fe2210",
+                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/f0abbd4536811d0c91e4f91473745f6af9f44cd2",
+                "reference": "f0abbd4536811d0c91e4f91473745f6af9f44cd2",
                 "shasum": ""
             },
             "require": {
@@ -1127,7 +1127,7 @@
                 "issues": "https://github.com/nowo-tech/UiKitBundle/issues",
                 "source": "https://github.com/nowo-tech/UiKitBundle"
             },
-            "time": "2026-10-17T22:24:08+00:00"
+            "time": "2026-10-17T23:39:23+00:00"
         },
         {
             "name": "nowo-tech/workflow-bundle",
@@ -1135,13 +1135,13 @@
             "dist": {
                 "type": "path",
                 "url": "/var/workflow-bundle",
-                "reference": "5a31fda7a47ba8e2adefcbc0f86b561df2c3d7ff"
+                "reference": "a3213654f140ad37b2834a9f4f99a3cb4c65389d"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.13 || ^3.2.4",
                 "doctrine/orm": "^3.7",
                 "nowo-tech/form-kit-bundle": "^2.0",
-                "nowo-tech/ui-kit-bundle": "^2.0",
+                "nowo-tech/ui-kit-bundle": "^2.1",
                 "php": ">=8.2 <8.6",
                 "symfony/config": "^7.4 || ^8.0",
                 "symfony/dependency-injection": "^7.4 || ^8.0",

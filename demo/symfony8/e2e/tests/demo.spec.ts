@@ -1,15 +1,16 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * REQ-DEMO-013 — Workflow admin UI on the UiKit 2.0 page contract (REQ-UI-003): every page renders through the
- * demo host layout, dialogs are native <dialog>s (no Bootstrap JS, no confirm()), the collection editors work and
- * no browser error is logged. The demo must be seeded (make reset-demo) before running.
+ * REQ-DEMO-013 — Workflow admin UI on the UiKit 2.1 page contract (REQ-UI-003): every page renders through the
+ * demo host layout, dialogs are native <dialog>s (UiKit `dialog` partial; no Bootstrap JS, no confirm()), the
+ * collection editors work and no browser error is logged. The demo must be seeded (make reset-demo) before running.
  */
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
-    if (message.type() === 'error') {
+    // The WebProfiler toolbar may load before its profile is stored (404 on /_wdt): not a page error.
+    if (message.type() === 'error' && !/_wdt|favicon/.test(message.location().url)) {
       errors.push(message.text());
     }
   });
@@ -114,6 +115,12 @@ test.describe('workflow admin (UiKit page contract)', () => {
     await expect(page.locator('#workflow-transitions-editor[open] .ts-control')).toHaveCount(2);
     await page.locator('#workflow-transitions-editor [data-dialog-cancel]').click();
     await expect(page.locator('dialog[open]')).toHaveCount(0);
+
+    // The UiKit dialog header close button discards the entry like Cancel / Esc.
+    await page.locator('[data-workflow-collection="transitions"] tbody tr').first().locator('[data-row-edit]').click();
+    await page.locator('#workflow-transitions-editor[open] [data-nowo-ui-dialog-close]').click();
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
+    await expect(page.locator('#workflow-transitions-editor [data-dialog-body]')).toBeEmpty();
 
     expect(errors).toEqual([]);
   });
