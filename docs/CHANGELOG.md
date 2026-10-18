@@ -41,6 +41,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Flow diagram of branching definitions.** Transition labels and arrows pointed at the wrong places (e.g. "Submit
+  for review" landed on Cancelled), Cancelled was ranked next to Review, and forward edges (review → cancel →
+  cancelled) were listed under "Return / loop transitions". The new `WorkflowGraphLayout` ranks places by the longest
+  path from the initial place, classifies only true back-edges (target ranked at or before the source, found by a
+  depth-first search) as loops, orders each rank by barycentre sweeps, and draws the diagram as an SVG: one curved
+  connector per edge from its source to the middle of its own target place (long edges pass through waypoints), each
+  label on its own connector (moved along it when two labels would collide). Places and labels stay focusable
+  buttons that open the place / transition dialogs; hovering or focusing a label highlights its connector.
+- Demo: e2e covers the diagram geometry (every connector ends at the middle of its own target, only Resubmit and
+  Reopen listed as loops); README screenshots re-captured (REQ-DEMO-013).
+
+### Changed
+
+- **Definitions list.** The match rules column is end-aligned like priority, places and transitions (`Column`
+  `align: 'end'`; the cells keep `nowo-ui-cell--end`); the "Default" badge uses the neutral badge slot
+  (`badge_neutral`) instead of the solid info badge, and its label is capitalised in every locale.
+- Inline identifiers (slug, subject class, place names in the diagram, dialogs and loop list, and the code cells the
+  collection editors build in JS — `data-code-class` on the collection root) use the UiKit `code` slot.
+- `WorkflowGraphPresenter::present()` layout: `columns` are the ranks of the new layout, `bridges[<rank>]` lists the
+  forward edges leaving that rank (also edges spanning several ranks), `backEdges` only true loops; new keys `ranks`
+  (place → rank) and `diagram` (SVG geometry: `width`, `height`, `nodes`, `edges` with `path` and label box; `null`
+  for linear definitions, which keep `sequence`).
+
 ## [1.9.0] - 2026-10-18
 
 Workflow UI on the UiKit 2.1 standard page contract (REQ-UI-003): dashboard, list, show, form and settings scaffolds, UiKit native dialogs, no CDN assets (Tom Select vendored); deprecated `ui.*` keys mapped to `web_ui.*` / `security.*`. See [UPGRADING](UPGRADING.md#to-190).

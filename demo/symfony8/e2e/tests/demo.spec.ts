@@ -68,6 +68,50 @@ test.describe('workflow admin (UiKit page contract)', () => {
     expect(errors).toEqual([]);
   });
 
+  test('flow diagram: every connector ends at its own target, only true loops are listed', async ({ page }) => {
+    const errors = collectErrors(page);
+    const id = await definitionId(page, 'change_request_review');
+    await page.goto(`/workflow/definitions/${id}`);
+
+    const svg = page.getByTestId('workflow-flow-svg');
+    await expect(svg).toBeVisible();
+    await expect(svg.locator('.nowo-workflow-diagram__edge')).toHaveCount(6);
+
+    // Each connector ends at the left edge, vertical middle, of the place box it names in data-to.
+    const misses = await svg.evaluate((root) => {
+      const out: string[] = [];
+      root.querySelectorAll<SVGPathElement>('.nowo-workflow-diagram__edge').forEach((path) => {
+        const end = path.getPointAtLength(path.getTotalLength());
+        const box = root.querySelector<SVGForeignObjectElement>(`.nowo-workflow-diagram__box[data-place="${path.dataset.to}"]`)!;
+        const x = box.x.baseVal.value;
+        const middle = box.y.baseVal.value + box.height.baseVal.value / 2;
+        if (Math.abs(end.x - x) > 0.5 || Math.abs(end.y - middle) > 0.5) {
+          out.push(`${path.dataset.from} → ${path.dataset.to}`);
+        }
+      });
+
+      return out;
+    });
+    expect(misses).toEqual([]);
+
+    const label = (text: string) => svg.locator('.nowo-workflow-diagram__label-box').filter({ has: page.getByRole('button', { name: text, exact: true }) });
+    await expect(label('Submit for review')).toHaveAttribute('data-to', 'review');
+    await expect(label('Approve')).toHaveAttribute('data-to', 'approved');
+    await expect(label('Request changes')).toHaveAttribute('data-to', 'changes_needed');
+
+    const loops = page.getByTestId('workflow-flow-back-edges').getByRole('button');
+    await expect(loops).toHaveCount(2);
+    await expect(loops).toContainText(['Resubmit', 'Reopen']);
+
+    await label('Approve').getByRole('button').hover();
+    await expect(svg.locator('.nowo-workflow-diagram__edge.is-active')).toHaveAttribute('data-to', 'approved');
+    await label('Approve').getByRole('button').click();
+    await expect(page.locator('dialog[open]')).toHaveAttribute('id', /^workflow-transition-/);
+    await page.keyboard.press('Escape');
+
+    expect(errors).toEqual([]);
+  });
+
   test('places editor: add, validate, remove and save', async ({ page }) => {
     const errors = collectErrors(page);
     const id = await definitionId(page, 'invoice_processing');
