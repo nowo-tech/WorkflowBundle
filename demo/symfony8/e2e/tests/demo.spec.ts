@@ -56,7 +56,7 @@ test.describe('workflow admin (UiKit page contract)', () => {
     await page.locator('.nowo-workflow-diagram__state').first().click();
     const placeDialog = page.locator('dialog[open][data-nowo-ui-dialog]');
     await expect(placeDialog).toHaveCount(1);
-    await placeDialog.locator('[data-workflow-dialog-swap]').first().click();
+    await placeDialog.locator('[data-nowo-ui-dialog-replace]').first().click();
     await expect(page.locator('dialog[open]')).toHaveAttribute('id', /^workflow-transition-/);
     await page.keyboard.press('Escape');
     await expect(page.locator('dialog[open]')).toHaveCount(0);
