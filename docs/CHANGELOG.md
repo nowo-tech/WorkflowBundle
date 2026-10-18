@@ -42,6 +42,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Requires `nowo-tech/ui-kit-bundle` **^2.2** (default-theme polish: table header hierarchy, striped rows, numeric
+  headers aligned with their cells, subtle badges, help text spacing). See [UPGRADING](UPGRADING.md#unreleased).
+- Flow diagram: the transition links of a place dialog swap dialogs through the UiKit 2.2 opener
+  (`data-nowo-ui-dialog-replace`, focus handed back to the diagram) instead of the bundle's own capture-phase
+  handler (`data-workflow-dialog-swap` and its script removed).
+- Transitions editor: Tom Select chips and focus ring painted from the UiKit primary token (UiKit
+  `css/nowo-ui-tom-select.css`); the collection remove confirmation uses the solid destructive button
+  (`btn_danger_solid`).
+- `layout_integrate_base.html.twig` and the deprecated 1.x bridge `base.html.twig` print the UiKit runtimes through
+  the UiKit `scripts` partial (the 1.x bridge loaded only the confirm runtime). Demo host layout likewise.
+
 ## [1.9.1] - 2026-10-18
 
 Flow diagram arrows reach their real targets (ranked layout, SVG connectors, only true back-edges listed as loops); end-aligned numeric columns, neutral Default badge, code slot for identifiers. See [UPGRADING](UPGRADING.md#to-191).

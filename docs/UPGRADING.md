@@ -59,6 +59,18 @@
 
 ## Unreleased
 
+Requires UiKit **^2.2** (`composer require nowo-tech/ui-kit-bundle:^2.2`). No configuration change. What hosts may
+notice:
+
+- Overrides of `workflow_definition/_flow_dialogs.html.twig` that kept `data-workflow-dialog-swap` on transition
+  links: replace it by `data-nowo-ui-dialog-replace` (the bundle script no longer handles the old attribute; without
+  either, the transition dialog opens on top of the place dialog).
+- Host layouts with their own UiKit script list: include `{{ include(nowo_ui_partial('scripts')) }}` instead (the
+  show / edit pages still load `nowo-ui-dialog.js` themselves for such layouts).
+- A host theme that styles `btn_danger` for the collection remove confirmation sets `btn_danger_solid` too.
+- UiKit 2.2 default theme: small uppercase table headers, striped rows, numeric columns end-aligned, Tom Select chips
+  in the primary colour (UiKit UPGRADING "Template contract (2.2)").
+
 ## To 1.9.1
 
 From **1.9.0**:
