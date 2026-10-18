@@ -35,7 +35,7 @@ final class WorkflowExtension extends AbstractExtension implements GlobalsInterf
             'nowo_workflow_layout_template' => $this->layoutTemplate,
             'nowo_workflow_css_framework'   => $this->cssFramework,
             'nowo_workflow_icon_set'        => $this->iconSet,
-            // Applied to the Workflow forms only while the deprecated ui.css_framework is set (1.x behaviour).
+            // 1.x global (host overrides only): the Workflow forms get these themes through FormPage / SettingsSection.
             'nowo_workflow_form_themes' => $this->formThemeFramework === null ? [] : self::formThemesFor($this->formThemeFramework),
         ];
     }

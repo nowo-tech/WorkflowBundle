@@ -118,7 +118,12 @@ final class PageContractTest extends PageContractTestCase
         self::assertStringContainsString('value="token-delete1"', $page->html);
         self::assertStringContainsString('“Purchase order approval”', $page->html);
         self::assertStringNotContainsString('onsubmit', $page->html);
-        self::assertSame(5, substr_count($page->html, 'data-workflow-dialog '), 'one dialog per place and per transition');
+        self::assertSame(5, substr_count($page->html, 'data-nowo-ui-dialog aria-labelledby'), 'one UiKit dialog per place and per transition');
+        self::assertStringContainsString('data-nowo-ui-dialog-open="workflow-place-0"', $page->html);
+        self::assertStringContainsString('data-workflow-dialog-swap', $page->html);
+        self::assertMatchesRegularExpression('#id="workflow-place-0-title"[^>]*>\s*Draft\s*<span class="nowo-ui-badge#', $page->html, 'initial badge in the title');
+        self::assertStringNotContainsString('&lt;span', $page->html);
+        self::assertStringContainsString('/assets/js/nowo-ui-dialog.js', $page->html);
         self::assertStringContainsString('id="workflow-transition-1"', $page->html);
         self::assertStringContainsString('/assets/bundles/nowoworkflow/js/nowo-workflow.js', $page->html);
     }
@@ -138,7 +143,9 @@ final class PageContractTest extends PageContractTestCase
         self::assertStringContainsString('data-prototype=', $transitions->html);
         self::assertStringContainsString('id="workflow-transitions-editor"', $transitions->html);
         self::assertStringContainsString('id="workflow-transitions-remove"', $transitions->html);
-        self::assertStringContainsString('nowo-workflow-dialog--wide', $transitions->html);
+        self::assertStringContainsString('nowo-ui-dialog--lg', $transitions->html);
+        self::assertStringContainsString('data-title-edit="Edit transition"', $transitions->html);
+        self::assertStringContainsString('nowo-ui-input--full nowo-place-multiselect', $transitions->html);
         self::assertStringContainsString('&quot;legal_review&quot;', $transitions->html);
         self::assertStringContainsString('/assets/bundles/nowoworkflow/vendor/tom-select/tom-select.complete.min.js', $transitions->html);
         self::assertSame(3, substr_count($transitions->html, 'data-collection-entry='));

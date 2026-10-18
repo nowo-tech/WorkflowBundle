@@ -50,6 +50,7 @@ services:
     Nowo\WorkflowBundle\View\WorkflowPageFactory:
         arguments:
             $layout: '%nowo_workflow.web_ui.layout_template%'
+            $formThemeFramework: '%nowo_workflow.ui.css_framework_override%'
 
     Nowo\WorkflowBundle\Doctrine\TableNamePrefixer:
         arguments:

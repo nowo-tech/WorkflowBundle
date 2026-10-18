@@ -20,23 +20,7 @@
   font-weight: 600;
 }
 
-/* --- Dialogs (UiKit confirm chrome, wider and with regular body text) --- */
-.nowo-workflow-dialog .nowo-ui-confirm__panel {
-  width: min(34rem, calc(100vw - 2rem));
-  max-height: calc(100dvh - 4rem);
-  display: flex;
-  flex-direction: column;
-}
-
-.nowo-workflow-dialog--wide .nowo-ui-confirm__panel {
-  width: min(48rem, calc(100vw - 2rem));
-}
-
-.nowo-workflow-dialog .nowo-workflow-dialog__body {
-  color: var(--nowo-ui-text);
-  overflow-y: auto;
-}
-
+/* --- Dialog content (UiKit dialog partial: chrome, sizes and body text come from UiKit) --- */
 .nowo-workflow-dialog__subtitle {
   margin: 1rem 0 0.5rem;
   font-size: 0.95rem;
@@ -225,15 +209,14 @@
 }
 
 /* --- TomSelect (vendored, optional) on the UiKit tokens --- */
-.nowo-workflow-collection .ts-control,
-.nowo-workflow-dialog .ts-control {
+.nowo-workflow-collection .ts-control {
   border-color: var(--nowo-ui-border-strong, var(--nowo-ui-border));
   border-radius: var(--nowo-ui-radius, 0.375rem);
   background: var(--nowo-ui-surface);
   color: var(--nowo-ui-text);
 }
 
-.nowo-workflow-dialog .ts-dropdown {
+.nowo-workflow-collection .ts-dropdown {
   background: var(--nowo-ui-surface);
   color: var(--nowo-ui-text);
 }
@@ -243,14 +226,8 @@
   grid-column: 1 / -1;
 }
 
-.nowo-workflow-form-grid .nowo-ui-input,
-.nowo-workflow-dialog .nowo-ui-input {
-  width: 100%;
-  max-width: none;
-}
-
 /* TomSelect copies the select classes to its wrapper: keep the control as the only box. */
-.nowo-workflow-dialog .ts-wrapper.nowo-ui-input {
+.nowo-workflow-collection .ts-wrapper.nowo-ui-input {
   padding: 0;
   border: 0;
   background: none;

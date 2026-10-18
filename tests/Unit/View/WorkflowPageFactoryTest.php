@@ -10,6 +10,7 @@ use Nowo\UiKitBundle\View\KpiTile;
 use Nowo\UiKitBundle\View\Label;
 use Nowo\UiKitBundle\View\SettingsSection;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
+use Nowo\WorkflowBundle\Tests\Support\StubUrlGenerator;
 use Nowo\WorkflowBundle\Tests\Support\WorkflowPageFixtures;
 use Nowo\WorkflowBundle\View\WorkflowPageFactory;
 use PHPUnit\Framework\TestCase;
@@ -112,6 +113,22 @@ final class WorkflowPageFactoryTest extends TestCase
         self::assertSame('/generated/nowo_workflow_definition_edit_places', $page->sections[2]->href);
         self::assertSame('Purchase order approval · purchase_order', $page->header->intro);
         self::assertSame('/generated/nowo_workflow_definition_show', $page->header->breadcrumbs[2]->href);
+    }
+
+    public function testDeprecatedCssFrameworkFormThemesGoThroughTheViewModels(): void
+    {
+        $definition = WorkflowPageFixtures::purchaseOrder();
+        $form       = WorkflowPageFixtures::formView($definition, WorkflowDefinitionFormSection::General);
+
+        $default = WorkflowPageFixtures::factory();
+        self::assertSame([], $default->newForm($form)->formThemes);
+        self::assertSame([], $default->edit($definition, WorkflowDefinitionFormSection::General, $form)->sections[0]->formThemes);
+
+        $legacy = new WorkflowPageFactory(new StubUrlGenerator(), WorkflowPageFixtures::csrf(), null, 'bootstrap5');
+        self::assertSame(['bootstrap_5_layout.html.twig'], $legacy->newForm($form)->formThemes);
+        $edit = $legacy->edit($definition, WorkflowDefinitionFormSection::General, $form);
+        self::assertSame(['bootstrap_5_layout.html.twig'], $edit->sections[0]->formThemes);
+        self::assertSame([], $edit->sections[1]->formThemes, 'only the section with the form');
     }
 
     public function testSectionHelpKeys(): void

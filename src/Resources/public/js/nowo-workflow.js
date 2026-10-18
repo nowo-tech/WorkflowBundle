@@ -1,12 +1,12 @@
 /*
  * NowoWorkflowBundle admin UI behaviour (REQ-UI-003): no framework JS, no inline handlers, no confirm().
  *
- * - Dialogs: [data-workflow-dialog-open="<dialog id>"] opens a native <dialog data-workflow-dialog>;
- *   [data-workflow-dialog-close], Esc and a backdrop click close it. Opening from inside an open dialog closes it
- *   first (place → transition in the flow diagram).
- * - Collection editors ([data-workflow-collection]): table of the CollectionType entries, add / edit in a <dialog>
- *   (the entry's fields move into it), remove behind the UiKit confirm dialog, optional TomSelect multiselects
- *   (loaded by the transitions page from the bundle's vendor/tom-select assets).
+ * - Dialogs: the UiKit `dialog` partial and js/nowo-ui-dialog.js open / close them (data-nowo-ui-dialog-open,
+ *   data-nowo-ui-dialog-close, Esc, backdrop click). An opener with data-workflow-dialog-swap closes the dialog it
+ *   sits in first (place → transition in the flow diagram), so one dialog is open at a time.
+ * - Collection editors ([data-workflow-collection]): table of the CollectionType entries, add / edit in the UiKit
+ *   dialog (the entry's fields move into it), remove behind the UiKit confirm dialog, optional TomSelect
+ *   multiselects (loaded by the transitions page from the bundle's vendor/tom-select assets).
  */
 (function () {
     'use strict';
@@ -23,37 +23,14 @@
         }
     }
 
+    // Capture phase: runs before the UiKit opener (bubble phase on document) opens the target dialog.
     document.addEventListener('click', function (event) {
         var target = event.target;
-        if (!(target instanceof Element)) {
-            return;
-        }
-
-        var opener = target.closest('[data-workflow-dialog-open]');
+        var opener = target instanceof Element ? target.closest('[data-workflow-dialog-swap][data-nowo-ui-dialog-open]') : null;
         if (opener) {
-            var dialog = document.getElementById(opener.getAttribute('data-workflow-dialog-open') || '');
-            if (dialog) {
-                event.preventDefault();
-                closeDialog(opener.closest('dialog'));
-                openDialog(dialog);
-            }
-
-            return;
+            closeDialog(opener.closest('dialog'));
         }
-
-        var closer = target.closest('[data-workflow-dialog-close]');
-        if (closer) {
-            event.preventDefault();
-            closeDialog(closer.closest('dialog'));
-
-            return;
-        }
-
-        // Backdrop click: the event target is the <dialog> itself.
-        if (target instanceof HTMLDialogElement && target.hasAttribute('data-workflow-dialog')) {
-            closeDialog(target);
-        }
-    });
+    }, true);
 
     var tomSelects = new WeakMap();
 
@@ -230,7 +207,7 @@
         }
 
         var dialogBody = dialog.querySelector('[data-dialog-body]');
-        var dialogTitle = dialog.querySelector('[data-title-add]');
+        var dialogTitle = document.getElementById(dialog.id + '-title');
         var active = null;
         var state = null;
         var isNew = false;
@@ -287,7 +264,7 @@
             isNew = created;
             state = snapshot(entry);
             if (dialogTitle) {
-                dialogTitle.textContent = dialogTitle.getAttribute(created ? 'data-title-add' : 'data-title-edit') || '';
+                dialogTitle.textContent = dialog.getAttribute(created ? 'data-title-add' : 'data-title-edit') || '';
             }
             dialogBody.appendChild(entry);
             initTomSelects(entry, placeNames, placeholder);
@@ -361,7 +338,7 @@
             finish(false);
             closeDialog(dialog);
         });
-        // Esc / backdrop: discard the changes of the open entry.
+        // Esc / backdrop / header close button: discard the changes of the open entry.
         dialog.addEventListener('close', function () {
             finish(false);
         });

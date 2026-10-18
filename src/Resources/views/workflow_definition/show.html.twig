@@ -4,7 +4,7 @@
   Variables: page (View\ShowPage: header with edit / delete actions, detail sections general / runtime binding /
   match rules, created / updated meta), definition (WorkflowDefinition), graph (WorkflowGraphPresenter::present()).
   Data blocks: nowo_ui_show_sections (flow diagram before the detail sections); nowo_ui_modals (place / transition
-  dialogs of the diagram).
+  dialogs of the diagram, UiKit `dialog` partial).
 #}
 {% extends '@NowoUiKit/page/show.html.twig' %}
 
@@ -29,5 +29,7 @@
 
 {% block nowo_ui_scripts %}
     {{ parent() }}
+    {# Idempotent: also loaded by the UiKit document layout; kept for host layouts with their own script list. #}
+    <script src="{{ asset('js/nowo-ui-dialog.js', 'nowo_ui_kit') }}" defer></script>
     <script src="{{ asset('bundles/nowoworkflow/js/nowo-workflow.js') }}" defer></script>
 {% endblock %}

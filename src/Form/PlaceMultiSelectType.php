@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Form;
 
+use Nowo\UiKitBundle\Theme\ThemeSlots;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -21,7 +22,7 @@ final class PlaceMultiSelectType extends AbstractType
             'multiple' => true,
             'required' => false,
             'attr'     => [
-                'class' => 'nowo-ui-input nowo-place-multiselect',
+                'class' => ThemeSlots::semantic('input_full') . ' nowo-place-multiselect',
             ],
         ]);
         $resolver->setRequired(['choices']);

@@ -93,13 +93,13 @@ final class NowoWorkflowExtensionTest extends TestCase
     {
         foreach (['bootstrap', 'bootstrap5', 'bootstrap4', 'tabler'] as $framework) {
             $profile = NowoWorkflowExtension::formKitProfile($framework);
-            self::assertSame('nowo-ui-input form-control', $profile['defaults']['attr']['class'], $framework);
+            self::assertSame('nowo-ui-input nowo-ui-input--full form-control', $profile['defaults']['attr']['class'], $framework);
             self::assertArrayHasKey('field_types', $profile);
             self::assertSame('bootstrap', NowoWorkflowExtension::formKitCssFramework($framework));
         }
 
         $profile = NowoWorkflowExtension::formKitProfile('tailwind');
-        self::assertSame(['attr' => ['class' => 'nowo-ui-input']], $profile['defaults']);
+        self::assertSame(['attr' => ['class' => 'nowo-ui-input nowo-ui-input--full']], $profile['defaults']);
         self::assertArrayNotHasKey('field_types', $profile);
         self::assertSame('NowoWorkflowBundle', $profile['translation_domain']);
 
@@ -123,7 +123,7 @@ final class NowoWorkflowExtensionTest extends TestCase
 
         $seed = $container->getExtensionConfig('nowo_form_kit')[0];
         self::assertSame('tailwind', $seed['css_framework']);
-        self::assertSame(['attr' => ['class' => 'nowo-ui-input']], $seed['profiles']['workflow']['defaults']);
+        self::assertSame(['attr' => ['class' => 'nowo-ui-input nowo-ui-input--full']], $seed['profiles']['workflow']['defaults']);
     }
 
     public function testPrependSeedsFormKitFromTheDeprecatedUiCssFramework(): void

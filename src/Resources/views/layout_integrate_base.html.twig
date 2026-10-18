@@ -32,7 +32,7 @@
 {% block javascripts %}
     {{ parent() }}
     {% block nowo_ui_scripts %}
-        {% for _script in ['nowo-ui-modal', 'nowo-ui-confirm', 'nowo-ui-toast', 'nowo-ui-tabs'] %}
+        {% for _script in ['nowo-ui-modal', 'nowo-ui-confirm', 'nowo-ui-dialog', 'nowo-ui-toast', 'nowo-ui-tabs'] %}
             <script src="{{ asset('js/' ~ _script ~ '.js', 'nowo_ui_kit') }}" defer></script>
         {% endfor %}
     {% endblock %}

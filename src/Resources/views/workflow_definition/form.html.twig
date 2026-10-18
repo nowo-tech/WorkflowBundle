@@ -1,7 +1,8 @@
 {#
   New workflow definition — UiKit page/form (REQ-UI-003).
 
-  Variable: page (View\FormPage: general section form, submit "Create and continue", cancel to the list).
+  Variable: page (View\FormPage: general section form, submit "Create and continue", cancel to the list; formThemes
+  while the deprecated ui.css_framework is set).
   Data block: nowo_ui_form_body (general fields in a grid, then the REQ-TWIG-003 loop for the rest).
   After creation the controller redirects to the edit page (match rules tab).
 #}
@@ -13,9 +14,6 @@
 {% endblock %}
 
 {% block nowo_ui_form_body %}
-    {% if nowo_workflow_form_themes|default([]) is not empty %}
-        {% form_theme form with nowo_workflow_form_themes %}
-    {% endif %}
     {{ include('@NowoWorkflowBundle/workflow_definition/_general_fields.html.twig', {form: form}, false) }}
     {{ parent() }}
 {% endblock %}

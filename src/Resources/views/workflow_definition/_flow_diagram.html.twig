@@ -1,6 +1,6 @@
 {#
   Flow diagram card of a workflow definition (show page). States and transitions open their dialogs
-  (_flow_dialogs.html.twig) through data-workflow-dialog-open (nowo-workflow.js).
+  (_flow_dialogs.html.twig) through the UiKit dialog opener (data-nowo-ui-dialog-open, js/nowo-ui-dialog.js).
 
   Required: graph (WorkflowGraphPresenter::present()), bundle.
 #}
@@ -59,7 +59,7 @@
                         <p class="{{ nowo_ui_class('muted', bundle) }}">{{ 'diagram.back_edges'|trans({}, _d) }}</p>
                         <div class="{{ nowo_ui_class('toolbar', bundle) }}">
                             {% for edge in graph.layout.backEdges %}
-                                <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}" data-workflow-dialog-open="workflow-transition-{{ edge.transitionIndex }}">
+                                <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}" data-nowo-ui-dialog-open="workflow-transition-{{ edge.transitionIndex }}">
                                     <code>{{ edge.fromPlace }}</code> → {{ edge.transitionLabel }} → <code>{{ edge.toPlace }}</code>
                                 </button>
                             {% endfor %}
@@ -78,12 +78,12 @@
 </section>
 
 {% macro place_node(place) %}
-    <button type="button" class="nowo-workflow-diagram__state{% if place.isInitial %} nowo-workflow-diagram__state--initial{% endif %}" data-workflow-dialog-open="workflow-place-{{ place.index }}">
+    <button type="button" class="nowo-workflow-diagram__state{% if place.isInitial %} nowo-workflow-diagram__state--initial{% endif %}" data-nowo-ui-dialog-open="workflow-place-{{ place.index }}">
         <span class="nowo-workflow-diagram__state-title">{{ place.displayLabel }}</span>
         <span class="nowo-workflow-diagram__state-name"><code>{{ place.name }}</code></span>
     </button>
 {% endmacro %}
 
 {% macro transition_pill(index, label) %}
-    <button type="button" class="nowo-workflow-diagram__transition" data-workflow-dialog-open="workflow-transition-{{ index }}">{{ label }}</button>
+    <button type="button" class="nowo-workflow-diagram__transition" data-nowo-ui-dialog-open="workflow-transition-{{ index }}">{{ label }}</button>
 {% endmacro %}

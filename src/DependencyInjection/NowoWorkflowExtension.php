@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
+use Nowo\UiKitBundle\Theme\ThemeSlots;
 use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -100,17 +101,20 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
 
     /**
      * FormKit profile of the Workflow forms: Bootstrap control classes on Bootstrap stacks, semantic nowo-ui-* classes
-     * only on any other stack (the host theme styles them).
+     * only on any other stack (the host theme styles them). Text controls use the UiKit 2.1 `input_full` slot
+     * (`nowo-ui-input nowo-ui-input--full`): the form grid cells and the editor dialogs size them.
      *
      * @return array<string, mixed>
      */
     public static function formKitProfile(string $cssFramework): array
     {
+        $input = ThemeSlots::semantic('input_full');
+
         if (!self::isBootstrap($cssFramework)) {
             return [
                 'alias'              => 'workflow',
                 'translation_domain' => 'NowoWorkflowBundle',
-                'defaults'           => ['attr' => ['class' => 'nowo-ui-input']],
+                'defaults'           => ['attr' => ['class' => $input]],
             ];
         }
 
@@ -118,7 +122,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             'alias'              => 'workflow',
             'translation_domain' => 'NowoWorkflowBundle',
             'defaults'           => [
-                'attr'     => ['class' => 'nowo-ui-input form-control'],
+                'attr'     => ['class' => $input . ' form-control'],
                 'row_attr' => ['class' => 'mb-2'],
             ],
             'field_types' => [
@@ -133,10 +137,10 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
                     'attr' => ['class' => 'form-select'],
                 ],
                 'file' => [
-                    'attr' => ['class' => 'nowo-ui-input form-control'],
+                    'attr' => ['class' => $input . ' form-control'],
                 ],
                 'textarea' => [
-                    'attr' => ['class' => 'nowo-ui-input form-control'],
+                    'attr' => ['class' => $input . ' form-control'],
                 ],
             ],
         ];

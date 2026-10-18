@@ -2,7 +2,8 @@
   Edit a workflow definition — UiKit page/settings (REQ-UI-003): one tab per section (general, match rules,
   places, transitions); each tab is its own form (links between tabs, the current one carries the form).
 
-  Variables: page (View\SettingsPage), definition (WorkflowDefinition), section (WorkflowDefinitionFormSection).
+  Variables: page (View\SettingsPage; the current section carries the form and its formThemes), definition
+  (WorkflowDefinition), section (WorkflowDefinitionFormSection).
   Data block: nowo_ui_settings_section (general fields grid, or the collection editor of the section).
 #}
 {% extends '@NowoUiKit/page/settings.html.twig' %}
@@ -19,9 +20,6 @@
     {% if section.form %}
         {% set _b = page.bundle %}
         {% set form = section.form %}
-        {% if nowo_workflow_form_themes|default([]) is not empty %}
-            {% form_theme form with nowo_workflow_form_themes %}
-        {% endif %}
         {{ form_start(form, {attr: {id: 'workflow-definition-form', class: nowo_ui_class('form', _b), 'data-nowo-ui-region': 'form'}|merge(nowo_ui_theme.attributesFor('form', _b, {}, nowo_ui_page_type))}) }}
             {% if section.id == 'general' %}
                 {{ include('@NowoWorkflowBundle/workflow_definition/_general_fields.html.twig', {form: form}, false) }}
@@ -88,6 +86,8 @@
 
 {% block nowo_ui_scripts %}
     {{ parent() }}
+    {# Idempotent: also loaded by the UiKit document layout; kept for host layouts with their own script list. #}
+    <script src="{{ asset('js/nowo-ui-dialog.js', 'nowo_ui_kit') }}" defer></script>
     {% if section.value == 'transitions' %}
         <script src="{{ asset('bundles/nowoworkflow/vendor/tom-select/tom-select.complete.min.js') }}" defer></script>
     {% endif %}

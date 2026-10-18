@@ -1,7 +1,7 @@
 {#
   Collection editor of a workflow definition section (match rules, places, transitions): a table of the entries,
-  an add button, one <dialog> editor (the entry's fields move into it while editing) and a remove confirmation
-  (UiKit confirm partial). Behaviour: nowo-workflow.js (no inline script, no confirm()).
+  an add button, one editor (UiKit `dialog` partial; the entry's fields move into it while editing) and a remove
+  confirmation (UiKit `confirm` partial). Behaviour: nowo-workflow.js (no inline script, no confirm()).
 
   Required: collection (CollectionType FormView), config ({add, empty, title_add, title_edit, columns: list of
   {field, label, format: text|code|list}}), key (section id), bundle.
@@ -64,22 +64,24 @@
         {% endfor %}
     </div>
 
-    {% embed '@NowoWorkflowBundle/workflow_definition/_dialog.html.twig' with {
+    {% set _editor_footer %}
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }}" data-dialog-cancel>{{ 'action.cancel'|trans({}, _d) }}</button>
+        <button type="button" class="{{ nowo_ui_class('btn_primary', bundle) }}" data-dialog-apply>{{ 'action.apply'|trans({}, _d) }}</button>
+    {% endset %}
+    {% embed nowo_ui_partial('dialog', bundle) with {
         id: _dialog,
+        title: config.title_add|trans({}, _d),
+        size: key == 'transitions' ? 'lg' : 'md',
+        footer: _editor_footer,
         bundle: bundle,
-        size: key == 'transitions' ? 'wide' : null,
-        title_attr: {'data-title-add': config.title_add|trans({}, _d), 'data-title-edit': config.title_edit|trans({}, _d)},
-        body_attr: {'data-dialog-body': true},
+        attr: {'data-title-add': config.title_add|trans({}, _d), 'data-title-edit': config.title_edit|trans({}, _d)},
     } %}
-        {% block footer %}
-            <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }}" data-dialog-cancel>{{ 'action.cancel'|trans({}, 'NowoWorkflowBundle') }}</button>
-            <button type="button" class="{{ nowo_ui_class('btn_primary', bundle) }}" data-dialog-apply>{{ 'action.apply'|trans({}, 'NowoWorkflowBundle') }}</button>
-        {% endblock %}
+        {% block nowo_ui_dialog_body %}<div data-dialog-body></div>{% endblock %}
     {% endembed %}
 
     {% set _remove_body %}<p class="nowo-ui-confirm__message">{{ 'collection.confirm_delete'|trans({}, _d) }}</p>{% endset %}
     {% set _remove_footer %}
-        <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }}" data-nowo-confirm-close data-workflow-dialog-close>{{ 'action.cancel'|trans({}, _d) }}</button>
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }}" data-nowo-confirm-close>{{ 'action.cancel'|trans({}, _d) }}</button>
         <button type="button" class="{{ nowo_ui_class('btn_danger', bundle) }}" data-collection-remove-confirm>{{ 'action.remove'|trans({}, _d) }}</button>
     {% endset %}
     {{ include(nowo_ui_partial('confirm', bundle), {
