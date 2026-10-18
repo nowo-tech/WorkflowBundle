@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.9.1] - 2026-10-18](#191---2026-10-18)
 - [[1.9.0] - 2026-10-18](#190---2026-10-18)
 - [[1.8.2] - 2026-10-13](#182---2026-10-13)
 - [[1.8.1] - 2026-10-13](#181---2026-10-13)
@@ -41,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-10-18
+
+Flow diagram arrows reach their real targets (ranked layout, SVG connectors, only true back-edges listed as loops); end-aligned numeric columns, neutral Default badge, code slot for identifiers. See [UPGRADING](UPGRADING.md#to-191).
+
 ### Fixed
 
 - **Flow diagram of branching definitions.** Transition labels and arrows pointed at the wrong places (e.g. "Submit
@@ -65,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   forward edges leaving that rank (also edges spanning several ranks), `backEdges` only true loops; new keys `ranks`
   (place → rank) and `diagram` (SVG geometry: `width`, `height`, `nodes`, `edges` with `path` and label box; `null`
   for linear definitions, which keep `sequence`).
+
+[1.9.1]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.9.1
 
 ## [1.9.0] - 2026-10-18
 

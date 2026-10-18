@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.9.1](#to-191)
 - [To 1.9.0](#to-190)
   - [Template contract](#template-contract)
   - [Configuration](#configuration)
@@ -57,6 +58,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.9.1
+
+From **1.9.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 No configuration change. Hosts that override `@NowoWorkflowBundle/workflow_definition/_flow_diagram.html.twig`:
 the branching diagram is now an SVG built from `graph.layout.diagram` (`nodes` with `x`/`y`/`width`/`height`,
