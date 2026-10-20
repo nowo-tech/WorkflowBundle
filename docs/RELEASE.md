@@ -1,5 +1,13 @@
 # Release
 
+## Table of contents
+
+- [Pre-release](#pre-release)
+- [Tag and publish](#tag-and-publish)
+- [Post-release](#post-release)
+  - [Example for v1.6.1](#example-for-v161)
+  - [Example for v1.5.2](#example-for-v152)
+
 ## Pre-release
 
 ```bash

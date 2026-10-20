@@ -8,10 +8,10 @@ assignees: ''
 ---
 
 <!--
-- Please do not report an issue for a version of `WorkflowBundle` that is no longer supported. Currently supported versions are listed here: https://github.com/nowo-tech/WorkflowBundle#version-information
+- Please do not report an issue for a version of `workflow-bundle` that is no longer supported. Currently supported versions are listed here: https://github.com/nowo-tech/WorkflowBundle#version-information
 - Please fill in this template according to your issue.
 - Please keep the table shown below at the top of your issue.
-- You can retrieve `WorkflowBundle` version by running `composer info | grep "WorkflowBundle"`.
+- You can retrieve `workflow-bundle` version by running `composer info | grep "workflow-bundle"`.
 - You can retrieve PHP version by running `php -v`.
 - Please post code as text (using proper markup). Do not post screenshots of code.
 - Please remove this comment before submitting your issue.
@@ -19,7 +19,7 @@ assignees: ''
 
 | Q                           | A
 | ----------------------------| -----------------------
-| `WorkflowBundle` version    | x.y.z
+| `WorkflowBundle` version        | x.y.z
 | PHP version                 | x.y.z
 | Database                    | MySQL / PostgreSQL / SQLite / Other
 

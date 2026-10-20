@@ -9,6 +9,18 @@
 | Remediation (2026-09-23 / release 1.6.8) | W-01 to W-03 resolved: request-scoped workflow memo + `ResetInterface` on `DatabaseWorkflowRegistry`, entity-free `DatabaseMetadataStore`, closed-EntityManager recovery after failed flushes (`Doctrine\ClosedEntityManagerResetter`) in `WorkflowApplicator` and `WorkflowDefinitionController`; regression tests simulate consecutive requests without `reset()` |
 | **Verdict** | ✅ **Viable under scenario B** — no bundle-owned state outlives the main request; definitions edited in one worker are seen by every worker on the next request. Clearing Doctrine's identity map between requests remains the application's responsibility (see usage recommendations) |
 
+## Table of contents
+
+- [Execution model assumed](#execution-model-assumed)
+- [Summary](#summary)
+- [Services reviewed](#services-reviewed)
+- [Findings](#findings)
+  - [W-01 — Workflow registry cache is never reset and is per worker (Medium)](#w-01--workflow-registry-cache-is-never-reset-and-is-per-worker-medium)
+  - [W-02 — Cached workflows hold an entity from an earlier request (Low)](#w-02--cached-workflows-hold-an-entity-from-an-earlier-request-low)
+  - [W-03 — `WorkflowApplicator` depends on Doctrine's resetter after a failed flush (Medium, scenario B only)](#w-03--workflowapplicator-depends-on-doctrines-resetter-after-a-failed-flush-medium-scenario-b-only)
+- [Usage recommendations in worker mode](#usage-recommendations-in-worker-mode)
+- [Re-audit triggers](#re-audit-triggers)
+
 ## Execution model assumed
 
 FrankenPHP worker mode boots the Symfony kernel once per worker and serves many requests with the same container. This audit assumes the **strict** variant: the kernel is **not** rebooted between requests, so every shared service, static property and PHP global survives from one request to the next. Two scenarios are evaluated:

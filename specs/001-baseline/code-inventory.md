@@ -2,7 +2,7 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/workflow-bundle`  
-**Last audited**: 2026-09-25
+**Last audited**: 2026-10-20
 
 This file proves that **every production source artifact** under `src/` is referenced by the baseline specification. Test-only files under `tests/` and `*.test.ts` under `src/` are out of Packagist scope. Built assets under `Resources/public/` are documented as Vite/build outputs.
 
@@ -77,6 +77,9 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Service/WorkflowDefinitionBuilder.php` | Definition builder from entities | FR-WF-005 |
 | `Service/WorkflowGraphPresenter.php` | Flow diagram presenter | FR-WF-006 |
 | `Service/WorkflowResolver.php` | Workflow match resolver | FR-WF-003 |
+| `Service/DenyAllWorkflowUiAccessChecker.php` | Fail-closed default UI access (deny all) | FR-SEC-007 |
+| `Service/WorkflowGraphLayout.php` | Layered (Sugiyama-style) layout of the flow diagram | FR-VIEW-008 |
+| `Util/SubjectClass.php` | Subject class matching (Doctrine proxies, subclasses) | FR-WF-003 |
 
 ## Contracts & attributes
 
@@ -91,6 +94,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
 | `Twig/WorkflowExtension.php` | Twig extension | FR-TWIG-001 |
+| `View/WorkflowPageFactory.php` | UiKit admin page view models (REQ-UI-003) | FR-UI-002 |
 
 ## Persistence integration
 
@@ -132,23 +136,29 @@ This file proves that **every production source artifact** under `src/` is refer
 
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
-| `Resources/views/_framework_assets.css.twig` | Framework CDN CSS partial | FR-UI-001 |
-| `Resources/views/_framework_assets.js.twig` | Framework CDN JS partial | FR-UI-001 |
 | `Resources/views/_locale_switcher.html.twig` | Shared partial template | FR-VIEW-010 |
-| `Resources/views/_pagination.html.twig` | List pagination partial | FR-UI-001 / PERF |
 | `Resources/views/base.html.twig` | Page shell + parent() stacking | FR-UI-001, FR-VIEW-001 |
 | `Resources/views/dashboard/index.html.twig` | Dashboard template | FR-VIEW-003 |
-| `Resources/views/layout.html.twig` | Demo layout template | FR-VIEW-001, FR-UI-001 |
 | `Resources/views/layout_integrate_base.html.twig` | Optional host layout bridge | FR-UI-001 |
-| `Resources/views/workflow_definition/_collection_manager.js.twig` | Workflow editor template | FR-VIEW-007 |
-| `Resources/views/workflow_definition/_edit_nav.html.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/_flow_diagram.html.twig` | Workflow editor template | FR-VIEW-007 |
-| `Resources/views/workflow_definition/_match_rules_section.html.twig` | Workflow editor template | FR-VIEW-007 |
-| `Resources/views/workflow_definition/_places_section.html.twig` | Workflow editor template | FR-VIEW-007 |
-| `Resources/views/workflow_definition/_transitions_section.html.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/form.html.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/index.html.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/show.html.twig` | Workflow editor template | FR-VIEW-007 |
+| `Resources/views/workflow_definition/edit.html.twig` | Edit page (UiKit page/settings, one tab per section) | FR-VIEW-007, FR-UI-002 |
+| `Resources/views/workflow_definition/_general_fields.html.twig` | General fields grid | FR-VIEW-007 |
+| `Resources/views/workflow_definition/_collection_section.html.twig` | Collection editor (match rules, places, transitions) with UiKit dialog | FR-VIEW-007, FR-FORM-001 |
+| `Resources/views/workflow_definition/_flow_dialogs.html.twig` | Place / transition dialogs of the flow diagram | FR-VIEW-008 |
+
+## Public assets
+
+| Source file | Spec section | Requirement IDs |
+| --- | --- | --- |
+| `Resources/public/js/nowo-workflow.js` | Admin UI behaviour (no framework JS, no inline handlers) | FR-UI-003 |
+| `Resources/public/css/nowo-workflow.css` | Admin UI styles on UiKit tokens | FR-UI-003 |
+| `Resources/public/vendor/tom-select/tom-select.complete.min.js` | Vendored Tom Select (searchable selects) | FR-UI-004 |
+| `Resources/public/vendor/tom-select/tom-select.default.min.css` | Vendored Tom Select styles | FR-UI-004 |
+| `Resources/public/vendor/tom-select/LICENSE` | Third-party license shipped with the vendored copy | FR-UI-004 |
+| `Resources/public/vendor/tom-select/README.md` | Vendored copy provenance / version notes | FR-UI-004 |
 
 ## Coverage summary
 
@@ -160,14 +170,15 @@ This file proves that **every production source artifact** under `src/` is refer
 | Persistence | 5 | 5 |
 | Forms | 7 | 7 |
 | Domain models | 4 | 4 |
-| Application services | 11 | 11 |
+| Application services | 14 | 14 |
 | Contracts & attributes | 3 | 3 |
-| Twig PHP | 1 | 1 |
+| Twig PHP & page views | 2 | 2 |
 | Persistence integration | 5 | 5 |
 | Exceptions | 2 | 2 |
 | Symfony config | 2 | 2 |
 | Translations | 7 | 7 |
-| Twig views | 17 | 17 |
-| **Total production sources** | **74** | **74** |
+| Twig views | 12 | 12 |
+| Public assets (JS/CSS, vendored Tom Select) | 6 | 6 |
+| **Total production sources** | **79** | **79** |
 
-Audit: `find src -type f ! -path '*/assets/dist/*' ! -name '*.test.ts' | wc -l`
+Audit: `git ls-files src | wc -l` → 79.

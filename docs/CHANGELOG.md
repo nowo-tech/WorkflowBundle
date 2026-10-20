@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- Documentation: wave-1 REQ compliance — README GitHub stars badge uses the package name, documentation list order (Templates/PSR under Additional documentation), canonical issue templates, CONTRIBUTING Code of Conduct link and Cursor Agent queue settings (REQ-IDE-006), tables of contents on long docs, Spec Kit inventory refresh after the UiKit page migration (79/79).
+
 ## [1.9.2] - 2026-10-18
 
 Requires UiKit ^2.2; workarounds made unnecessary by 2.2 removed. See [UPGRADING](UPGRADING.md#to-192).

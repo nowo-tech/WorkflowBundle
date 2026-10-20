@@ -3,6 +3,18 @@
 Thank you for contributing to Workflow Bundle.
 
 
+## Table of contents
+
+- [Code of Conduct](#code-of-conduct)
+- [Development setup](#development-setup)
+- [Quality checks](#quality-checks)
+- [Code standards](#code-standards)
+- [Pull requests](#pull-requests)
+- [Spec-driven development](#spec-driven-development)
+- [Questions](#questions)
+- [Cursor Agent](#cursor-agent)
+- [Git hooks (REQ-GIT-001)](#git-hooks-req-git-001)
+
 ## Code of Conduct
 
 This project follows the [Contributor Covenant Code of Conduct](../CODE_OF_CONDUCT.md). By participating, you are expected to uphold it. Please report unacceptable behavior to **hectorfranco@nowo.tech**.
@@ -59,6 +71,21 @@ See [SPEC-DRIVEN-DEVELOPMENT.md](SPEC-DRIVEN-DEVELOPMENT.md) for product scope a
 ## Questions
 
 Open an [issue](https://github.com/nowo-tech/WorkflowBundle/issues) or contact hectorfranco@nowo.tech.
+
+## Cursor Agent
+
+Contributors using Cursor Agent on this repository should enable these user-level settings (REQ-IDE-006):
+
+1. **Submit with Ctrl + Enter** (macOS: **⌘ + Enter**) — Cursor Settings → Agents / Chat → Submit with Ctrl + Enter. Enter inserts a newline; Ctrl/⌘+Enter submits the prompt.
+2. **Queue follow-ups while the agent is running** — in your user `settings.json` (Linux `~/.config/Cursor/User/settings.json`, Windows `%APPDATA%\Cursor\User\settings.json`, macOS `~/Library/Application Support/Cursor/User/settings.json`):
+
+```json
+{
+  "cursor.composer.queueMessageDefaultBehavior": "queue"
+}
+```
+
+Do not use `"steer"` as the default: it interrupts the running agent turn as soon as the follow-up is sent.
 
 ## Git hooks (REQ-GIT-001)
 

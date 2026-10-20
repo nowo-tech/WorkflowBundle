@@ -5,6 +5,7 @@ This document describes how the **Workflow Bundle** demo (`demo/symfony8`) runs 
 ## Contents
 
 - [Overview](#overview)
+  - [Demo smoke (REQ-TEST-011)](#demo-smoke-req-test-011)
 - [What the demo includes](#what-the-demo-includes)
 - [Development configuration](#development-configuration)
 - [Production configuration](#production-configuration)

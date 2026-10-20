@@ -1,5 +1,16 @@
 # Usage
 
+## Table of contents
+
+- [Match rules and resolution](#match-rules-and-resolution)
+- [Runtime API](#runtime-api)
+- [Extending entities](#extending-entities)
+- [Protecting the CRUD UI](#protecting-the-crud-ui)
+- [Custom workflow registry](#custom-workflow-registry)
+- [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
+- [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
+- [Overriding translations (REQ-I18N-001)](#overriding-translations-req-i18n-001)
+
 ## Match rules and resolution
 
 Each `WorkflowDefinition` can define zero or more `WorkflowMatchRule` rows (`parameter_key` + `parameter_value`).

@@ -30,7 +30,7 @@ Per SDD US-01–US-05: DB-backed definitions, CRUD UI with flow diagram, context
 
 ### Registry & runtime
 
-- **FR-WF-001–006**: CRUD controller, `DatabaseWorkflowRegistry`, `WorkflowResolver`, `WorkflowApplicator`, `WorkflowDefinitionBuilder`, `WorkflowGraphPresenter`.
+- **FR-WF-001–006**: CRUD controller, `DatabaseWorkflowRegistry`, `WorkflowResolver`, `WorkflowApplicator`, `WorkflowDefinitionBuilder`, `WorkflowGraphPresenter`. `SubjectClass` matches definitions against runtime subjects (Doctrine proxies, subclasses) for `WorkflowResolver` (FR-WF-003).
 - **FR-WF-007**: FrankenPHP / long-running worker safety (kernel not reset between requests): `DatabaseWorkflowRegistry` memoizes built workflows only for the current main request and implements `ResetInterface`; `DatabaseMetadataStore` snapshots labels (no entity retained); `ClosedEntityManagerResetter` reopens a closed EM after failed flushes in `WorkflowApplicator` and the CRUD controller. See [`docs/FRANKENPHP-WORKER-AUDIT.md`](../../docs/FRANKENPHP-WORKER-AUDIT.md).
 - **FR-ENTITY-001**: Entities for definition, places, transitions, match rules.
 - **FR-MDL-001**: `WorkflowType` enum; `CssFramework` / `IconSet` UI enums; `WorkflowContext` model.
@@ -42,7 +42,11 @@ Per SDD US-01–US-05: DB-backed definitions, CRUD UI with flow diagram, context
 - **FR-VIEW-007**: Workflow editor/show templates and flow diagram partial; pages extend `@NowoWorkflowBundle/base.html.twig` with `nowo_ui_*` blocks and `{{ parent() }}` asset stacking.
 - **FR-UI-001**: Configurable `ui.layout_template`, `ui.css_framework` (`bootstrap5`, `tailwind`, `foundation`, `custom`, …), `ui.icon_set`; framework CDN partials; semantic `nowo-ui-*` classes (UiKit macros).
 - **FR-I18N-001 / FR-I18N-002**: Locale switcher controller and `LocaleManager`.
-- **FR-SEC-007**: Private-by-default UI access via `security.access_roles` / optional `access_checker` / `allow_unauthenticated` (demo only); `WorkflowUiSecurityPass` + `RoleBasedWorkflowUiAccessChecker` / `AllowAllWorkflowUiAccessChecker`.
+- **FR-SEC-007**: Private-by-default UI access via `security.access_roles` / optional `access_checker` / `allow_unauthenticated` (demo only); `WorkflowUiSecurityPass` + `RoleBasedWorkflowUiAccessChecker` / `AllowAllWorkflowUiAccessChecker`. Default alias `DenyAllWorkflowUiAccessChecker` is fail-closed.
+- **FR-UI-002**: `WorkflowPageFactory` builds the UiKit view models of the admin pages (REQ-UI-003); the edit page is a UiKit settings page with one tab per section (general, match rules, places, transitions).
+- **FR-UI-003**: `Resources/public/js/nowo-workflow.js` / `css/nowo-workflow.css` — admin UI behaviour and styles without framework JS, inline handlers or `confirm()` (CSP-safe).
+- **FR-UI-004**: Vendored Tom Select 2.4.3 (`Resources/public/vendor/tom-select/`, with its LICENSE) for the searchable from/to place selects; optional at runtime (native `<select multiple>` fallback), never loaded from a CDN.
+- **FR-VIEW-008**: Flow diagram: `WorkflowGraphLayout` computes a layered (Sugiyama-style) layout; place / transition dialogs use the UiKit `dialog` partial.
 
 ### Infrastructure
 
@@ -54,6 +58,14 @@ Per SDD US-01–US-05: DB-backed definitions, CRUD UI with flow diagram, context
 
 ---
 
+## Non-goals
+
+- Executing workflows on behalf of the host beyond Symfony Workflow semantics (no job scheduling, no BPMN engine).
+- Host authentication / user management (UI access is delegated to `security.*` / an access checker; deny-all by default).
+- `demo/` trees (illustrative, not Packagist API).
+
+---
+
 ## Future specifications
 
 None at this time. Planned work must be added here (or under `FUT-*` IDs) with explicit **Status: future** — never as unmarked current `FR-*`.
@@ -62,7 +74,7 @@ None at this time. Planned work must be added here (or under `FUT-*` IDs) with e
 
 ## Success Criteria
 
-- **SC-001**: 100% of production files in `src/` appear in [`code-inventory.md`](code-inventory.md) with requirement IDs.
+- **SC-001**: 100% of production files in `src/` appear in [`code-inventory.md`](code-inventory.md) with requirement IDs (**79/79**, audited 2026-10-20).
 - **SC-002**: Configuration keys in `docs/CONFIGURATION.md` match `Configuration.php`.
 - **SC-003**: `composer qa` / `make release-check` pass in CI (PHPUnit, PHPStan where applicable).
 - **SC-004**: No Packagist-visible behavior change without spec, inventory, and test updates.

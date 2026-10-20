@@ -1,5 +1,19 @@
 # Security — Workflow Bundle
 
+## Table of contents
+
+- [Scope](#scope)
+- [Attack surface](#attack-surface)
+- [Threats and mitigations](#threats-and-mitigations)
+- [Secrets](#secrets)
+- [Reporting a vulnerability](#reporting-a-vulnerability)
+- [Release security checklist (12.4.1)](#release-security-checklist-1241)
+- [Protecting the CRUD UI](#protecting-the-crud-ui)
+  - [Canonical config](#canonical-config)
+  - [Two layers](#two-layers)
+  - [Custom checker](#custom-checker)
+  - [Demos](#demos)
+
 ## Scope
 
 This Symfony bundle persists **workflow definitions** in Doctrine, exposes a **built-in CRUD UI** (configurable path, default `/workflow`), and provides services to **resolve and apply** Symfony Workflow transitions at runtime. The UI is **private by default** (`security.allow_unauthenticated: false`).

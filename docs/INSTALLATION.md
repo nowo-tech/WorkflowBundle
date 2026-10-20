@@ -8,6 +8,16 @@
 composer require nowo-tech/workflow-bundle
 ```
 
+## Table of contents
+
+- [Bundle registration](#bundle-registration)
+- [Routes](#routes)
+- [Layout and assets (UiKit page contract)](#layout-and-assets-uikit-page-contract)
+- [Database](#database)
+- [Demo data](#demo-data)
+- [Symfony Flex recipe](#symfony-flex-recipe)
+- [Twig Extra Bundle (REQ-TWIG-004)](#twig-extra-bundle-req-twig-004)
+
 ## Bundle registration
 
 ```php
