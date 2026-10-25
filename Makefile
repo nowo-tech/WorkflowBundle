@@ -6,7 +6,7 @@ COMPOSE_BIN := $(shell docker compose version >/dev/null 2>&1 && echo "docker co
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down build shell install assets test test-coverage coverage-check cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan igor update validate validate-translations setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke down-dev check-twig-extra
+.PHONY: help up down build shell install assets test test-coverage coverage-check cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan igor update validate validate-translations setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke down-dev check-twig-extra check-no-raw-html-form
 
 help:
 	@echo "Usage: make <target>"
@@ -22,6 +22,7 @@ help:
 	@echo "Quality:"
 	@echo "  cs-check cs-fix rector rector-dry phpstan qa validate-translations"
 	@echo "Release:"
+	@echo "  check-no-raw-html-form Fail on raw <form>/<input>/<textarea>/<select> in Twig (REQ-TWIG-005)"
 	@echo "  release-check composer-sync"
 	@echo "  check-open-prs Fail if unresolved open GitHub PRs remain (REQ-REL-003)"
 	@echo "Git hooks:"
@@ -108,8 +109,11 @@ check-twig-extra:
 # Run Igor worker-state audit (REQ-CS-008)
 igor: ensure-up
 	$(COMPOSE) exec -T php composer igor
-# check-no-raw-html-form (REQ-TWIG-005) is wired once the remaining raw form markup is migrated
-release-check: ensure-up check-no-cursor-coauthor check-open-prs check-twig-extra composer-sync cs-fix cs-check rector-dry phpstan igor coverage-check validate-translations release-check-demos
+release-check: ensure-up check-no-cursor-coauthor check-open-prs check-twig-extra check-no-raw-html-form composer-sync cs-fix cs-check rector-dry phpstan igor coverage-check validate-translations release-check-demos
+
+check-no-raw-html-form:
+	@chmod +x .scripts/check-no-raw-html-form.sh
+	@./.scripts/check-no-raw-html-form.sh
 
 release-check-demos:
 	@$(MAKE) -C demo release-check

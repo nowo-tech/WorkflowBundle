@@ -43,9 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Developer tooling: `make check-no-raw-html-form` fails on raw `<form>` / `<input>` / `<textarea>` / `<select>` in bundle views and demo templates, and runs in `release-check` (REQ-TWIG-005).
+
 ### Changed
 
-- Developer tooling: `make release-check` runs the full REQ-MAKE-002 chain in order (`ensure-up` first, then `check-no-cursor-coauthor`, `check-open-prs`, `check-twig-extra`, `composer-sync`, `cs-fix`, `cs-check`, `rector-dry`, `phpstan`, `igor`, `coverage-check`, `validate-translations`, demo release-check); `check-open-prs` also fails on conflicted pull requests (REQ-REL-003). `check-no-raw-html-form` (REQ-TWIG-005) is wired once the remaining raw form markup is migrated.
+- Demo: the playground create forms (`App\Form\PlaygroundSubjectType`), the transition buttons (`App\Form\TransitionType`, one CSRF-only form per transition) and the resolver GET filter (`App\Form\ResolverFilterType`, query names unchanged) render through Symfony Form Types with `form_start` / child loop / `form_end`; create and transition handlers validate with `handleRequest` + `isValid()` (stateless `submit` CSRF token, as configured in the demo) (REQ-TWIG-005).
+- Developer tooling: `make release-check` runs the full REQ-MAKE-002 chain in order (`ensure-up` first, then `check-no-cursor-coauthor`, `check-open-prs`, `check-twig-extra`, `composer-sync`, `cs-fix`, `cs-check`, `rector-dry`, `phpstan`, `igor`, `coverage-check`, `validate-translations`, demo release-check); `check-open-prs` also fails on conflicted pull requests (REQ-REL-003).
 - Dependencies refreshed (Composer and pnpm/npm lock files of the bundle and its demos, campaign 2026-10-19).
 - `.php-cs-fixer.dist.php`: `new ParallelConfig(2)` (REQ-CS-001).
 

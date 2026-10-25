@@ -10,6 +10,7 @@
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
 - [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
 - [Overriding translations (REQ-I18N-001)](#overriding-translations-req-i18n-001)
+- [Forms in Twig (REQ-TWIG-005)](#forms-in-twig-req-twig-005)
 
 ## Match rules and resolution
 
@@ -88,3 +89,20 @@ translations/NowoWorkflowBundle.es.yaml
 ```
 
 Clear cache after adding overrides: `php bin/console cache:clear`.
+
+## Forms in Twig (REQ-TWIG-005)
+
+Every UI form — bundle views and the demo apps — is a PHP Symfony Form Type (FormKit types when FormKit is in the stack) rendered with `form_start`, the REQ-TWIG-003 child loop and `form_end`; submit / cancel buttons may stay outside the loop:
+
+```twig
+{{ form_start(form) }}
+    {% for child in form %}
+        {% if not child.rendered %}
+            {{ form_row(child) }}
+        {% endif %}
+    {% endfor %}
+    <button type="submit">Save</button>
+{{ form_end(form) }}
+```
+
+CSRF-only actions (delete, logout-style buttons, toggles) use an empty Form Type too, and login forms map `_username` / `_password` / `_csrf_token` (token id `authenticate`) on a Form Type. Host overrides and demos must not reintroduce raw `<form>` / `<input>` / `<textarea>` / `<select>` markup: `make check-no-raw-html-form` (part of `make release-check`) fails when it appears.

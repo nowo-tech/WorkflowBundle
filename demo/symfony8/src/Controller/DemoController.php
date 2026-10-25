@@ -9,12 +9,16 @@ use App\Entity\DemoDocument;
 use App\Entity\DemoExpense;
 use App\Entity\DemoOrder;
 use App\Entity\DemoPurchaseOrder;
+use App\Form\PlaygroundSubjectType;
+use App\Form\ResolverFilterType;
+use App\Form\TransitionType;
 use Doctrine\ORM\EntityManagerInterface;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\WorkflowApplicator;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -67,7 +71,12 @@ class DemoController extends AbstractController
             }
         }
 
+        $filterForm = $this->container->get('form.factory')->createNamed('', ResolverFilterType::class, [
+            'subject_class' => $subjectClass,
+        ] + $parameters);
+
         return $this->render('demo/resolver.html.twig', [
+            'filter_form'   => $filterForm->createView(),
             'subject_class' => $subjectClass,
             'parameters'    => $parameters,
             'resolved'      => $resolved,
@@ -83,6 +92,9 @@ class DemoController extends AbstractController
             DemoOrder::class,
             'demo/orders.html.twig',
             'orders',
+            'order',
+            'demo_orders_new',
+            'demo_orders_transition',
             workflowSlug: 'order_approval_default',
         );
     }
@@ -96,6 +108,9 @@ class DemoController extends AbstractController
             DemoChangeRequest::class,
             'demo/change_requests.html.twig',
             'change_requests',
+            'change_request',
+            'demo_change_requests_new',
+            'demo_change_requests_transition',
             workflowSlug: 'change_request_review',
             extra: [
                 'workflow_definition' => $definition,
@@ -106,7 +121,11 @@ class DemoController extends AbstractController
     #[Route('/playground/change-requests/new', name: 'demo_change_requests_new', methods: ['POST'])]
     public function createChangeRequest(Request $request): Response
     {
-        $title         = trim((string) $request->request->get('title', 'Database migration plan'));
+        $data = $this->submittedCreateForm('change_request', 'demo_change_requests_new', $request);
+        if ($data === null) {
+            return $this->redirectToRoute('demo_change_requests');
+        }
+        $title         = trim((string) ($data['title'] ?? 'Database migration plan'));
         $changeRequest = new DemoChangeRequest($title !== '' ? $title : 'Database migration plan');
         $this->entityManager->persist($changeRequest);
         $this->entityManager->flush();
@@ -115,9 +134,13 @@ class DemoController extends AbstractController
     }
 
     #[Route('/playground/change-requests/{id}/transition/{transition}', name: 'demo_change_requests_transition', methods: ['POST'])]
-    public function applyChangeRequestTransition(DemoChangeRequest $changeRequest, string $transition): Response
+    public function applyChangeRequestTransition(Request $request, DemoChangeRequest $changeRequest, string $transition): Response
     {
-        $this->workflowApplicator->applyForSubject($changeRequest, $transition);
+        $form = $this->createTransitionForm('demo_change_requests_transition', (int) $changeRequest->getId(), $transition);
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->workflowApplicator->applyForSubject($changeRequest, $transition);
+        }
 
         return $this->redirectToRoute('demo_change_requests');
     }
@@ -125,7 +148,11 @@ class DemoController extends AbstractController
     #[Route('/playground/orders/new', name: 'demo_orders_new', methods: ['POST'])]
     public function createOrder(Request $request): Response
     {
-        $title = trim((string) $request->request->get('title', 'Demo order'));
+        $data = $this->submittedCreateForm('order', 'demo_orders_new', $request);
+        if ($data === null) {
+            return $this->redirectToRoute('demo_orders');
+        }
+        $title = trim((string) ($data['title'] ?? 'Demo order'));
         $order = new DemoOrder($title !== '' ? $title : 'Demo order');
         $this->entityManager->persist($order);
         $this->entityManager->flush();
@@ -134,9 +161,13 @@ class DemoController extends AbstractController
     }
 
     #[Route('/playground/orders/{id}/transition/{transition}', name: 'demo_orders_transition', methods: ['POST'])]
-    public function applyOrderTransition(DemoOrder $order, string $transition): Response
+    public function applyOrderTransition(Request $request, DemoOrder $order, string $transition): Response
     {
-        $this->workflowApplicator->applyForSubject($order, $transition);
+        $form = $this->createTransitionForm('demo_orders_transition', (int) $order->getId(), $transition);
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->workflowApplicator->applyForSubject($order, $transition);
+        }
 
         return $this->redirectToRoute('demo_orders');
     }
@@ -148,15 +179,22 @@ class DemoController extends AbstractController
             DemoDocument::class,
             'demo/documents.html.twig',
             'documents',
-            true,
+            'document',
+            'demo_documents_new',
+            'demo_documents_transition',
+            arrayMarking: true,
         );
     }
 
     #[Route('/playground/documents/new', name: 'demo_documents_new', methods: ['POST'])]
     public function createDocument(Request $request): Response
     {
-        $title    = trim((string) $request->request->get('title', 'Demo document'));
-        $type     = (string) $request->request->get('document_type', 'invoice');
+        $data = $this->submittedCreateForm('document', 'demo_documents_new', $request);
+        if ($data === null) {
+            return $this->redirectToRoute('demo_documents');
+        }
+        $title    = trim((string) ($data['title'] ?? 'Demo document'));
+        $type     = (string) ($data['document_type'] ?? 'invoice');
         $document = new DemoDocument($title !== '' ? $title : 'Demo document', $type);
         $this->entityManager->persist($document);
         $this->entityManager->flush();
@@ -165,9 +203,13 @@ class DemoController extends AbstractController
     }
 
     #[Route('/playground/documents/{id}/transition/{transition}', name: 'demo_documents_transition', methods: ['POST'])]
-    public function applyDocumentTransition(DemoDocument $document, string $transition): Response
+    public function applyDocumentTransition(Request $request, DemoDocument $document, string $transition): Response
     {
-        $this->workflowApplicator->applyForSubject($document, $transition);
+        $form = $this->createTransitionForm('demo_documents_transition', (int) $document->getId(), $transition);
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->workflowApplicator->applyForSubject($document, $transition);
+        }
 
         return $this->redirectToRoute('demo_documents');
     }
@@ -179,16 +221,23 @@ class DemoController extends AbstractController
             DemoExpense::class,
             'demo/expenses.html.twig',
             'expenses',
+            'expense',
+            'demo_expenses_new',
+            'demo_expenses_transition',
         );
     }
 
     #[Route('/playground/expenses/new', name: 'demo_expenses_new', methods: ['POST'])]
     public function createExpense(Request $request): Response
     {
+        $data = $this->submittedCreateForm('expense', 'demo_expenses_new', $request);
+        if ($data === null) {
+            return $this->redirectToRoute('demo_expenses');
+        }
         $expense = new DemoExpense(
-            trim((string) $request->request->get('title', 'Team lunch')),
-            (string) $request->request->get('tenant', 'acme'),
-            (string) $request->request->get('department', 'finance'),
+            trim((string) ($data['title'] ?? 'Team lunch')),
+            (string) ($data['tenant'] ?? 'acme'),
+            (string) ($data['department'] ?? 'finance'),
         );
         $this->entityManager->persist($expense);
         $this->entityManager->flush();
@@ -197,9 +246,13 @@ class DemoController extends AbstractController
     }
 
     #[Route('/playground/expenses/{id}/transition/{transition}', name: 'demo_expenses_transition', methods: ['POST'])]
-    public function applyExpenseTransition(DemoExpense $expense, string $transition): Response
+    public function applyExpenseTransition(Request $request, DemoExpense $expense, string $transition): Response
     {
-        $this->workflowApplicator->applyForSubject($expense, $transition);
+        $form = $this->createTransitionForm('demo_expenses_transition', (int) $expense->getId(), $transition);
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->workflowApplicator->applyForSubject($expense, $transition);
+        }
 
         return $this->redirectToRoute('demo_expenses');
     }
@@ -211,17 +264,24 @@ class DemoController extends AbstractController
             DemoPurchaseOrder::class,
             'demo/purchase_orders.html.twig',
             'purchase_orders',
+            'purchase_order',
+            'demo_purchase_orders_new',
+            'demo_purchase_orders_transition',
         );
     }
 
     #[Route('/playground/purchase-orders/new', name: 'demo_purchase_orders_new', methods: ['POST'])]
     public function createPurchaseOrder(Request $request): Response
     {
+        $data = $this->submittedCreateForm('purchase_order', 'demo_purchase_orders_new', $request);
+        if ($data === null) {
+            return $this->redirectToRoute('demo_purchase_orders');
+        }
         $po = new DemoPurchaseOrder(
-            trim((string) $request->request->get('title', 'Server hardware')),
-            (string) $request->request->get('tenant', 'acme'),
-            (string) $request->request->get('region', 'eu'),
-            (string) $request->request->get('amount_tier', 'high'),
+            trim((string) ($data['title'] ?? 'Server hardware')),
+            (string) ($data['tenant'] ?? 'acme'),
+            (string) ($data['region'] ?? 'eu'),
+            (string) ($data['amount_tier'] ?? 'high'),
         );
         $this->entityManager->persist($po);
         $this->entityManager->flush();
@@ -230,9 +290,13 @@ class DemoController extends AbstractController
     }
 
     #[Route('/playground/purchase-orders/{id}/transition/{transition}', name: 'demo_purchase_orders_transition', methods: ['POST'])]
-    public function applyPurchaseOrderTransition(DemoPurchaseOrder $po, string $transition): Response
+    public function applyPurchaseOrderTransition(Request $request, DemoPurchaseOrder $po, string $transition): Response
     {
-        $this->workflowApplicator->applyForSubject($po, $transition);
+        $form = $this->createTransitionForm('demo_purchase_orders_transition', (int) $po->getId(), $transition);
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->workflowApplicator->applyForSubject($po, $transition);
+        }
 
         return $this->redirectToRoute('demo_purchase_orders');
     }
@@ -245,6 +309,9 @@ class DemoController extends AbstractController
         string $entityClass,
         string $template,
         string $variable,
+        string $subjectType,
+        string $createRoute,
+        string $transitionRoute,
         bool $arrayMarking = false,
         ?string $workflowSlug = null,
         array $extra = [],
@@ -253,13 +320,19 @@ class DemoController extends AbstractController
         $items    = [];
 
         foreach ($subjects as $subject) {
-            $definition = $this->workflowApplicator->resolveForSubject($subject);
-            $items[]    = [
+            $definition  = $this->workflowApplicator->resolveForSubject($subject);
+            $transitions = $this->workflowApplicator->getEnabledTransitionsForSubject($subject);
+            $forms       = [];
+            foreach ($transitions as $transition) {
+                $forms[$transition] = $this->createTransitionForm($transitionRoute, (int) $subject->getId(), $transition)->createView();
+            }
+            $items[] = [
                 'entity'           => $subject,
                 'workflow_slug'    => $definition->getSlug(),
                 'workflow_name'    => $definition->getName(),
                 'match_parameters' => $definition->getMatchParameters(),
-                'transitions'      => $this->workflowApplicator->getEnabledTransitionsForSubject($subject),
+                'transitions'      => $transitions,
+                'transition_forms' => $forms,
                 'marking'          => $arrayMarking && method_exists($subject, 'getStatus')
                     ? implode(', ', $subject->getStatus())
                     : (method_exists($subject, 'getStatus') ? $subject->getStatus() : ''),
@@ -269,6 +342,59 @@ class DemoController extends AbstractController
         return $this->render($template, array_merge([
             $variable       => $items,
             'workflow_slug' => $workflowSlug,
+            'create_form'   => $this->createSubjectForm($subjectType, $createRoute)->createView(),
         ], $extra));
+    }
+
+    /**
+     * @return FormInterface<array<string, string|null>>
+     */
+    private function createSubjectForm(string $subjectType, string $createRoute): FormInterface
+    {
+        $defaults = match ($subjectType) {
+            'change_request' => ['title' => 'Upgrade payment gateway'],
+            'expense'        => ['title' => 'Team lunch'],
+            'purchase_order' => ['title' => 'Server hardware', 'tenant' => 'acme'],
+            default          => [],
+        };
+
+        return $this->createForm(PlaygroundSubjectType::class, $defaults, [
+            'subject' => $subjectType,
+            'action'  => $this->generateUrl($createRoute),
+        ]);
+    }
+
+    /**
+     * Handles a playground "create" POST; returns the submitted data, or null when the form is not valid (CSRF).
+     *
+     * @return array<string, string|null>|null
+     */
+    private function submittedCreateForm(string $subjectType, string $createRoute, Request $request): ?array
+    {
+        $form = $this->createSubjectForm($subjectType, $createRoute);
+        $form->handleRequest($request);
+        if (!$form->isSubmitted() || !$form->isValid()) {
+            return null;
+        }
+
+        /** @var array<string, string|null> $data */
+        $data = $form->getData();
+
+        return $data;
+    }
+
+    /**
+     * CSRF-only form for one transition button (REQ-TWIG-005).
+     *
+     * @return FormInterface<null>
+     */
+    private function createTransitionForm(string $route, int $id, string $transition): FormInterface
+    {
+        return $this->container->get('form.factory')->createNamed(
+            'transition_' . $id . '_' . $transition,
+            TransitionType::class,
+            null,
+            ['action' => $this->generateUrl($route, ['id' => $id, 'transition' => $transition])],
+        );
     }
 }

@@ -10,19 +10,20 @@
         <a href="{{ path('demo_change_requests') }}">{{ 'nav.change_requests'|trans({}, 'demo') }}</a>.
     </div>
 
-    <form method="post" action="{{ path('demo_orders_new') }}" class="card shadow-sm mb-4">
+    {{ form_start(create_form) }}
         <div class="card-body">
             <div class="row g-3 align-items-end">
-                <div class="col-md-8">
-                    <label class="form-label" for="title">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</label>
-                    <input class="form-control" type="text" name="title" id="title" required>
-                </div>
+                {% for child in create_form %}
+                    {% if not child.rendered %}
+                        {{ form_row(child) }}
+                    {% endif %}
+                {% endfor %}
                 <div class="col-md-4">
                     <button type="submit" class="btn btn-primary w-100">{{ 'playground.orders.create'|trans({}, 'demo') }}</button>
                 </div>
             </div>
         </div>
-    </form>
+    {{ form_end(create_form) }}
 
     {% for item in orders %}
         <div class="card shadow-sm mb-3">
@@ -35,9 +36,11 @@
                 <p class="text-muted small mb-3">{{ 'playground.resolved'|trans({}, 'demo') }}: <code>{{ item.workflow_slug }}</code></p>
                 <div class="d-flex flex-wrap gap-2">
                     {% for transition in item.transitions %}
-                        <form method="post" action="{{ path('demo_orders_transition', {id: item.entity.id, transition: transition}) }}">
+                        {% set transition_form = item.transition_forms[transition] %}
+                        {{ form_start(transition_form) }}
+                            {% for child in transition_form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
                             <button type="submit" class="btn btn-sm btn-outline-primary">{{ transition }}</button>
-                        </form>
+                        {{ form_end(transition_form) }}
                     {% endfor %}
                 </div>
             </div>

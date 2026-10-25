@@ -8,44 +8,20 @@
         <p class="text-muted mb-0">{{ 'playground.resolver.intro'|trans({}, 'demo') }}</p>
     </div>
 
-    <form method="get" class="card shadow-sm mb-4">
+    {{ form_start(filter_form) }}
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label" for="subject_class">{{ 'playground.resolver.subject_class'|trans({}, 'demo') }}</label>
-                    <select class="form-select" name="subject_class" id="subject_class">
-                        <option value="App\Entity\DemoOrder" {% if subject_class == 'App\\Entity\\DemoOrder' %}selected{% endif %}>DemoOrder (default)</option>
-                        <option value="App\Entity\DemoDocument" {% if subject_class == 'App\\Entity\\DemoDocument' %}selected{% endif %}>DemoDocument (1 param)</option>
-                        <option value="App\Entity\DemoExpense" {% if subject_class == 'App\\Entity\\DemoExpense' %}selected{% endif %}>DemoExpense (2 params)</option>
-                        <option value="App\Entity\DemoPurchaseOrder" {% if subject_class == 'App\\Entity\\DemoPurchaseOrder' %}selected{% endif %}>DemoPurchaseOrder (3 params)</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label" for="document_type">document_type</label>
-                    <input class="form-control" type="text" name="document_type" id="document_type" value="{{ parameters.document_type|default('') }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="tenant">tenant</label>
-                    <input class="form-control" type="text" name="tenant" id="tenant" value="{{ parameters.tenant|default('') }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="department">department</label>
-                    <input class="form-control" type="text" name="department" id="department" value="{{ parameters.department|default('') }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="region">region</label>
-                    <input class="form-control" type="text" name="region" id="region" value="{{ parameters.region|default('') }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label" for="amount_tier">amount_tier</label>
-                    <input class="form-control" type="text" name="amount_tier" id="amount_tier" value="{{ parameters.amount_tier|default('') }}">
-                </div>
+                {% for child in filter_form %}
+                    {% if not child.rendered %}
+                        {{ form_row(child) }}
+                    {% endif %}
+                {% endfor %}
                 <div class="col-12">
                     <button type="submit" class="btn btn-primary">{{ 'playground.resolver.resolve'|trans({}, 'demo') }}</button>
                 </div>
             </div>
         </div>
-    </form>
+    {{ form_end(filter_form) }}
 
     {% if error %}
         <div class="alert alert-danger" role="alert"><strong>{{ 'playground.resolver.error'|trans({}, 'demo') }}:</strong> {{ error }}</div>

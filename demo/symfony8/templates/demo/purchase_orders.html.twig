@@ -5,37 +5,20 @@
 {% block body %}
     <h1 class="h2 mb-4">{{ 'playground.purchase_orders.title'|trans({}, 'demo') }}</h1>
 
-    <form method="post" action="{{ path('demo_purchase_orders_new') }}" class="card shadow-sm mb-4">
+    {{ form_start(create_form) }}
         <div class="card-body">
             <div class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label class="form-label" for="title">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</label>
-                    <input class="form-control" type="text" name="title" id="title" value="Server hardware">
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label" for="tenant">{{ 'playground.purchase_orders.tenant'|trans({}, 'demo') }}</label>
-                    <input class="form-control" type="text" name="tenant" id="tenant" value="acme">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="region">{{ 'playground.purchase_orders.region'|trans({}, 'demo') }}</label>
-                    <select class="form-select" name="region" id="region">
-                        <option value="eu">eu</option>
-                        <option value="us">us</option>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label" for="amount_tier">{{ 'playground.purchase_orders.amount_tier'|trans({}, 'demo') }}</label>
-                    <select class="form-select" name="amount_tier" id="amount_tier">
-                        <option value="high">{{ 'playground.purchase_orders.option_high'|trans({}, 'demo') }}</option>
-                        <option value="low">{{ 'playground.purchase_orders.option_low'|trans({}, 'demo') }}</option>
-                    </select>
-                </div>
+                {% for child in create_form %}
+                    {% if not child.rendered %}
+                        {{ form_row(child) }}
+                    {% endif %}
+                {% endfor %}
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100">{{ 'playground.purchase_orders.create'|trans({}, 'demo') }}</button>
                 </div>
             </div>
         </div>
-    </form>
+    {{ form_end(create_form) }}
 
     {% for item in purchase_orders %}
         <div class="card shadow-sm mb-3">
@@ -49,9 +32,11 @@
                 <p class="text-muted small mb-3">{{ 'playground.resolved'|trans({}, 'demo') }}: <code>{{ item.workflow_slug }}</code></p>
                 <div class="d-flex flex-wrap gap-2">
                     {% for transition in item.transitions %}
-                        <form method="post" action="{{ path('demo_purchase_orders_transition', {id: item.entity.id, transition: transition}) }}">
+                        {% set transition_form = item.transition_forms[transition] %}
+                        {{ form_start(transition_form) }}
+                            {% for child in transition_form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
                             <button type="submit" class="btn btn-sm btn-outline-primary">{{ transition }}</button>
-                        </form>
+                        {{ form_end(transition_form) }}
                     {% endfor %}
                 </div>
             </div>
