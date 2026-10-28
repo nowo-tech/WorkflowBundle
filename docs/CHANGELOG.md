@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.10.0] - 2026-10-28](#1100---2026-10-28)
 - [[1.9.2] - 2026-10-18](#192---2026-10-18)
 - [[1.9.1] - 2026-10-18](#191---2026-10-18)
 - [[1.9.0] - 2026-10-18](#190---2026-10-18)
@@ -43,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-28
+
+Performance: the definition list loads its collections with one query each instead of a cartesian fetch-join. See [UPGRADING](UPGRADING.md#to-1100).
+
 ### Performance
 
 - **Definition list without a cartesian product.** `paginateByName()` fetch-joined places, transitions and match rules
@@ -64,6 +69,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - Documentation: wave-1 REQ compliance — README GitHub stars badge uses the package name, documentation list order (Templates/PSR under Additional documentation), canonical issue templates, CONTRIBUTING Code of Conduct link and Cursor Agent queue settings (REQ-IDE-006), tables of contents on long docs, Spec Kit inventory refresh after the UiKit page migration (79/79).
+
+[1.10.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.10.0
 
 ## [1.9.2] - 2026-10-18
 
