@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+
+- **Definition list without a cartesian product.** `paginateByName()` fetch-joined places, transitions and match rules
+  in one query (places × transitions × rules rows per definition, through a `Paginator`) only to print their counts.
+  The page query now has no collection join (plain `LIMIT`) and the three collections are loaded with one `IN` query
+  each (1 + 3 queries per page, no lazy load per row); an integration test pins the query count.
+
 ### Added
 
 - Developer tooling: `make check-no-raw-html-form` fails on raw `<form>` / `<input>` / `<textarea>` / `<select>` in bundle views and demo templates, and runs in `release-check` (REQ-TWIG-005).

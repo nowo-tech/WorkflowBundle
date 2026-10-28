@@ -12,6 +12,8 @@ use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 use Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Service\SchemaSyncService;
+use Symfony\Bridge\Doctrine\Middleware\Debug\DebugDataHolder;
+use Symfony\Bridge\Doctrine\Middleware\Debug\Middleware;
 use Throwable;
 
 use function dirname;
@@ -20,7 +22,7 @@ use const PHP_VERSION_ID;
 
 final class IntegrationEntityManagerFactory
 {
-    public static function createInMemory(?string $tablePrefix = null): EntityManagerInterface
+    public static function createInMemory(?string $tablePrefix = null, ?DebugDataHolder $queries = null): EntityManagerInterface
     {
         $entityPath = dirname(__DIR__, 2) . '/src/Entity';
         $config     = ORMSetup::createAttributeMetadataConfiguration([$entityPath], true);
@@ -29,7 +31,11 @@ final class IntegrationEntityManagerFactory
             $config->enableNativeLazyObjects(true);
         }
 
-        $connection    = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        if ($queries instanceof DebugDataHolder) {
+            $config->setMiddlewares([new Middleware($queries, null)]);
+        }
+
+        $connection    = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true], $config);
         $entityManager = new EntityManager($connection, $config);
 
         self::registerTablePrefixSubscriber($entityManager, $tablePrefix);
@@ -37,9 +43,9 @@ final class IntegrationEntityManagerFactory
         return $entityManager;
     }
 
-    public static function createSyncedInMemory(?string $tablePrefix = null): EntityManagerInterface
+    public static function createSyncedInMemory(?string $tablePrefix = null, ?DebugDataHolder $queries = null): EntityManagerInterface
     {
-        $entityManager = self::createInMemory($tablePrefix);
+        $entityManager = self::createInMemory($tablePrefix, $queries);
         $service       = new SchemaSyncService($entityManager);
         $connection    = $entityManager->getConnection();
 

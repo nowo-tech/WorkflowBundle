@@ -6,12 +6,9 @@ namespace Nowo\WorkflowBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
-use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use SortDirection;
-
-use function iterator_to_array;
 
 /**
  * @extends ServiceEntityRepository<WorkflowDefinition>
@@ -79,6 +76,7 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
             $items = $this->createListQueryBuilder()
                 ->getQuery()
                 ->getResult();
+            $this->loadListCollections($items);
 
             return [
                 'items'     => $items,
@@ -92,13 +90,14 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
         $pages = max(1, (int) ceil($total / $pageSize));
         $page  = min($page, $pages);
 
-        // Paginator: a plain LIMIT on the fetch-joined query would count joined rows, not definitions.
-        $query = $this->createListQueryBuilder()
+        // No collection join in the page query: a plain LIMIT pages definitions, not joined rows.
+        /** @var list<WorkflowDefinition> $items */
+        $items = $this->createListQueryBuilder()
             ->setFirstResult(($page - 1) * $pageSize)
             ->setMaxResults($pageSize)
-            ->getQuery();
-        /** @var list<WorkflowDefinition> $items */
-        $items = iterator_to_array(new Paginator($query, true), false);
+            ->getQuery()
+            ->getResult();
+        $this->loadListCollections($items);
 
         return [
             'items'     => $items,
@@ -112,9 +111,31 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
     private function createListQueryBuilder(): QueryBuilder
     {
         return $this->createQueryBuilder('d')
-            ->leftJoin('d.places', 'p')->addSelect('p')
-            ->leftJoin('d.transitions', 't')->addSelect('t')
-            ->leftJoin('d.matchRules', 'm')->addSelect('m')
             ->orderBy('d.name', SortDirection::Ascending);
+    }
+
+    /**
+     * Initializes places, transitions and match rules of the listed definitions with one query per collection.
+     *
+     * Fetch-joining the three collections in one query returned places × transitions × rules rows per definition
+     * (a cartesian product); one `IN (:ids)` fetch-join per collection fills the already managed definitions instead
+     * (1 + 3 queries per page, no lazy load per row).
+     *
+     * @param list<WorkflowDefinition> $items
+     */
+    private function loadListCollections(array $items): void
+    {
+        if ($items === []) {
+            return;
+        }
+
+        foreach (['places', 'transitions', 'matchRules'] as $collection) {
+            $this->createQueryBuilder('d')
+                ->leftJoin('d.' . $collection, 'c')->addSelect('c')
+                ->where('d IN (:items)')
+                ->setParameter('items', $items)
+                ->getQuery()
+                ->getResult();
+        }
     }
 }
