@@ -14,6 +14,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 use function is_string;
+use function ltrim;
 
 /**
  * Enforces {@see WorkflowUiAccessCheckerInterface} before Workflow UI controllers run.
@@ -23,6 +24,8 @@ use function is_string;
 final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
 {
     public const ROUTE_NAME_PREFIX = 'nowo_workflow_';
+
+    public const CONTROLLER_NAMESPACE = 'Nowo\\WorkflowBundle\\Controller\\';
 
     public function __construct(
         private readonly WorkflowUiAccessCheckerInterface $accessChecker,
@@ -59,11 +62,20 @@ final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
         }
     }
 
+    /**
+     * A Workflow UI request: a route named `nowo_workflow_*`, or any route whose controller is one of the bundle's UI
+     * controllers — so a host importing the routes with a `name_prefix` (or renaming them) does not bypass the check.
+     */
     public static function isWorkflowUiRoute(Request $request): bool
     {
         $routeName = $request->attributes->get('_route');
+        if (is_string($routeName) && str_starts_with($routeName, self::ROUTE_NAME_PREFIX)) {
+            return true;
+        }
 
-        return is_string($routeName) && str_starts_with($routeName, self::ROUTE_NAME_PREFIX);
+        $controller = $request->attributes->get('_controller');
+
+        return is_string($controller) && str_starts_with(ltrim($controller, '\\'), self::CONTROLLER_NAMESPACE);
     }
 
     public static function getSubscribedEvents(): array

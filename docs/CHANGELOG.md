@@ -44,6 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **UI guard no longer depends on route names.** `WorkflowUiAccessSubscriber` recognised Workflow UI requests only by
+  the `nowo_workflow_` route-name prefix; importing the routes with a `name_prefix:` (or renaming them) skipped the
+  access check. Requests handled by the bundle's controllers are now always checked.
+
 ## [1.10.0] - 2026-10-28
 
 Performance: the definition list loads its collections with one query each instead of a cartesian fetch-join. See [UPGRADING](UPGRADING.md#to-1100).

@@ -61,6 +61,29 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
         (new WorkflowUiAccessSubscriber($checker))->onKernelController($event);
     }
 
+    /** Routes imported with a `name_prefix` keep the bundle controller: still guarded. */
+    public function testDeniesBundleControllersUnderAForeignRouteName(): void
+    {
+        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
+        $checker->expects(self::once())->method('isGranted')->willReturn(false);
+
+        $request = new Request();
+        $request->attributes->set('_route', 'cms_definitions');
+        $request->attributes->set('_controller', 'Nowo\\WorkflowBundle\\Controller\\WorkflowDefinitionController::index');
+
+        $event = new ControllerEvent(
+            $this->createMock(HttpKernelInterface::class),
+            static fn (): string => 'ok',
+            $request,
+            HttpKernelInterface::MAIN_REQUEST,
+        );
+
+        self::assertTrue(WorkflowUiAccessSubscriber::isWorkflowUiRoute($request));
+        $this->expectException(AccessDeniedHttpException::class);
+
+        (new WorkflowUiAccessSubscriber($checker))->onKernelController($event);
+    }
+
     public function testIgnoresNonWorkflowUiRoutes(): void
     {
         $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
