@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+### Changed
+
+- Developer tooling: Rector targets PHP 8.2, the declared `php` floor (REQ-CS-003, REQ-SF-001).
 ## [1.10.1] - 2026-10-28
 
 Security: the UI access check also applies when the routes are imported with a name_prefix. See [UPGRADING](UPGRADING.md#to-1101).
