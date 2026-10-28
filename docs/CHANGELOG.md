@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.10.1] - 2026-10-28](#1101---2026-10-28)
 - [[1.10.0] - 2026-10-28](#1100---2026-10-28)
 - [[1.9.2] - 2026-10-18](#192---2026-10-18)
 - [[1.9.1] - 2026-10-18](#191---2026-10-18)
@@ -44,11 +45,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-10-28
+
+Security: the UI access check also applies when the routes are imported with a name_prefix. See [UPGRADING](UPGRADING.md#to-1101).
+
 ### Security
 
 - **UI guard no longer depends on route names.** `WorkflowUiAccessSubscriber` recognised Workflow UI requests only by
   the `nowo_workflow_` route-name prefix; importing the routes with a `name_prefix:` (or renaming them) skipped the
   access check. Requests handled by the bundle's controllers are now always checked.
+
+[1.10.1]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.10.1
 
 ## [1.10.0] - 2026-10-28
 
