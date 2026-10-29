@@ -2,7 +2,7 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/workflow-bundle`  
-**Last audited**: 2026-10-20
+**Last audited**: 2026-10-29
 
 This file proves that **every production source artifact** under `src/` is referenced by the baseline specification. Test-only files under `tests/` and `*.test.ts` under `src/` are out of Packagist scope. Built assets under `Resources/public/` are documented as Vite/build outputs.
 
@@ -12,6 +12,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | --- | --- | --- |
 | `DependencyInjection/Compiler/TwigPathsPass.php` | Compiler pass | FR-DI-002 |
 | `DependencyInjection/Compiler/WorkflowUiSecurityPass.php` | UI security wiring | FR-SEC-007 |
+| `DependencyInjection/Compiler/CsrfProtectionPass.php` | CSRF fail-closed when the UI is enabled | FR-SEC-008 |
 | `DependencyInjection/Configuration.php` | Config tree (`ui.*`, `security.*`) | FR-CFG-001, FR-UI-001, FR-SEC-007 |
 | `DependencyInjection/NowoWorkflowExtension.php` | DI extension | FR-CFG-002 |
 | `NowoWorkflowBundle.php` | Bundle entry | FR-BUNDLE-001 |

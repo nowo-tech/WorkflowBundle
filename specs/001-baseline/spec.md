@@ -43,6 +43,7 @@ Per SDD US-01–US-05: DB-backed definitions, CRUD UI with flow diagram, context
 - **FR-UI-001**: Configurable `ui.layout_template`, `ui.css_framework` (`bootstrap5`, `tailwind`, `foundation`, `custom`, …), `ui.icon_set`; framework CDN partials; semantic `nowo-ui-*` classes (UiKit macros).
 - **FR-I18N-001 / FR-I18N-002**: Locale switcher controller and `LocaleManager`.
 - **FR-SEC-007**: Private-by-default UI access via `security.access_roles` / optional `access_checker` / `allow_unauthenticated` (demo only); `WorkflowUiSecurityPass` + `RoleBasedWorkflowUiAccessChecker` / `AllowAllWorkflowUiAccessChecker`. Default alias `DenyAllWorkflowUiAccessChecker` is fail-closed.
+- **FR-SEC-008**: With `web_ui.enabled: true` the container refuses to compile without CSRF protection (`security.csrf.token_manager`, form CSRF extension enabled) — `CsrfProtectionPass`, fail closed.
 - **FR-UI-002**: `WorkflowPageFactory` builds the UiKit view models of the admin pages (REQ-UI-003); the edit page is a UiKit settings page with one tab per section (general, match rules, places, transitions).
 - **FR-UI-003**: `Resources/public/js/nowo-workflow.js` / `css/nowo-workflow.css` — admin UI behaviour and styles without framework JS, inline handlers or `confirm()` (CSP-safe).
 - **FR-UI-004**: Vendored Tom Select 2.4.3 (`Resources/public/vendor/tom-select/`, with its LICENSE) for the searchable from/to place selects; optional at runtime (native `<select multiple>` fallback), never loaded from a CDN.
