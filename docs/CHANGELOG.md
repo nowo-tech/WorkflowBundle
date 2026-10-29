@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.11.0] - 2026-10-29](#1110---2026-10-29)
 - [[1.10.1] - 2026-10-28](#1101---2026-10-28)
 - [[1.10.0] - 2026-10-28](#1100---2026-10-28)
 - [[1.9.2] - 2026-10-18](#192---2026-10-18)
@@ -45,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-29
+
+Workflow: MySQL demo + schema-sync fixes, scoped asset package, CSRF fail-closed, PSR-3 logging, no innerHTML See [UPGRADING](UPGRADING.md#to-1110).
+
 ### Added
 
 - `framework.assets.packages.nowo_workflow` (`base_path: /bundles/nowoworkflow`) prepended by the extension; the
@@ -76,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default (MySQL error 1101). The default is dropped (the PHP default `[]` applies).
 - `nowo:workflow:sync-schema` failed on MySQL when foreign keys / indexes / columns already existed (errors 1826,
   1061, 1060) — they are now counted as already applied, like PostgreSQL duplicates (incl. SQLSTATE 42710).
+[1.11.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.11.0
+
 ## [1.10.1] - 2026-10-28
 
 Security: the UI access check also applies when the routes are imported with a name_prefix. See [UPGRADING](UPGRADING.md#to-1101).

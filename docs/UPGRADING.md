@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.11.0](#to-1110)
 - [To 1.10.1](#to-1101)
 - [To 1.10.0](#to-1100)
 - [To 1.9.2](#to-192)
@@ -61,6 +62,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.11.0
+
+From **1.10.1**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 ```bash
 composer update nowo-tech/workflow-bundle
