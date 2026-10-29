@@ -178,7 +178,7 @@ final class PageContractTest extends PageContractTestCase
         self::assertStringNotContainsString('&lt;span', $page->html);
         self::assertStringContainsString('/assets/js/nowo-ui-dialog.js', $page->html);
         self::assertStringContainsString('id="workflow-transition-1"', $page->html);
-        self::assertStringContainsString('/assets/bundles/nowoworkflow/js/nowo-workflow.js', $page->html);
+        self::assertStringContainsString('/assets/js/nowo-workflow.js', $page->html);
     }
 
     public function testCollectionEditorsShipPrototypeDialogsAndLocalAssets(): void
@@ -193,7 +193,8 @@ final class PageContractTest extends PageContractTestCase
             'section'    => WorkflowDefinitionFormSection::Transitions,
         ]));
         self::assertStringContainsString('data-workflow-collection="transitions"', $transitions->html);
-        self::assertStringContainsString('data-prototype=', $transitions->html);
+        self::assertStringContainsString('<template data-collection-prototype>', $transitions->html);
+        self::assertStringNotContainsString('data-prototype=', $transitions->html);
         self::assertStringContainsString('data-code-class="nowo-ui-code', $transitions->html, 'JS-built code cells use the UiKit code slot');
         self::assertStringContainsString('id="workflow-transitions-editor"', $transitions->html);
         self::assertStringContainsString('id="workflow-transitions-remove"', $transitions->html);
@@ -201,7 +202,7 @@ final class PageContractTest extends PageContractTestCase
         self::assertStringContainsString('data-title-edit="Edit transition"', $transitions->html);
         self::assertStringContainsString('nowo-ui-input--full nowo-place-multiselect', $transitions->html);
         self::assertStringContainsString('&quot;legal_review&quot;', $transitions->html);
-        self::assertStringContainsString('/assets/bundles/nowoworkflow/vendor/tom-select/tom-select.complete.min.js', $transitions->html);
+        self::assertStringContainsString('/assets/vendor/tom-select/tom-select.complete.min.js', $transitions->html);
         self::assertSame(3, substr_count($transitions->html, 'data-collection-entry='));
 
         $places = $this->renderPage(new PageFixture(self::VIEWS . 'workflow_definition/edit.html.twig', [
@@ -225,7 +226,7 @@ final class PageContractTest extends PageContractTestCase
         self::assertStringContainsString('<main class="legacy">', $page->html);
         self::assertStringContainsString('data-nowo-ui-bundle="NowoWorkflowBundle"', $page->html);
         self::assertStringContainsString('Purchase order approval', $page->html);
-        self::assertStringContainsString('/assets/bundles/nowoworkflow/css/nowo-workflow.css', $page->html);
+        self::assertStringContainsString('/assets/css/nowo-workflow.css', $page->html);
         self::assertStringContainsString('/assets/js/nowo-ui-confirm.js', $page->html);
     }
 

@@ -1,5 +1,6 @@
 /*
- * NowoWorkflowBundle admin UI behaviour (REQ-UI-003): no framework JS, no inline handlers, no confirm().
+ * NowoWorkflowBundle admin UI behaviour (REQ-UI-003, REQ-UX-001): no framework JS, no inline handlers, no confirm(),
+ * no innerHTML / document.write / eval and no global API of its own (data-* attributes drive everything).
  *
  * - Dialogs: the UiKit `dialog` partial and js/nowo-ui-dialog.js open / close them (data-nowo-ui-dialog-open,
  *   data-nowo-ui-dialog-close, Esc, backdrop click). Place → transition links in the flow diagram swap dialogs
@@ -42,14 +43,6 @@
     });
 
     var tomSelects = new WeakMap();
-
-    function escapeHtml(value) {
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
 
     function fieldValue(entry, field) {
         var select = entry.querySelector('[name$="[' + field + '][]"]');
@@ -146,7 +139,7 @@
                 }
             });
 
-            select.innerHTML = '';
+            select.replaceChildren();
             names.forEach(function (name) {
                 var option = document.createElement('option');
                 option.value = name;
@@ -189,18 +182,61 @@
     }
 
     // codeClass: the UiKit `code` slot classes (data-code-class on the collection root).
-    function formatCell(value, format, codeClass) {
-        var open = codeClass ? '<code class="' + escapeHtml(codeClass) + '">' : '<code>';
+    function codeNode(text, codeClass) {
+        var code = document.createElement('code');
+        if (codeClass) {
+            code.className = codeClass;
+        }
+        code.textContent = text;
+
+        return code;
+    }
+
+    // Field values are user input: they only ever reach the DOM as text nodes.
+    function fillCell(cell, value, format, codeClass) {
         if (Array.isArray(value)) {
-            return value.length === 0 ? '—' : value.map(function (item) {
-                return open + escapeHtml(item) + '</code>';
-            }).join(', ');
+            if (value.length === 0) {
+                cell.textContent = '—';
+
+                return;
+            }
+            value.forEach(function (item, index) {
+                if (index > 0) {
+                    cell.appendChild(document.createTextNode(', '));
+                }
+                cell.appendChild(codeNode(String(item), codeClass));
+            });
+
+            return;
         }
         if (value === '') {
-            return '—';
+            cell.textContent = '—';
+        } else if (format === 'code') {
+            cell.appendChild(codeNode(value, codeClass));
+        } else {
+            cell.textContent = value;
+        }
+    }
+
+    // New entry from the server-rendered <template data-collection-prototype>: clone it and number the
+    // __name__ placeholders in attributes (name, id, for…) and text — no HTML string is ever parsed.
+    function prototypeEntry(prototype, index) {
+        var fragment = prototype.content.cloneNode(true);
+        fragment.querySelectorAll('*').forEach(function (element) {
+            Array.prototype.forEach.call(element.attributes, function (attribute) {
+                if (attribute.value.indexOf('__name__') !== -1) {
+                    attribute.value = attribute.value.split('__name__').join(index);
+                }
+            });
+        });
+        var walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+            if (walker.currentNode.nodeValue.indexOf('__name__') !== -1) {
+                walker.currentNode.nodeValue = walker.currentNode.nodeValue.split('__name__label__').join(index).split('__name__').join(index);
+            }
         }
 
-        return format === 'code' ? open + escapeHtml(value) + '</code>' : escapeHtml(value);
+        return fragment.firstElementChild ? fragment : null;
     }
 
     function createCollection(root) {
@@ -210,12 +246,14 @@
         var dialog = document.getElementById(root.getAttribute('data-dialog-id') || '');
         var removeDialog = document.getElementById(root.getAttribute('data-remove-dialog-id') || '');
         var rowTemplate = root.querySelector('template[data-collection-row]');
+        var prototype = root.querySelector('template[data-collection-prototype]');
         var tbody = root.querySelector('[data-collection-table]');
         var emptyState = root.querySelector('[data-collection-empty]');
         var entriesHost = root.querySelector('[data-collection-entries]');
-        if (!dialog || !rowTemplate || !tbody || !entriesHost) {
+        if (!dialog || !rowTemplate || !tbody || !entriesHost || root.hasAttribute('data-collection-ready')) {
             return;
         }
+        root.setAttribute('data-collection-ready', '');
 
         var dialogBody = dialog.querySelector('[data-dialog-body]');
         var dialogTitle = document.getElementById(dialog.id + '-title');
@@ -226,7 +264,7 @@
 
         function rebuild() {
             var entries = root.querySelectorAll('[data-collection-entries] [data-collection-entry]');
-            tbody.innerHTML = '';
+            tbody.replaceChildren();
             entries.forEach(function (entry, index) {
                 var row = rowTemplate.content.firstElementChild.cloneNode(true);
                 var cellTemplate = row.querySelector('[data-collection-cell]');
@@ -236,7 +274,7 @@
                     var cell = cellTemplate.cloneNode(false);
                     cell.removeAttribute('data-collection-cell');
                     cell.setAttribute('data-label', column.label);
-                    cell.innerHTML = formatCell(fieldValue(entry, column.field), column.format, root.getAttribute('data-code-class') || '');
+                    fillCell(cell, fieldValue(entry, column.field), column.format, root.getAttribute('data-code-class') || '');
                     row.insertBefore(cell, actionsCell);
                 });
                 row.querySelector('[data-row-edit]').setAttribute('data-row-edit', String(index));
@@ -266,7 +304,7 @@
             reindex(root);
             state = null;
             isNew = false;
-            dialogBody.innerHTML = '';
+            dialogBody.replaceChildren();
             rebuild();
         }
 
@@ -287,14 +325,13 @@
         }
 
         root.querySelector('[data-collection-add]').addEventListener('click', function () {
-            var holder = document.createElement('div');
-            holder.innerHTML = (root.getAttribute('data-prototype') || '').replace(/__name__/g, root.getAttribute('data-index') || '0');
-            var widget = holder.firstElementChild;
+            var index = root.getAttribute('data-index') || '0';
+            var widget = prototype ? prototypeEntry(prototype, index) : null;
             if (!widget) {
                 return;
             }
             var entry = document.createElement('div');
-            entry.setAttribute('data-collection-entry', root.getAttribute('data-index') || '0');
+            entry.setAttribute('data-collection-entry', index);
             entry.appendChild(widget);
             entriesHost.appendChild(entry);
             reindex(root);

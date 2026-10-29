@@ -66,7 +66,7 @@ Preferred path — configure UiKit once, **do not** copy Workflow pages:
    (`nowo_ui_document_title`, `nowo_ui_head`, `nowo_ui_styles`, `nowo_ui_page_header`, `nowo_ui_flashes`,
    `nowo_ui_content`, `nowo_ui_modals`, `nowo_ui_scripts`) and loads UiKit's `nowo-ui.css` / `nowo-ui-confirm.js`.
 2. Theme `nowo_ui_kit.theme` (tokens + class map) once for every bundle.
-3. Run `php bin/console assets:install` (the pages load `bundles/nowoworkflow/…`).
+3. Run `php bin/console assets:install` (the pages load `bundles/nowoworkflow/…` through the `nowo_workflow` asset package, see [INSTALLATION.md](INSTALLATION.md#layout-and-assets-uikit-page-contract)).
 
 ```yaml
 # config/packages/nowo_ui_kit.yaml

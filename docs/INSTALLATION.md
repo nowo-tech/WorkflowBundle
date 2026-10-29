@@ -40,6 +40,23 @@ The admin pages extend UiKit 2.1 scaffolds: point `nowo_ui_kit.layouts.admin` at
 php bin/console assets:install
 ```
 
+Run it once after every install / upgrade: the files land in `public/bundles/nowoworkflow/`. The bundle registers the
+asset package **`nowo_workflow`** (`base_path: /bundles/nowoworkflow`) itself, and its templates load every file through
+it (REQ-ASSETS-004):
+
+```twig
+<link rel="stylesheet" href="{{ asset('css/nowo-workflow.css', 'nowo_workflow') }}">
+<script src="{{ asset('js/nowo-workflow.js', 'nowo_workflow') }}" defer></script>
+<link rel="stylesheet" href="{{ asset('vendor/tom-select/tom-select.default.min.css', 'nowo_workflow') }}">
+<script src="{{ asset('vendor/tom-select/tom-select.complete.min.js', 'nowo_workflow') }}" defer></script>
+```
+
+Use the same form in template overrides; do not hard-code `/bundles/nowoworkflow/…` and do not declare the
+`nowo_workflow` package in `config/packages/framework.yaml` (only to point it at a CDN / other base URL).
+
+The Workflow UI requires CSRF protection (`framework.csrf_protection` and `framework.form.csrf_protection`, on in a
+default Symfony app): without it the container does not compile unless `nowo_workflow.web_ui.enabled: false`.
+
 ## Database
 
 ```bash

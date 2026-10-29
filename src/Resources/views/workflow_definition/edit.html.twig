@@ -11,11 +11,11 @@
 {% block nowo_ui_styles %}
     {{ parent() }}
     {% if section.value == 'transitions' %}
-        <link rel="stylesheet" href="{{ asset('bundles/nowoworkflow/vendor/tom-select/tom-select.default.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('vendor/tom-select/tom-select.default.min.css', 'nowo_workflow') }}">
         {# UiKit 2.2: Tom Select chips / focus ring from the primary token (after the Tom Select stylesheet). #}
         <link rel="stylesheet" href="{{ asset('css/nowo-ui-tom-select.css', 'nowo_ui_kit') }}">
     {% endif %}
-    <link rel="stylesheet" href="{{ asset('bundles/nowoworkflow/css/nowo-workflow.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/nowo-workflow.css', 'nowo_workflow') }}">
 {% endblock %}
 
 {% block nowo_ui_settings_section %}
@@ -91,7 +91,7 @@
     {# Idempotent: also loaded by the UiKit document layout; kept for host layouts with their own script list. #}
     <script src="{{ asset('js/nowo-ui-dialog.js', 'nowo_ui_kit') }}" defer></script>
     {% if section.value == 'transitions' %}
-        <script src="{{ asset('bundles/nowoworkflow/vendor/tom-select/tom-select.complete.min.js') }}" defer></script>
+        <script src="{{ asset('vendor/tom-select/tom-select.complete.min.js', 'nowo_workflow') }}" defer></script>
     {% endif %}
-    <script src="{{ asset('bundles/nowoworkflow/js/nowo-workflow.js') }}" defer></script>
+    <script src="{{ asset('js/nowo-workflow.js', 'nowo_workflow') }}" defer></script>
 {% endblock %}

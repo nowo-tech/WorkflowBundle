@@ -5,3 +5,7 @@ Next steps (security):
   2. Protect the UI path with Symfony security.access_control (e.g. ^/workflow → ROLE_ADMIN).
   3. See docs/SECURITY.md and the commented snippet in config/packages/nowo_workflow.yaml.
 
+Assets:
+  4. Run php bin/console assets:install (files land in public/bundles/nowoworkflow/).
+  5. The pages load them through the nowo_workflow asset package, e.g. {{ asset('css/nowo-workflow.css', 'nowo_workflow') }};
+     do not declare that package in config/packages/framework.yaml.

@@ -18,7 +18,6 @@
     class="nowo-workflow-collection"
     data-workflow-collection="{{ key }}"
     data-form-prefix="{{ collection.vars.full_name }}"
-    data-prototype="{{ form_widget(collection.vars.prototype)|e('html_attr') }}"
     data-index="{{ collection|length }}"
     data-columns="{{ _columns|json_encode|e('html_attr') }}"
     data-dialog-id="{{ _dialog }}"
@@ -58,6 +57,9 @@
             </td>
         </tr>
     </template>
+
+    {# New entries: nowo-workflow.js clones this inert markup and numbers the __name__ placeholders (no innerHTML). #}
+    <template data-collection-prototype>{{ form_widget(collection.vars.prototype) }}</template>
 
     <div data-collection-entries hidden>
         {% for entry in collection %}

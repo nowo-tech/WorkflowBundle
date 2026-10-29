@@ -41,11 +41,12 @@ Bundle-specific content of the data blocks (no chrome, theme slots only):
 | `workflow_definition/_flow_diagram.html.twig` | show | flow diagram card (`card`, `card_*`, `badge_neutral`, `btn_secondary`, `toolbar`, `muted`, `code` slots; `nowo-workflow-diagram__*` classes): linear definitions as a row (`graph.layout.sequence`), branching ones as an SVG from `graph.layout.diagram` (`WorkflowGraphLayout`: ranks from the initial place, one connector per edge ending at its target, place / transition buttons in `foreignObject`s), true loops listed under it (`graph.layout.backEdges`) |
 | `workflow_definition/_flow_dialogs.html.twig` | show | one UiKit `dialog` partial per place / transition (embedded, block `nowo_ui_dialog_body`; detail list through `nowo_ui_partial('detail_list')`); transition links in a place dialog carry `data-nowo-ui-dialog-replace` (UiKit 2.2: the place dialog closes, the transition dialog opens, focus returns to the diagram) |
 | `workflow_definition/_general_fields.html.twig` | new, edit (general) | general fields in a responsive grid |
-| `workflow_definition/_collection_section.html.twig` | edit (match rules, places, transitions) | collection editor: table (`table*` slots), row template, editor dialog through `nowo_ui_partial('dialog')` (`lg` for transitions; `data-title-add` / `data-title-edit` on the `<dialog>`), remove confirmation through `nowo_ui_partial('confirm')` |
+| `workflow_definition/_collection_section.html.twig` | edit (match rules, places, transitions) | collection editor: table (`table*` slots), row template, entry prototype (`<template data-collection-prototype>`), editor dialog through `nowo_ui_partial('dialog')` (`lg` for transitions; `data-title-add` / `data-title-edit` on the `<dialog>`), remove confirmation through `nowo_ui_partial('confirm')` |
 
 ## Assets
 
-Shipped under `src/Resources/public/` (`php bin/console assets:install` → `bundles/nowoworkflow/`), never from a CDN:
+Shipped under `src/Resources/public/` (`php bin/console assets:install` → `bundles/nowoworkflow/`), loaded through the
+`nowo_workflow` asset package (`asset('js/nowo-workflow.js', 'nowo_workflow')`), never from a CDN:
 
 | Asset | Loaded by | Role |
 | --- | --- | --- |

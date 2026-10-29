@@ -204,6 +204,11 @@ final class NowoWorkflowExtensionTest extends TestCase
         $frameworkConfigs = $container->getExtensionConfig('framework');
         self::assertNotEmpty($frameworkConfigs);
         self::assertNotEmpty($frameworkConfigs[0]['translator']['paths'] ?? []);
+        // REQ-ASSETS-004: named asset package matching the assets:install output.
+        self::assertSame(
+            ['base_path' => '/bundles/nowoworkflow'],
+            $frameworkConfigs[0]['assets']['packages']['nowo_workflow'] ?? null,
+        );
     }
 
     public function testGetAlias(): void

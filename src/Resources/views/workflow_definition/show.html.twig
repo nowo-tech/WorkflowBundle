@@ -10,7 +10,7 @@
 
 {% block nowo_ui_styles %}
     {{ parent() }}
-    <link rel="stylesheet" href="{{ asset('bundles/nowoworkflow/css/nowo-workflow.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/nowo-workflow.css', 'nowo_workflow') }}">
 {% endblock %}
 
 {% block nowo_ui_show_sections %}
@@ -31,5 +31,5 @@
     {{ parent() }}
     {# Idempotent: also loaded by the UiKit document layout; kept for host layouts with their own script list. #}
     <script src="{{ asset('js/nowo-ui-dialog.js', 'nowo_ui_kit') }}" defer></script>
-    <script src="{{ asset('bundles/nowoworkflow/js/nowo-workflow.js') }}" defer></script>
+    <script src="{{ asset('js/nowo-workflow.js', 'nowo_workflow') }}" defer></script>
 {% endblock %}

@@ -27,6 +27,14 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
      */
     public const UI_KIT_ADMIN_LAYOUT = '@NowoUiKit/layout/admin.html.twig';
 
+    /**
+     * Public path of src/Resources/public after `assets:install` (base_path of the nowo_workflow asset package).
+     */
+    public const ASSETS_BASE_PATH = '/bundles/nowoworkflow';
+
+    /**
+     * Prepends Doctrine mappings, translator paths, the asset package and FormKit / UiKit defaults.
+     */
     public function prepend(ContainerBuilder $container): void
     {
         $this->prependFormKitDefaults($container);
@@ -53,6 +61,14 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
                 'translator' => [
                     'paths' => [
                         __DIR__ . '/../Resources/translations',
+                    ],
+                ],
+                // Named asset package of the published files (REQ-ASSETS-004): asset('css/nowo-workflow.css', 'nowo_workflow').
+                'assets' => [
+                    'packages' => [
+                        Configuration::ALIAS => [
+                            'base_path' => self::ASSETS_BASE_PATH,
+                        ],
                     ],
                 ],
             ]);
@@ -240,6 +256,9 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         return $config;
     }
 
+    /**
+     * Loads the bundle services and exposes the processed configuration as container parameters.
+     */
     public function load(array $configs, ContainerBuilder $container): void
     {
         $loader = new YamlFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
@@ -281,6 +300,9 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.security.allow_unauthenticated', $config['security']['allow_unauthenticated']);
     }
 
+    /**
+     * Returns the configuration alias (nowo_workflow).
+     */
     public function getAlias(): string
     {
         return Configuration::ALIAS;
