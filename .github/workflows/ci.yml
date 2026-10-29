@@ -151,6 +151,9 @@ jobs:
       - name: PHPStan (level and ignoreErrors from phpstan.neon.dist; fails the build on any error)
         run: composer phpstan --no-interaction
 
+      - name: Validate translations (syntax + 7 locales + key parity, REQ-MAKE-004)
+        run: php scripts/validate-translations.php
+
   twig-lint:
     name: Twig lint
     runs-on: ubuntu-latest

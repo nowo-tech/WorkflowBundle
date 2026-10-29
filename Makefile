@@ -89,8 +89,9 @@ rector-dry: ensure-up
 phpstan: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer phpstan
 
+# REQ-MAKE-004 / REQ-I18N-002: YAML syntax + the 7 required locales + key parity with en (fails on missing/extra keys).
 validate-translations: ensure-up
-	@$(COMPOSE) exec -T $(SERVICE_PHP) sh -c 'for f in src/Resources/translations/*.yaml; do php -r "require \"vendor/autoload.php\"; Symfony\\Component\\Yaml\\Yaml::parseFile(\$$argv[1]);" "$$f" || exit 1; done'
+	@$(COMPOSE) exec -T $(SERVICE_PHP) php scripts/validate-translations.php
 
 qa: ensure-up
 	$(COMPOSE) exec -T $(SERVICE_PHP) composer qa
