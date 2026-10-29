@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.11.1] - 2026-10-29](#1111---2026-10-29)
 - [[1.11.0] - 2026-10-29](#1110---2026-10-29)
 - [[1.10.1] - 2026-10-28](#1101---2026-10-28)
 - [[1.10.0] - 2026-10-28](#1100---2026-10-28)
@@ -46,9 +47,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-10-29
+
+Workflow: sync-schema no longer drops host tables (all versions since 1.0.0) See [UPGRADING](UPGRADING.md#to-1111).
+
 ### Security
 
 - **`nowo:workflow:sync-schema` could drop host tables.** With Doctrine ORM 3, `SchemaTool::getUpdateSchemaSql()` compares the whole database with the bundle entities, so the update SQL contained `DROP TABLE` (and on PostgreSQL `DROP SEQUENCE`) for every table and sequence that is not a bundle one, unless the host had a Doctrine `schema_filter`. The command now compares only the bundle tables. All versions since 1.0.0 are affected; do not run `sync-schema` with an older version on a database that holds other tables (REQ-SEC-004 re-audit H1, CWE-1188).
+
+[1.11.1]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.11.1
 
 ## [1.11.0] - 2026-10-29
 
