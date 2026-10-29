@@ -28,7 +28,7 @@ make up
 make install
 ```
 
-Demos: `make -C demo up-symfony8` (FrankenPHP + PostgreSQL).
+Demos: `make -C demo up-symfony8` (FrankenPHP + MySQL 8.4).
 
 Playwright (REQ-DEMO-013, official Playwright Docker image): `make -C demo/symfony8 reset-demo test-e2e` runs the
 admin happy paths; `make -C demo/symfony8 demo-screenshots` refreshes `docs/images/demo/*.webp`.

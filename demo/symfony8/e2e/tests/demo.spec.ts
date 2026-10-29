@@ -166,6 +166,17 @@ test.describe('workflow admin (UiKit page contract)', () => {
     await expect(page.locator('dialog[open]')).toHaveCount(0);
     await expect(page.locator('#workflow-transitions-editor [data-dialog-body]')).toBeEmpty();
 
+    // New entries come from <template data-collection-prototype> (no innerHTML): numbered fields, TomSelect on both lists.
+    const collection = page.locator('[data-workflow-collection="transitions"]');
+    const index = await collection.getAttribute('data-index');
+    await collection.locator('[data-collection-add]').click();
+    const editor = page.locator('#workflow-transitions-editor[open]');
+    await expect(editor.locator('.ts-control')).toHaveCount(2);
+    await expect(editor.locator(`input[name$="[${index}][name]"]`)).toHaveCount(1);
+    await expect(editor.locator('[name*="__name__"], [id*="__name__"]')).toHaveCount(0);
+    await page.locator('#workflow-transitions-editor [data-dialog-cancel]').click();
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
+
     expect(errors).toEqual([]);
   });
 });

@@ -23,8 +23,9 @@ services:
       FRANKENPHP_MODE: ${FRANKENPHP_MODE:-worker}
       APP_DEBUG: "1"
       APP_SECRET: ${APP_SECRET:-demo-secret}
-      # Override .env localhost URL — use internal Docker network host `database`.
-      DATABASE_URL: postgresql://app:!ChangeMe!@database:5432/app?serverVersion=16&charset=utf8
+      # MySQL on the internal Docker network host `database` (REQ-DEMO-011; no host port, REQ-DEMO-006).
+      DATABASE_URL: ${DATABASE_URL:-mysql://app:app@database:3306/app?serverVersion=8.4&charset=utf8mb4}
+    # Mitigate Docker/WSL DNS failures resolving repo.packagist.org (composer curl error 6) — REQ-DEMO-009.
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -38,20 +39,24 @@ services:
         condition: service_healthy
 
   database:
-    image: postgres:16-alpine
+    image: mysql:8.4
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      POSTGRES_USER: ${POSTGRES_USER:-app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-app}
+      MYSQL_USER: ${MYSQL_USER:-app}
+      # Credentials come from the demo .env (copied from .env.example by `make up`); no literal in this file.
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?copy .env.example to .env (make up does it)}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?copy .env.example to .env (make up does it)}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 30
+      start_period: 20s
     volumes:
-      - database_data:/var/lib/postgresql/data
+      - database_data:/var/lib/mysql
+    # REQ-DEMO-006: no `ports:` — the database is reachable only on the Docker network.
     expose:
-      - "5432"
+      - "3306"
     networks:
       - workflow-demo-network
 

@@ -65,10 +65,11 @@ link-bundle: ensure-up
 	$(COMPOSE) exec php sh -c "rm -rf vendor/nowo-tech/workflow-bundle && ln -s /var/workflow-bundle vendor/nowo-tech/workflow-bundle && php bin/console cache:clear"
 
 update-bundle: ensure-up
-	$(COMPOSE) exec php composer update nowo-tech/workflow-bundle -W --no-interaction
-	$(COMPOSE) exec php sh -c "php bin/console cache:clear --env=dev"
+	$(COMPOSE) exec -T php composer update nowo-tech/workflow-bundle -W --no-interaction
+	$(COMPOSE) exec -T php sh -c "php bin/console cache:clear --env=dev"
 
-release-check: ensure-up link-bundle test test-coverage
+# REQ-DEMO-007: sync the bundle code (composer path repo + cache clear) before the tests.
+release-check: ensure-up update-bundle test test-coverage
 
 verify: ensure-up
 	@PORT=$$(grep "^PORT=" .env 2>/dev/null | cut -d= -f2 | tr -d '\r'); \

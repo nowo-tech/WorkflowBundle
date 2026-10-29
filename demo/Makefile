@@ -12,7 +12,7 @@ help:
 	@echo "  test-symfony8 test-coverage-symfony8 update-bundle-symfony8"
 	@echo ""
 	@echo "Aliases: up down update-bundle test test-coverage (REQ-MAKE-003)"
-	@echo "  release-verify       up → HTTP smoke → down (REQ-TEST-011)"
+	@echo "  release-verify       up → update-bundle → HTTP smoke → down (REQ-TEST-011, REQ-DEMO-007)"
 	@echo "  release-check        Same as release-verify"
 	@echo "  update-deps-all      composer update in all demos (REQ-MAKE-008)"
 
@@ -61,6 +61,7 @@ release-verify:
 		[ -z "$$port" ] && port=8022; \
 		echo "Release verify: $$demo (port $$port)..."; \
 		$(MAKE) up-$$demo; \
+		$(MAKE) update-bundle-$$demo; \
 		code=000; \
 		for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
 			code=$$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$$port/" 2>/dev/null || echo "000"); \

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a9ddfdd3a783a092efff906f973efe12",
+    "content-hash": "51b84373e0d67f08b8360591d74d3ee2",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -1143,7 +1143,7 @@
             "dist": {
                 "type": "path",
                 "url": "/var/workflow-bundle",
-                "reference": "df8ba512168906d32d3ced75e39b4a9fd168a2d5"
+                "reference": "d738d022628a8a8b62b43b33fce7f5a366ccf5e0"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.13 || ^3.2.4",
@@ -1151,6 +1151,7 @@
                 "nowo-tech/form-kit-bundle": "^2.0",
                 "nowo-tech/ui-kit-bundle": "^2.2",
                 "php": ">=8.2 <8.6",
+                "psr/log": "^1.1 || ^2.0 || ^3.0",
                 "symfony/config": "^7.4 || ^8.0",
                 "symfony/dependency-injection": "^7.4 || ^8.0",
                 "symfony/form": "^7.4 || ^8.0",
