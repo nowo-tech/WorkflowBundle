@@ -63,6 +63,8 @@
 
 ## Unreleased
 
+- **Upgrade before running `nowo:workflow:sync-schema` again.** Earlier versions could emit `DROP TABLE` for every non-bundle table (no Doctrine `schema_filter`). From this release the command only creates or alters the bundle tables. If you ran it on a shared database, check your tables and restore from backup if needed.
+
 ## To 1.11.0
 
 From **1.10.1**:

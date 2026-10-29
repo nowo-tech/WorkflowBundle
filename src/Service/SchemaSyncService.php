@@ -6,6 +6,7 @@ namespace Nowo\WorkflowBundle\Service;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DbalException;
+use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Sequence;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
@@ -44,13 +45,30 @@ class SchemaSyncService
     /**
      * Returns the additive update SQL of the bundle tables.
      *
+     * Only the bundle tables are compared: `SchemaTool::getUpdateSchemaSql()` (ORM 3, no save mode) diffs the whole
+     * database against the given classes and would emit DROP TABLE / DROP SEQUENCE for every host object.
+     *
      * @return list<string> SQL statements to update schema (additive)
      */
     public function getUpdateSchemaSql(): array
     {
-        $tool = new SchemaTool($this->entityManager);
+        $connection    = $this->entityManager->getConnection();
+        $schemaManager = $connection->createSchemaManager();
+        $toSchema      = (new SchemaTool($this->entityManager))->getSchemaFromMetadata($this->getBundleMetadata());
 
-        return $tool->getUpdateSchemaSql($this->getBundleMetadata());
+        $existingTables = array_flip($this->listExistingTableNames());
+        $fromTables     = [];
+        foreach ($toSchema->getTables() as $table) {
+            if (isset($existingTables[strtolower($table->getName())])) {
+                $fromTables[] = $schemaManager->introspectTable($table->getName());
+            }
+        }
+
+        // No host sequences in the source schema: CREATE SEQUENCE of existing ones is filtered by getSyncSchemaSql().
+        $fromSchema = new Schema($fromTables, [], $schemaManager->createSchemaConfig());
+        $diff       = $schemaManager->createComparator()->compareSchemas($fromSchema, $toSchema);
+
+        return array_values($connection->getDatabasePlatform()->getAlterSchemaSQL($diff));
     }
 
     /**

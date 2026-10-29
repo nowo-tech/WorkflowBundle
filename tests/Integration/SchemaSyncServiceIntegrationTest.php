@@ -75,4 +75,21 @@ final class SchemaSyncServiceIntegrationTest extends TestCase
         self::assertStringContainsString('uniq_acme_definition_slug', $sql);
         self::assertStringNotContainsString('CREATE TABLE workflow_', $sql);
     }
+
+    public function testSyncSchemaSqlNeverTouchesHostTables(): void
+    {
+        $entityManager = IntegrationEntityManagerFactory::createSyncedInMemory();
+        $connection    = $entityManager->getConnection();
+        $connection->executeStatement('CREATE TABLE host_customer (id INTEGER PRIMARY KEY, name VARCHAR(50))');
+        $connection->executeStatement('CREATE INDEX idx_host_customer_name ON host_customer (name)');
+        $service = new SchemaSyncService($entityManager);
+
+        foreach ([$service->getUpdateSchemaSql(), $service->getSyncSchemaSql()] as $statements) {
+            self::assertStringNotContainsStringIgnoringCase('host_customer', implode("\n", $statements));
+        }
+
+        $service->executeStatements($connection, $service->getSyncSchemaSql());
+
+        self::assertTrue($connection->createSchemaManager()->tablesExist(['host_customer']));
+    }
 }

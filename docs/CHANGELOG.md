@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`nowo:workflow:sync-schema` could drop host tables.** With Doctrine ORM 3, `SchemaTool::getUpdateSchemaSql()` compares the whole database with the bundle entities, so the update SQL contained `DROP TABLE` (and on PostgreSQL `DROP SEQUENCE`) for every table and sequence that is not a bundle one, unless the host had a Doctrine `schema_filter`. The command now compares only the bundle tables. All versions since 1.0.0 are affected; do not run `sync-schema` with an older version on a database that holds other tables (REQ-SEC-004 re-audit H1, CWE-1188).
+
 ## [1.11.0] - 2026-10-29
 
 Workflow: MySQL demo + schema-sync fixes, scoped asset package, CSRF fail-closed, PSR-3 logging, no innerHTML See [UPGRADING](UPGRADING.md#to-1110).
