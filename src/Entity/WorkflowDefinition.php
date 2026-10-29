@@ -55,8 +55,12 @@ class WorkflowDefinition
     #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
     private int $priority = 0;
 
-    /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSON, options: ['default' => '{}'])]
+    /**
+     * No database default: MySQL rejects literal defaults on JSON columns (error 1101); the PHP default applies.
+     *
+     * @var array<string, mixed>
+     */
+    #[ORM\Column(type: Types::JSON)]
     private array $metadata = [];
 
     /** @var Collection<int, WorkflowMatchRule> */
@@ -95,6 +99,9 @@ class WorkflowDefinition
     #[ORM\Column(name: 'updated_at', type: Types::DATETIME_IMMUTABLE)]
     private DateTimeImmutable $updatedAt;
 
+    /**
+     * Creates a definition with its name, slug, initial place, subject class and type.
+     */
     public function __construct(
         string $name,
         string $slug,
@@ -114,16 +121,25 @@ class WorkflowDefinition
         $this->updatedAt    = new DateTimeImmutable();
     }
 
+    /**
+     * Returns the database identifier (null before the first flush).
+     */
     public function getId(): ?int
     {
         return $this->id;
     }
 
+    /**
+     * Returns the human-readable name.
+     */
     public function getName(): string
     {
         return $this->name;
     }
 
+    /**
+     * Sets the human-readable name.
+     */
     public function setName(string $name): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -132,11 +148,17 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Returns the unique slug used to look the workflow up.
+     */
     public function getSlug(): string
     {
         return $this->slug;
     }
 
+    /**
+     * Sets the unique slug used to look the workflow up.
+     */
     public function setSlug(string $slug): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -145,11 +167,17 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Returns the workflow type (workflow or state machine).
+     */
     public function getType(): WorkflowType
     {
         return $this->type;
     }
 
+    /**
+     * Sets the workflow type (workflow or state machine).
+     */
     public function setType(WorkflowType $type): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -158,11 +186,17 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Returns the initial place name.
+     */
     public function getInitialPlace(): string
     {
         return $this->initialPlace;
     }
 
+    /**
+     * Sets the initial place name.
+     */
     public function setInitialPlace(string $initialPlace): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -171,11 +205,17 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Returns the FQCN of the subjects this workflow applies to.
+     */
     public function getSubjectClass(): string
     {
         return $this->subjectClass;
     }
 
+    /**
+     * Sets the FQCN of the subjects this workflow applies to.
+     */
     public function setSubjectClass(string $subjectClass): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -184,11 +224,17 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Returns the subject property that stores the marking.
+     */
     public function getMarkingProperty(): string
     {
         return $this->markingProperty;
     }
 
+    /**
+     * Sets the subject property that stores the marking.
+     */
     public function setMarkingProperty(string $markingProperty): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -197,11 +243,17 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Tells whether the definition can be resolved at runtime.
+     */
     public function isEnabled(): bool
     {
         return $this->enabled;
     }
 
+    /**
+     * Enables or disables runtime resolution of the definition.
+     */
     public function setEnabled(bool $enabled): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -210,11 +262,17 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Returns the optional description.
+     */
     public function getDescription(): ?string
     {
         return $this->description;
     }
 
+    /**
+     * Sets the optional description.
+     */
     public function setDescription(?string $description): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -223,11 +281,17 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Returns the priority used to break ties between equally specific matches.
+     */
     public function getPriority(): int
     {
         return $this->priority;
     }
 
+    /**
+     * Sets the priority used to break ties between equally specific matches.
+     */
     public function setPriority(int $priority): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -236,13 +300,21 @@ class WorkflowDefinition
         return $this->touch();
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Returns the free-form workflow metadata.
+     *
+     * @return array<string, mixed>
+     */
     public function getMetadata(): array
     {
         return $this->metadata;
     }
 
-    /** @param array<string, mixed> $metadata */
+    /**
+     * Replaces the free-form workflow metadata.
+     *
+     * @param array<string, mixed> $metadata
+     */
     public function setMetadata(array $metadata): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -251,12 +323,19 @@ class WorkflowDefinition
         return $this->touch();
     }
 
-    /** @return Collection<int, WorkflowMatchRule> */
+    /**
+     * Returns the match rules (all must match the lookup context).
+     *
+     * @return Collection<int, WorkflowMatchRule>
+     */
     public function getMatchRules(): Collection
     {
         return $this->matchRules;
     }
 
+    /**
+     * Adds a match rule and links it to this definition.
+     */
     public function addMatchRule(WorkflowMatchRule $rule): self
     {
         if (!$this->matchRules->contains($rule)) {
@@ -267,6 +346,9 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Removes a match rule and unlinks it from this definition.
+     */
     public function removeMatchRule(WorkflowMatchRule $rule): self
     {
         if ($this->matchRules->removeElement($rule) && $rule->getWorkflow() === $this) {
@@ -276,12 +358,19 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Tells whether the definition has no match rules (default for its subject class).
+     */
     public function isDefaultMatcher(): bool
     {
         return $this->matchRules->isEmpty();
     }
 
-    /** @return array<string, string> */
+    /**
+     * Returns the match rules as a key-sorted parameter map.
+     *
+     * @return array<string, string>
+     */
     public function getMatchParameters(): array
     {
         $parameters = [];
@@ -294,6 +383,9 @@ class WorkflowDefinition
         return $parameters;
     }
 
+    /**
+     * Tells whether the subject class and every match rule match the given context.
+     */
     public function matchesContext(WorkflowContext $context): bool
     {
         if ($context->subjectClass !== null && !SubjectClass::matches($context->subjectClass, $this->subjectClass)) {
@@ -309,17 +401,27 @@ class WorkflowDefinition
         return true;
     }
 
+    /**
+     * Returns the number of match rules (more rules = more specific).
+     */
     public function getMatchSpecificity(): int
     {
         return $this->matchRules->count();
     }
 
-    /** @return Collection<int, WorkflowPlace> */
+    /**
+     * Returns the places of the workflow.
+     *
+     * @return Collection<int, WorkflowPlace>
+     */
     public function getPlaces(): Collection
     {
         return $this->places;
     }
 
+    /**
+     * Adds a place and links it to this definition.
+     */
     public function addPlace(WorkflowPlace $place): self
     {
         if (!$this->places->contains($place)) {
@@ -330,6 +432,9 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Removes a place and unlinks it from this definition.
+     */
     public function removePlace(WorkflowPlace $place): self
     {
         if ($this->places->removeElement($place) && $place->getWorkflow() === $this) {
@@ -339,12 +444,19 @@ class WorkflowDefinition
         return $this->touch();
     }
 
-    /** @return Collection<int, WorkflowTransition> */
+    /**
+     * Returns the transitions of the workflow.
+     *
+     * @return Collection<int, WorkflowTransition>
+     */
     public function getTransitions(): Collection
     {
         return $this->transitions;
     }
 
+    /**
+     * Adds a transition and links it to this definition.
+     */
     public function addTransition(WorkflowTransition $transition): self
     {
         if (!$this->transitions->contains($transition)) {
@@ -355,6 +467,9 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Removes a transition and unlinks it from this definition.
+     */
     public function removeTransition(WorkflowTransition $transition): self
     {
         if ($this->transitions->removeElement($transition) && $transition->getWorkflow() === $this) {
@@ -364,17 +479,27 @@ class WorkflowDefinition
         return $this->touch();
     }
 
+    /**
+     * Returns the creation timestamp.
+     */
     public function getCreatedAt(): DateTimeImmutable
     {
         return $this->createdAt;
     }
 
+    /**
+     * Returns the last modification timestamp.
+     */
     public function getUpdatedAt(): DateTimeImmutable
     {
         return $this->updatedAt;
     }
 
-    /** @return list<string> */
+    /**
+     * Returns the place names in sort order.
+     *
+     * @return list<string>
+     */
     public function getPlaceNames(): array
     {
         return array_values(array_map(

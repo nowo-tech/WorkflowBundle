@@ -21,12 +21,17 @@ class SchemaSyncService
 {
     private const ENTITY_NAMESPACE_PREFIX = 'Nowo\\WorkflowBundle\\Entity\\';
 
+    /**
+     * Creates the service for the entity manager that owns the bundle entities.
+     */
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
     /**
+     * Returns the CREATE SQL of the bundle tables.
+     *
      * @return list<string> SQL statements
      */
     public function getCreateSchemaSql(): array
@@ -37,6 +42,8 @@ class SchemaSyncService
     }
 
     /**
+     * Returns the additive update SQL of the bundle tables.
+     *
      * @return list<string> SQL statements to update schema (additive)
      */
     public function getUpdateSchemaSql(): array
@@ -72,6 +79,8 @@ class SchemaSyncService
     }
 
     /**
+     * Drops statements that would create tables, indexes or sequences that already exist.
+     *
      * @param list<string> $statements
      *
      * @return list<string>
@@ -95,6 +104,8 @@ class SchemaSyncService
     }
 
     /**
+     * Drops CREATE statements of tables listed as already existing.
+     *
      * @param list<string> $statements
      * @param list<string> $existingTables lower-case table names
      *
@@ -111,6 +122,8 @@ class SchemaSyncService
     }
 
     /**
+     * Executes the statements, counting duplicate-object errors as skipped.
+     *
      * @param list<string> $statements
      *
      * @return array{executed: int, skipped: int}
@@ -137,9 +150,13 @@ class SchemaSyncService
         return ['executed' => $executed, 'skipped' => $skipped];
     }
 
+    /**
+     * Tells whether an exception (or one of its previous exceptions) reports an already existing schema object.
+     */
     public function isDuplicateSchemaObjectException(Throwable $exception): bool
     {
-        $codes = ['42P07', '42701', '42S01', '1050'];
+        // PostgreSQL: duplicate table / column / object (constraint). MySQL: table, column, key name, foreign key name.
+        $codes = ['42P07', '42701', '42710', '42S01', '1050', '1060', '1061', '1826'];
         $walk  = $exception;
 
         while ($walk instanceof Throwable) {
@@ -155,6 +172,7 @@ class SchemaSyncService
                 str_contains($message, 'already exists')
                 || str_contains($message, 'duplicate key')
                 || str_contains($message, 'duplicate column')
+                || str_contains($message, 'duplicate foreign key')
             ) {
                 return true;
             }

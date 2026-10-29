@@ -234,6 +234,12 @@ final class SchemaSyncServiceTest extends TestCase
 
         self::assertTrue($service->isDuplicateSchemaObjectException(new TestDbalException(1050)));
         self::assertTrue($service->isDuplicateSchemaObjectException(new TestDbalException('42P07')));
+        // MySQL re-sync of existing foreign keys / indexes / columns; PostgreSQL duplicate constraint.
+        self::assertTrue($service->isDuplicateSchemaObjectException(new TestDbalException(1826)));
+        self::assertTrue($service->isDuplicateSchemaObjectException(new TestDbalException(1061)));
+        self::assertTrue($service->isDuplicateSchemaObjectException(new TestDbalException(1060)));
+        self::assertTrue($service->isDuplicateSchemaObjectException(new TestDbalException('42710')));
+        self::assertTrue($service->isDuplicateSchemaObjectException(new RuntimeException("SQLSTATE[HY000]: General error: 1826 Duplicate foreign key constraint name 'FK_1'")));
     }
 
     public function testListExistingSequenceNamesReturnsEmptyWhenListSequencesIsUnavailable(): void
