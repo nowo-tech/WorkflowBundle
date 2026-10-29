@@ -17,6 +17,9 @@ use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
  */
 final class DemoSeedService
 {
+    /**
+     * Creates the seeder with the entity manager, the definition repository and the workflow registry.
+     */
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly WorkflowDefinitionRepository $repository,
@@ -24,6 +27,9 @@ final class DemoSeedService
     ) {
     }
 
+    /**
+     * Seeds the demo definitions; with $fresh the existing definitions are removed first.
+     */
     public function seed(bool $fresh = false): void
     {
         if ($fresh) {

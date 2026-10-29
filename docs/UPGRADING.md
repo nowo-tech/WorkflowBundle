@@ -62,6 +62,33 @@
 
 ## Unreleased
 
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console assets:install
+php bin/console cache:clear
+```
+
+- **CSRF fail-closed (REQ-SEC-005).** With `nowo_workflow.web_ui.enabled: true` (the default) the container no longer
+  compiles without CSRF protection: enable `framework.csrf_protection` and `framework.form.csrf_protection`
+  (`symfony/security-csrf`, already a dependency), or set `nowo_workflow.web_ui.enabled: false` when the application
+  only uses the runtime registry.
+- **Asset package `nowo_workflow` (REQ-ASSETS-004).** The bundle now registers `framework.assets.packages.nowo_workflow`
+  (`base_path: /bundles/nowoworkflow`) and its templates load `asset('css/nowo-workflow.css', 'nowo_workflow')`,
+  `asset('js/nowo-workflow.js', 'nowo_workflow')` and `asset('vendor/tom-select/…', 'nowo_workflow')`. Template
+  overrides that hard-code `asset('bundles/nowoworkflow/…')` keep working but should switch to the package form; do
+  not declare a `nowo_workflow` package in the application's `framework.yaml`.
+- **Collection editor markup.** `_collection_section.html.twig` renders the entry prototype in
+  `<template data-collection-prototype>` instead of a `data-prototype` attribute (the JS no longer uses `innerHTML`).
+  Full copies of that partial under `templates/bundles/NowoWorkflowBundle/` must make the same change, or the
+  "add" buttons stop working.
+- **`metadata` column default dropped.** `WorkflowDefinition::$metadata` (JSON) has no database default any more (MySQL
+  rejects it with error 1101); the PHP default `[]` still applies. `doctrine:schema:update` / a new migration shows
+  `ALTER … metadata DROP DEFAULT` on PostgreSQL; apply it (no data change). `nowo:workflow:sync-schema` now also
+  works on MySQL / MariaDB (existing foreign keys, indexes and columns are reported as already applied).
+- **Logging (REQ-OBS-001).** `nowo:workflow:sync-schema`, `nowo:workflow:seed-demo` and the UI delete action log through
+  the autowired `logger` service (PSR-3, `psr/log` is now an explicit dependency). See
+  [SECURITY.md](SECURITY.md#logging).
+
 ## To 1.10.1
 
 From **1.10.0**:

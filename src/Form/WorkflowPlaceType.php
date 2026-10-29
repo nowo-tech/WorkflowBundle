@@ -21,6 +21,9 @@ final class WorkflowPlaceType extends AbstractType
 {
     use FormOptionsTrait;
 
+    /**
+     * Adds the place name, label and sort order fields.
+     */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $this->addText($builder, 'name', ['label' => 'form.field.name']);
@@ -28,6 +31,9 @@ final class WorkflowPlaceType extends AbstractType
         $this->addInteger($builder, 'sortOrder', ['label' => 'form.field.order']);
     }
 
+    /**
+     * Configures the data class and the translation domain.
+     */
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([

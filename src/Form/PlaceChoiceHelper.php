@@ -13,6 +13,8 @@ use function is_string;
 final class PlaceChoiceHelper
 {
     /**
+     * Builds a sorted, de-duplicated choice map of place names (selected values included).
+     *
      * @param list<string> $placeNames
      * @param list<string> $selected
      *
@@ -31,6 +33,8 @@ final class PlaceChoiceHelper
     }
 
     /**
+     * Extracts the non-empty place names from the submitted places collection.
+     *
      * @param list<array<string, mixed>> $places
      *
      * @return list<string>

@@ -24,6 +24,9 @@ final class WorkflowTransitionType extends AbstractType
 {
     use FormOptionsTrait;
 
+    /**
+     * Adds the transition name, label, source places and target places fields.
+     */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $this->addText($builder, 'name', ['label' => 'form.field.name']);
@@ -39,6 +42,9 @@ final class WorkflowTransitionType extends AbstractType
         });
     }
 
+    /**
+     * Configures the data class, the place_choices option and the translation domain.
+     */
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([

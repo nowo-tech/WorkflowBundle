@@ -11,5 +11,8 @@ use Symfony\Component\Workflow\WorkflowInterface;
  */
 interface WorkflowRegistryInterface
 {
+    /**
+     * Returns the Symfony workflow built from the enabled definition with the given slug.
+     */
     public function get(string $workflowSlug): WorkflowInterface;
 }

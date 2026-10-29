@@ -14,6 +14,9 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final class DenyAllWorkflowUiAccessChecker implements WorkflowUiAccessCheckerInterface
 {
+    /**
+     * Denies every request (fail-closed default).
+     */
     public function isGranted(Request $request): bool
     {
         return false;

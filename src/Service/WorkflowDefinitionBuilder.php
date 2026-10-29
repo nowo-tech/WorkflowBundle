@@ -16,6 +16,9 @@ use function sprintf;
  */
 final class WorkflowDefinitionBuilder
 {
+    /**
+     * Builds the Symfony workflow Definition (places, transitions, initial place, metadata) of a definition entity.
+     */
     public function build(WorkflowDefinition $definition): Definition
     {
         $places = $definition->getPlaceNames();

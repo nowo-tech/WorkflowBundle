@@ -12,6 +12,9 @@ enum WorkflowType: string
     case StateMachine = 'state_machine';
     case Workflow     = 'workflow';
 
+    /**
+     * Returns the English label of the workflow type.
+     */
     public function label(): string
     {
         return match ($this) {

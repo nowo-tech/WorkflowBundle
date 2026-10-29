@@ -45,10 +45,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `framework.assets.packages.nowo_workflow` (`base_path: /bundles/nowoworkflow`) prepended by the extension; the
+  templates load their CSS / JS / Tom Select files with `asset(…, 'nowo_workflow')` (REQ-ASSETS-004).
+- `CsrfProtectionPass`: with `web_ui.enabled: true` the container refuses to compile without the CSRF token manager
+  and the form CSRF extension, or with form CSRF disabled (REQ-SEC-005, fail closed).
+- PSR-3 logging (`psr/log` required): schema sync and demo seeding log start / finish / failure, the UI logs
+  definition deletions and rejected delete tokens; never tokens or personal data (REQ-OBS-001, REQ-CS-007).
+- `scripts/validate-translations.php`: `make validate-translations` (and CI) check YAML syntax, the seven required
+  locales and key parity with `en` (REQ-MAKE-004, REQ-I18N-002).
 
 ### Changed
 
+- `nowo-workflow.js` no longer uses `innerHTML`: table cells are built with text nodes and new collection entries are
+  cloned from `<template data-collection-prototype>` (was a `data-prototype` attribute); initialisation is idempotent
+  (REQ-UX-001).
+- Demo: MySQL 8.4 replaces PostgreSQL (REQ-DEMO-011); the Flex `compose.override.yaml` that published the database
+  port is removed (REQ-DEMO-006); the `dns:` entries are commented (REQ-DEMO-009); demo `release-check` /
+  `release-verify` run `update-bundle` (REQ-DEMO-007).
+- PHPDoc descriptions on every public class and method of `src/` (REQ-CS-001).
+- Docs: translation override procedure (REQ-I18N-001), browser JS / CSP notes, SECURITY.md logging, cryptography,
+  dependencies and limits sections plus the full 12.4.1 checklist (REQ-SEC-001, REQ-SEC-002), PSR-3 adopted in
+  `docs/PSR.md` (REQ-CS-007).
 - Developer tooling: Rector targets PHP 8.2, the declared `php` floor (REQ-CS-003, REQ-SF-001).
+
+### Fixed
+
+- The schema could not be created on MySQL: the JSON `metadata` column of `workflow_definition` declared a literal
+  default (MySQL error 1101). The default is dropped (the PHP default `[]` applies).
+- `nowo:workflow:sync-schema` failed on MySQL when foreign keys / indexes / columns already existed (errors 1826,
+  1061, 1060) — they are now counted as already applied, like PostgreSQL duplicates (incl. SQLSTATE 42710).
 ## [1.10.1] - 2026-10-28
 
 Security: the UI access check also applies when the routes are imported with a name_prefix. See [UPGRADING](UPGRADING.md#to-1101).

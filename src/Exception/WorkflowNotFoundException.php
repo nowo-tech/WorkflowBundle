@@ -16,11 +16,17 @@ use const JSON_THROW_ON_ERROR;
  */
 final class WorkflowNotFoundException extends RuntimeException
 {
+    /**
+     * Creates the exception for an unknown or disabled slug.
+     */
     public static function forSlug(string $slug): self
     {
         return new self(sprintf('Workflow definition "%s" was not found or is disabled.', $slug));
     }
 
+    /**
+     * Creates the exception for a context that no enabled definition matches.
+     */
     public static function forContext(WorkflowContext $context): self
     {
         return new self(sprintf(

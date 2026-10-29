@@ -22,6 +22,9 @@ final class TwigPathsPass implements CompilerPassInterface
 {
     private const TWIG_NAMESPACE = 'NowoWorkflowBundle';
 
+    /**
+     * Registers the bundle Twig namespaces on the Twig filesystem loader.
+     */
     public function process(ContainerBuilder $container): void
     {
         $loaderId = $this->getNativeLoaderServiceId($container);

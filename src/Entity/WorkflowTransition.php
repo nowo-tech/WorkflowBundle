@@ -39,6 +39,8 @@ class WorkflowTransition
     private array $toPlaces;
 
     /**
+     * Creates a transition with its name, source places, target places and optional label.
+     *
      * @param list<string> $fromPlaces
      * @param list<string> $toPlaces
      */
@@ -50,16 +52,25 @@ class WorkflowTransition
         $this->label      = $label;
     }
 
+    /**
+     * Returns the database identifier (null before the first flush).
+     */
     public function getId(): ?int
     {
         return $this->id;
     }
 
+    /**
+     * Returns the owning workflow definition.
+     */
     public function getWorkflow(): ?WorkflowDefinition
     {
         return $this->workflow;
     }
 
+    /**
+     * Sets the owning workflow definition.
+     */
     public function setWorkflow(?WorkflowDefinition $workflow): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -68,11 +79,17 @@ class WorkflowTransition
         return $this;
     }
 
+    /**
+     * Returns the technical transition name.
+     */
     public function getName(): string
     {
         return $this->name;
     }
 
+    /**
+     * Sets the technical transition name.
+     */
     public function setName(string $name): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -81,11 +98,17 @@ class WorkflowTransition
         return $this;
     }
 
+    /**
+     * Returns the optional display label.
+     */
     public function getLabel(): ?string
     {
         return $this->label;
     }
 
+    /**
+     * Sets the optional display label.
+     */
     public function setLabel(?string $label): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -94,13 +117,21 @@ class WorkflowTransition
         return $this;
     }
 
-    /** @return list<string> */
+    /**
+     * Returns the source place names.
+     *
+     * @return list<string>
+     */
     public function getFromPlaces(): array
     {
         return $this->fromPlaces;
     }
 
-    /** @param list<string> $fromPlaces */
+    /**
+     * Sets the source place names.
+     *
+     * @param list<string> $fromPlaces
+     */
     public function setFromPlaces(array $fromPlaces): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -109,13 +140,21 @@ class WorkflowTransition
         return $this;
     }
 
-    /** @return list<string> */
+    /**
+     * Returns the target place names.
+     *
+     * @return list<string>
+     */
     public function getToPlaces(): array
     {
         return $this->toPlaces;
     }
 
-    /** @param list<string> $toPlaces */
+    /**
+     * Sets the target place names.
+     *
+     * @param list<string> $toPlaces
+     */
     public function setToPlaces(array $toPlaces): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -124,6 +163,9 @@ class WorkflowTransition
         return $this;
     }
 
+    /**
+     * Returns the label, or the name when no label is set.
+     */
     public function getDisplayLabel(): string
     {
         return $this->label ?? $this->name;

@@ -33,6 +33,9 @@ class WorkflowPlace
     #[ORM\Column(name: 'sort_order', type: Types::INTEGER)]
     private int $sortOrder;
 
+    /**
+     * Creates a place with its name, optional label and sort order.
+     */
     public function __construct(string $name, ?string $label = null, int $sortOrder = 0)
     {
         $this->name      = $name;
@@ -40,16 +43,25 @@ class WorkflowPlace
         $this->sortOrder = $sortOrder;
     }
 
+    /**
+     * Returns the database identifier (null before the first flush).
+     */
     public function getId(): ?int
     {
         return $this->id;
     }
 
+    /**
+     * Returns the owning workflow definition.
+     */
     public function getWorkflow(): ?WorkflowDefinition
     {
         return $this->workflow;
     }
 
+    /**
+     * Sets the owning workflow definition.
+     */
     public function setWorkflow(?WorkflowDefinition $workflow): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -58,11 +70,17 @@ class WorkflowPlace
         return $this;
     }
 
+    /**
+     * Returns the technical place name.
+     */
     public function getName(): string
     {
         return $this->name;
     }
 
+    /**
+     * Sets the technical place name.
+     */
     public function setName(string $name): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -71,11 +89,17 @@ class WorkflowPlace
         return $this;
     }
 
+    /**
+     * Returns the optional display label.
+     */
     public function getLabel(): ?string
     {
         return $this->label;
     }
 
+    /**
+     * Sets the optional display label.
+     */
     public function setLabel(?string $label): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -84,11 +108,17 @@ class WorkflowPlace
         return $this;
     }
 
+    /**
+     * Returns the display order of the place.
+     */
     public function getSortOrder(): int
     {
         return $this->sortOrder;
     }
 
+    /**
+     * Sets the display order of the place.
+     */
     public function setSortOrder(int $sortOrder): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -97,6 +127,9 @@ class WorkflowPlace
         return $this;
     }
 
+    /**
+     * Returns the label, or the name when no label is set.
+     */
     public function getDisplayLabel(): string
     {
         return $this->label ?? $this->name;

@@ -24,6 +24,9 @@ use function is_string;
  */
 final class WorkflowUiSecurityPass implements CompilerPassInterface
 {
+    /**
+     * Aliases the Workflow UI access checker (role based, custom, allow-all or deny-all) and fails when no safe option is configured.
+     */
     public function process(ContainerBuilder $container): void
     {
         if (!$container->hasParameter('nowo_workflow.security.allow_unauthenticated')) {

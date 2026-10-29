@@ -12,6 +12,9 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final class AllowAllWorkflowUiAccessChecker implements WorkflowUiAccessCheckerInterface
 {
+    /**
+     * Grants every request (allow_unauthenticated: dev / demo only).
+     */
     public function isGranted(Request $request): bool
     {
         return true;

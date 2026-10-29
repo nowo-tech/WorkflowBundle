@@ -14,6 +14,9 @@ enum WorkflowDefinitionFormSection: string
     case Places      = 'places';
     case Transitions = 'transitions';
 
+    /**
+     * Returns the route name of the section editor.
+     */
     public function routeName(): string
     {
         return match ($this) {
@@ -37,6 +40,9 @@ enum WorkflowDefinitionFormSection: string
         };
     }
 
+    /**
+     * Returns the page title translation key of the section.
+     */
     public function titleKey(): string
     {
         return match ($this) {

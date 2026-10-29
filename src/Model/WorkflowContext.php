@@ -45,17 +45,27 @@ final readonly class WorkflowContext
         $this->parameters = $normalized;
     }
 
+    /**
+     * Returns the normalized value of a parameter, or null when it is not set.
+     */
     public function get(string $key): ?string
     {
         return $this->parameters[$key] ?? null;
     }
 
+    /**
+     * Tells whether a parameter is set.
+     */
     public function has(string $key): bool
     {
         return array_key_exists($key, $this->parameters);
     }
 
-    /** @return array<string, string> */
+    /**
+     * Returns the parameters sorted by key.
+     *
+     * @return array<string, string>
+     */
     public function sortedParameters(): array
     {
         $parameters = $this->parameters;
@@ -64,6 +74,9 @@ final readonly class WorkflowContext
         return $parameters;
     }
 
+    /**
+     * Returns a copy with the given parameter set.
+     */
     public function withParameter(string $key, string $value): self
     {
         $parameters       = $this->parameters;
@@ -72,6 +85,9 @@ final readonly class WorkflowContext
         return new self($this->subjectClass, $parameters);
     }
 
+    /**
+     * Returns a copy bound to the given subject class.
+     */
     public function withSubjectClass(string $subjectClass): self
     {
         return new self($subjectClass, $this->parameters);

@@ -29,6 +29,9 @@ final class WorkflowDefinitionFormType extends AbstractType
 {
     use FormOptionsTrait;
 
+    /**
+     * Adds the fields of the selected definition section.
+     */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $section = $options['section'];
@@ -148,6 +151,9 @@ final class WorkflowDefinitionFormType extends AbstractType
         ]);
     }
 
+    /**
+     * Configures the data class, the section option and the translation domain.
+     */
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([

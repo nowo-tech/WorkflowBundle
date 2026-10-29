@@ -16,6 +16,8 @@ enum IconSet: string
     case None           = 'none';
 
     /**
+     * Returns every accepted icon_set value.
+     *
      * @return list<string>
      */
     public static function values(): array

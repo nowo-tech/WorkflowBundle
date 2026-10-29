@@ -41,6 +41,9 @@ final class WorkflowPageFactory
 
     public const DOMAIN = 'NowoWorkflowBundle';
 
+    /**
+     * Creates the factory with the URL generator, the CSRF token manager, the layout and the 1.x form theme stack.
+     */
     public function __construct(
         private readonly UrlGeneratorInterface $urlGenerator,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
@@ -50,6 +53,8 @@ final class WorkflowPageFactory
     }
 
     /**
+     * Returns a translatable label of the NowoWorkflowBundle domain.
+     *
      * @param array<string, mixed> $params
      */
     public static function label(string $key, array $params = []): Label
@@ -58,6 +63,8 @@ final class WorkflowPageFactory
     }
 
     /**
+     * Builds the dashboard page view model.
+     *
      * @param int $total all definitions
      * @param int $enabled enabled definitions
      */
@@ -129,6 +136,9 @@ final class WorkflowPageFactory
         ];
     }
 
+    /**
+     * Builds the show page view model of a definition.
+     */
     public function show(WorkflowDefinition $definition): ShowPage
     {
         $id = (int) $definition->getId();
@@ -168,6 +178,9 @@ final class WorkflowPageFactory
         );
     }
 
+    /**
+     * Builds the form page view model of the new-definition form.
+     */
     public function newForm(FormView $form): FormPage
     {
         return new FormPage(

@@ -10,6 +10,7 @@
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
 - [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
 - [Overriding translations (REQ-I18N-001)](#overriding-translations-req-i18n-001)
+- [Browser JavaScript](#browser-javascript)
 - [Forms in Twig (REQ-TWIG-005)](#forms-in-twig-req-twig-005)
 
 ## Match rules and resolution
@@ -81,14 +82,46 @@ variable.
 
 ## Overriding translations (REQ-I18N-001)
 
-Translation domain: **`NowoWorkflowBundle`**. Override in the application:
+The bundle ships the **`NowoWorkflowBundle`** domain in seven locales (`en`, `es`, `fr`, `it`, `de`, `nl`, `pt`) under
+`src/Resources/translations/` and registers that directory as a translator path. Application catalogues in
+`translations/` have priority; any key the application does not define falls back to the bundle value.
 
-```
-translations/NowoWorkflowBundle.en.yaml
-translations/NowoWorkflowBundle.es.yaml
+Procedure:
+
+1. Use the bundle domain **`NowoWorkflowBundle`** (same name, same nesting of keys).
+2. Create `translations/NowoWorkflowBundle.<locale>.yaml` (or `.xlf`) in the application, one file per locale you
+   override.
+3. Copy only the keys you want to change — look them up in the bundle catalogue
+   (`vendor/nowo-tech/workflow-bundle/src/Resources/translations/NowoWorkflowBundle.en.yaml`).
+4. Clear the cache: `php bin/console cache:clear`. Check with
+   `php bin/console debug:translation es --domain=NowoWorkflowBundle --only-missing`.
+
+Example — `translations/NowoWorkflowBundle.es.yaml`:
+
+```yaml
+action:
+  delete: 'Eliminar definitivamente'
+flash:
+  deleted: 'Flujo eliminado.'
 ```
 
-Clear cache after adding overrides: `php bin/console cache:clear`.
+Every other `NowoWorkflowBundle` key (`action.edit`, `flash.created`, …) keeps the bundle translation. To add a locale
+the bundle does not ship, create the full catalogue in the application and add the locale to `web_ui.locales`.
+
+## Browser JavaScript
+
+`nowo-workflow.js` (published by `assets:install`, loaded with `asset('js/nowo-workflow.js', 'nowo_workflow')`) is a
+small dependency-free script, not a Stimulus controller: the bundle targets hosts without Symfony UX / AssetMapper, so
+the pages work with plain `assets:install` (REQ-UX-001).
+
+- Driven only by `data-*` attributes (`data-workflow-collection`, `data-collection-*`, `data-edge`); it defines **no**
+  `window.*` API. The only global it reads is the vendored `window.TomSelect` constructor (transitions page).
+- No `innerHTML`, `document.write`, `eval` or inline handlers: table cells are built with `textContent`, new collection
+  entries are cloned from `<template data-collection-prototype>` and their `__name__` placeholders are numbered in
+  attributes / text nodes.
+- Initialisation is idempotent (`data-collection-ready`); the document-level listeners (diagram highlight) are
+  registered once and live as long as the page. Tom Select instances are destroyed when their editor dialog closes.
+- CSP notes: [SECURITY.md](SECURITY.md#browser-javascript-and-csp).
 
 ## Forms in Twig (REQ-TWIG-005)
 

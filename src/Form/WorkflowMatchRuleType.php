@@ -21,6 +21,9 @@ final class WorkflowMatchRuleType extends AbstractType
 {
     use FormOptionsTrait;
 
+    /**
+     * Adds the parameter key, parameter value and sort order fields.
+     */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $this->addText($builder, 'parameterKey', ['label' => 'form.field.parameter_key']);
@@ -28,6 +31,9 @@ final class WorkflowMatchRuleType extends AbstractType
         $this->addInteger($builder, 'sortOrder', ['label' => 'form.field.order']);
     }
 
+    /**
+     * Configures the data class and the translation domain.
+     */
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([

@@ -33,6 +33,9 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
     /** @var WeakReference<Request>|null */
     private ?WeakReference $cacheOwner = null;
 
+    /**
+     * Creates the registry with the definition repository, the definition builder and the request stack.
+     */
     public function __construct(
         private readonly WorkflowDefinitionRepository $repository,
         private readonly WorkflowDefinitionBuilder $builder,
@@ -40,6 +43,9 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
     ) {
     }
 
+    /**
+     * Returns the workflow of an enabled definition, memoized for the current main request only.
+     */
     public function get(string $slug): WorkflowInterface
     {
         $request = $this->currentCacheOwner();
@@ -62,6 +68,9 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
         return $workflow;
     }
 
+    /**
+     * Tells whether an enabled definition exists for the slug.
+     */
     public function has(string $slug): bool
     {
         try {
@@ -73,6 +82,9 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
         }
     }
 
+    /**
+     * Drops the memoized workflow of one slug, or of every slug when null.
+     */
     public function invalidate(?string $slug = null): void
     {
         if ($slug === null) {
@@ -84,12 +96,18 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
         unset($this->cache[$slug]);
     }
 
+    /**
+     * Clears the memoized workflows between requests (kernel.reset).
+     */
     public function reset(): void
     {
         $this->cache      = [];
         $this->cacheOwner = null;
     }
 
+    /**
+     * Builds a Symfony Workflow or StateMachine from a definition entity.
+     */
     public function createWorkflow(WorkflowDefinition $definition): WorkflowInterface
     {
         $symfonyDefinition = $this->builder->build($definition);

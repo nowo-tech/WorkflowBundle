@@ -17,11 +17,17 @@ use Symfony\Component\HttpKernel\KernelEvents;
  */
 final class LocaleSubscriber implements EventSubscriberInterface
 {
+    /**
+     * Creates the subscriber with the UI locale manager.
+     */
     public function __construct(
         private readonly LocaleManager $localeManager,
     ) {
     }
 
+    /**
+     * Applies the stored UI locale to main requests of Workflow UI routes.
+     */
     public function onKernelRequest(RequestEvent $event): void
     {
         if (!$event->isMainRequest() || !WorkflowUiAccessSubscriber::isWorkflowUiRoute($event->getRequest())) {
@@ -31,6 +37,9 @@ final class LocaleSubscriber implements EventSubscriberInterface
         $event->getRequest()->setLocale($this->localeManager->resolveLocale());
     }
 
+    /**
+     * Returns the kernel events this subscriber listens to.
+     */
     public static function getSubscribedEvents(): array
     {
         return [

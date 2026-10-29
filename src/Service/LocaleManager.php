@@ -18,7 +18,11 @@ final class LocaleManager
 {
     public const SESSION_KEY = '_nowo_workflow_locale';
 
-    /** @param list<string> $enabledLocales */
+    /**
+     * Creates the manager with the request stack, the enabled UI locales and the default locale.
+     *
+     * @param list<string> $enabledLocales
+     */
     public function __construct(
         private readonly RequestStack $requestStack,
         private readonly array $enabledLocales,
@@ -26,22 +30,35 @@ final class LocaleManager
     ) {
     }
 
-    /** @return list<string> */
+    /**
+     * Returns the enabled UI locales.
+     *
+     * @return list<string>
+     */
     public function getEnabledLocales(): array
     {
         return $this->enabledLocales;
     }
 
+    /**
+     * Returns the default UI locale.
+     */
     public function getDefaultLocale(): string
     {
         return $this->defaultLocale;
     }
 
+    /**
+     * Tells whether a locale is one of the enabled UI locales.
+     */
     public function isEnabled(string $locale): bool
     {
         return in_array($locale, $this->enabledLocales, true);
     }
 
+    /**
+     * Stores an enabled locale in the session (ignored otherwise).
+     */
     public function setLocale(string $locale): void
     {
         if (!$this->isEnabled($locale)) {
@@ -55,6 +72,9 @@ final class LocaleManager
         }
     }
 
+    /**
+     * Returns the session locale when enabled, else the default locale.
+     */
     public function resolveLocale(): string
     {
         $session = $this->getSession();

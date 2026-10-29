@@ -14,9 +14,15 @@ use function in_array;
 use function is_string;
 use function sprintf;
 
+/**
+ * Switches the Workflow UI locale and redirects back to a same-host page.
+ */
 #[Route(path: '', name: 'nowo_workflow_')]
 final class LocaleController extends AbstractController
 {
+    /**
+     * Creates the controller with the UI locale manager.
+     */
     public function __construct(
         private readonly LocaleManager $localeManager,
     ) {
@@ -27,6 +33,9 @@ final class LocaleController extends AbstractController
      */
     public const LOCALE_REQUIREMENT = '[a-zA-Z]{2,3}(?:[_-][a-zA-Z0-9]{2,8})*';
 
+    /**
+     * Stores the requested UI locale (when enabled) and redirects to the same-host referer or the dashboard.
+     */
     #[Route('/locale/{_locale}', name: 'locale_switch', requirements: ['_locale' => self::LOCALE_REQUIREMENT], methods: ['GET'])]
     public function switch(string $_locale, Request $request): RedirectResponse
     {

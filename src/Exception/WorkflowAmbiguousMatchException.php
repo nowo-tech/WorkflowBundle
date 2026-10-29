@@ -17,6 +17,8 @@ use const JSON_THROW_ON_ERROR;
 final class WorkflowAmbiguousMatchException extends RuntimeException
 {
     /**
+     * Creates the exception for a context matched by several equally ranked definitions.
+     *
      * @param list<string> $slugs
      */
     public static function forContext(WorkflowContext $context, array $slugs): self

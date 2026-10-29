@@ -11,32 +11,49 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use SortDirection;
 
 /**
+ * Doctrine repository of workflow definitions.
+ *
  * @extends ServiceEntityRepository<WorkflowDefinition>
  */
 class WorkflowDefinitionRepository extends ServiceEntityRepository
 {
+    /**
+     * Creates the repository for the WorkflowDefinition entity.
+     */
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, WorkflowDefinition::class);
     }
 
+    /**
+     * Finds a definition by slug, enabled or not.
+     */
     public function findOneBySlug(string $slug): ?WorkflowDefinition
     {
         return $this->findOneBy(['slug' => $slug]);
     }
 
-    /** @return list<WorkflowDefinition> */
+    /**
+     * Returns every enabled definition ordered by name.
+     *
+     * @return list<WorkflowDefinition>
+     */
     public function findAllEnabled(): array
     {
         return $this->findBy(['enabled' => true], ['name' => 'ASC']);
     }
 
+    /**
+     * Counts the enabled definitions.
+     */
     public function countEnabled(): int
     {
         return $this->count(['enabled' => true]);
     }
 
     /**
+     * Returns the enabled definitions of the given subject class(es), highest priority first.
+     *
      * @param list<string>|string|null $subjectClass One class, a class hierarchy (IN), or null for all
      *
      * @return list<WorkflowDefinition>

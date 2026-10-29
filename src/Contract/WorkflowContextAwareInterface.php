@@ -11,5 +11,8 @@ use Nowo\WorkflowBundle\Model\WorkflowContext;
  */
 interface WorkflowContextAwareInterface
 {
+    /**
+     * Returns the lookup context (match parameters) used to resolve the workflow definition of this subject.
+     */
     public function getWorkflowContext(): WorkflowContext;
 }

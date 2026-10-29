@@ -15,6 +15,9 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 final class ClosedEntityManagerResetter
 {
+    /**
+     * Resets the given entity manager in the registry when a failed flush closed it.
+     */
     public static function resetIfClosed(?ManagerRegistry $managerRegistry, EntityManagerInterface $entityManager): void
     {
         if (!$managerRegistry instanceof ManagerRegistry || $entityManager->isOpen()) {

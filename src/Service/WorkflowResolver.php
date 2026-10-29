@@ -29,11 +29,17 @@ use const PHP_INT_MIN;
  */
 final class WorkflowResolver
 {
+    /**
+     * Creates the resolver with the definition repository.
+     */
     public function __construct(
         private readonly WorkflowDefinitionRepository $repository,
     ) {
     }
 
+    /**
+     * Returns the best matching enabled definition (class distance, specificity, priority).
+     */
     public function resolve(WorkflowContext $context): WorkflowDefinition
     {
         $hierarchy = $context->subjectClass !== null ? SubjectClass::hierarchy($context->subjectClass) : [];
@@ -70,11 +76,17 @@ final class WorkflowResolver
         return $best;
     }
 
+    /**
+     * Returns the slug of the best matching definition.
+     */
     public function resolveSlug(WorkflowContext $context): string
     {
         return $this->resolve($context)->getSlug();
     }
 
+    /**
+     * Returns the best matching definition for a subject and its own context.
+     */
     public function resolveForSubject(object $subject): WorkflowDefinition
     {
         if ($subject instanceof WorkflowContextAwareInterface) {
@@ -86,12 +98,17 @@ final class WorkflowResolver
         return $this->resolve($context);
     }
 
+    /**
+     * Returns the slug of the best matching definition for a subject.
+     */
     public function resolveSlugForSubject(object $subject): string
     {
         return $this->resolveForSubject($subject)->getSlug();
     }
 
     /**
+     * Returns the enabled definitions whose subject class and rules match the context.
+     *
      * @return list<WorkflowDefinition>
      */
     public function findMatching(WorkflowContext $context): array

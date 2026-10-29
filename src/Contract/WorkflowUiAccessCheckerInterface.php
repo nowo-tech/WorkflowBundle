@@ -15,5 +15,8 @@ use Symfony\Component\HttpFoundation\Request;
  */
 interface WorkflowUiAccessCheckerInterface
 {
+    /**
+     * Tells whether the current request may access the Workflow admin UI.
+     */
     public function isGranted(Request $request): bool;
 }

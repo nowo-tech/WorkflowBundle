@@ -18,6 +18,9 @@ use Twig\Extension\GlobalsInterface;
  */
 final class WorkflowExtension extends AbstractExtension implements GlobalsInterface
 {
+    /**
+     * Creates the extension with the locale manager and the deprecated 1.x UI values.
+     */
     public function __construct(
         private readonly LocaleManager $localeManager,
         private readonly string $layoutTemplate,
@@ -27,7 +30,11 @@ final class WorkflowExtension extends AbstractExtension implements GlobalsInterf
     ) {
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Returns the Twig globals of the Workflow UI.
+     *
+     * @return array<string, mixed>
+     */
     public function getGlobals(): array
     {
         return [

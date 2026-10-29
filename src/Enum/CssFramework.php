@@ -19,6 +19,8 @@ enum CssFramework: string
     case None       = 'none';
 
     /**
+     * Returns every accepted css_framework value.
+     *
      * @return list<string>
      */
     public static function values(): array

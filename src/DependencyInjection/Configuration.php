@@ -65,6 +65,9 @@ final class Configuration implements ConfigurationInterface
         'locales'        => 'locales',
     ];
 
+    /**
+     * Builds the nowo_workflow configuration tree.
+     */
     public function getConfigTreeBuilder(): TreeBuilder
     {
         $treeBuilder = new TreeBuilder(self::ALIAS);

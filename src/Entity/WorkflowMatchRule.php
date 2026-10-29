@@ -39,6 +39,9 @@ class WorkflowMatchRule
     #[ORM\Column(name: 'sort_order', type: Types::INTEGER)]
     private int $sortOrder;
 
+    /**
+     * Creates a match rule for a context parameter key / value pair.
+     */
     public function __construct(string $parameterKey, string $parameterValue, int $sortOrder = 0)
     {
         $this->parameterKey   = $parameterKey;
@@ -46,16 +49,25 @@ class WorkflowMatchRule
         $this->sortOrder      = $sortOrder;
     }
 
+    /**
+     * Returns the database identifier (null before the first flush).
+     */
     public function getId(): ?int
     {
         return $this->id;
     }
 
+    /**
+     * Returns the owning workflow definition.
+     */
     public function getWorkflow(): ?WorkflowDefinition
     {
         return $this->workflow;
     }
 
+    /**
+     * Sets the owning workflow definition.
+     */
     public function setWorkflow(?WorkflowDefinition $workflow): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -64,11 +76,17 @@ class WorkflowMatchRule
         return $this;
     }
 
+    /**
+     * Returns the context parameter key to match.
+     */
     public function getParameterKey(): string
     {
         return $this->parameterKey;
     }
 
+    /**
+     * Sets the context parameter key to match.
+     */
     public function setParameterKey(string $parameterKey): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -77,11 +95,17 @@ class WorkflowMatchRule
         return $this;
     }
 
+    /**
+     * Returns the expected context parameter value.
+     */
     public function getParameterValue(): string
     {
         return $this->parameterValue;
     }
 
+    /**
+     * Sets the expected context parameter value.
+     */
     public function setParameterValue(string $parameterValue): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -90,11 +114,17 @@ class WorkflowMatchRule
         return $this;
     }
 
+    /**
+     * Returns the display order of the rule.
+     */
     public function getSortOrder(): int
     {
         return $this->sortOrder;
     }
 
+    /**
+     * Sets the display order of the rule.
+     */
     public function setSortOrder(int $sortOrder): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
@@ -103,13 +133,21 @@ class WorkflowMatchRule
         return $this;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Returns the free-form rule metadata.
+     *
+     * @return array<string, mixed>
+     */
     public function getMetadata(): array
     {
         return $this->metadata;
     }
 
-    /** @param array<string, mixed> $metadata */
+    /**
+     * Replaces the free-form rule metadata.
+     *
+     * @param array<string, mixed> $metadata
+     */
     public function setMetadata(array $metadata): self
     {
         // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.

@@ -23,6 +23,9 @@ use function sprintf;
  */
 final class WorkflowApplicator
 {
+    /**
+     * Creates the applicator with the registry, repository, resolver and entity manager.
+     */
     public function __construct(
         private readonly WorkflowRegistryInterface $registry,
         private readonly WorkflowDefinitionRepository $definitionRepository,
@@ -33,6 +36,8 @@ final class WorkflowApplicator
     }
 
     /**
+     * Applies a transition with the workflow of the given slug and flushes the subject.
+     *
      * @throws WorkflowNotFoundException
      */
     public function apply(object $subject, string $workflowSlug, string $transitionName): void
@@ -41,6 +46,8 @@ final class WorkflowApplicator
     }
 
     /**
+     * Applies a transition with the workflow resolved from the context and flushes the subject.
+     *
      * @throws WorkflowNotFoundException
      */
     public function applyByContext(object $subject, WorkflowContext $context, string $transitionName): void
@@ -50,6 +57,8 @@ final class WorkflowApplicator
     }
 
     /**
+     * Applies a transition with the workflow resolved from the subject and flushes it.
+     *
      * @throws WorkflowNotFoundException
      */
     public function applyForSubject(object $subject, string $transitionName): void
@@ -57,13 +66,21 @@ final class WorkflowApplicator
         $this->applyWithDefinition($subject, $this->resolver->resolveForSubject($subject), $transitionName);
     }
 
-    /** @return list<string> */
+    /**
+     * Returns the transition names the subject can take in the workflow of the given slug.
+     *
+     * @return list<string>
+     */
     public function getEnabledTransitions(object $subject, string $workflowSlug): array
     {
         return $this->getEnabledTransitionsForDefinition($subject, $this->requireDefinition($workflowSlug));
     }
 
-    /** @return list<string> */
+    /**
+     * Returns the transition names the subject can take in the workflow resolved from the context.
+     *
+     * @return list<string>
+     */
     public function getEnabledTransitionsByContext(object $subject, WorkflowContext $context): array
     {
         $context = $context->withSubjectClass($subject::class);
@@ -71,22 +88,35 @@ final class WorkflowApplicator
         return $this->getEnabledTransitionsForDefinition($subject, $this->resolver->resolve($context));
     }
 
-    /** @return list<string> */
+    /**
+     * Returns the transition names the subject can take in the workflow resolved from the subject.
+     *
+     * @return list<string>
+     */
     public function getEnabledTransitionsForSubject(object $subject): array
     {
         return $this->getEnabledTransitionsForDefinition($subject, $this->resolver->resolveForSubject($subject));
     }
 
+    /**
+     * Returns the current marking of the subject in the workflow of the given slug.
+     */
     public function getMarking(object $subject, string $workflowSlug): string
     {
         return $this->getMarkingForDefinition($subject, $this->requireDefinition($workflowSlug));
     }
 
+    /**
+     * Returns the current marking of the subject in the workflow resolved from the subject.
+     */
     public function getMarkingForSubject(object $subject): string
     {
         return $this->getMarkingForDefinition($subject, $this->resolver->resolveForSubject($subject));
     }
 
+    /**
+     * Returns the definition that applies to the subject.
+     */
     public function resolveForSubject(object $subject): WorkflowDefinition
     {
         return $this->resolver->resolveForSubject($subject);

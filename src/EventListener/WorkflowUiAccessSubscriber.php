@@ -27,6 +27,9 @@ final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
 
     public const CONTROLLER_NAMESPACE = 'Nowo\\WorkflowBundle\\Controller\\';
 
+    /**
+     * Creates the subscriber with the UI access checker and the web_ui.enabled flag.
+     */
     public function __construct(
         private readonly WorkflowUiAccessCheckerInterface $accessChecker,
         private readonly bool $enabled = true,
@@ -43,6 +46,9 @@ final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
         }
     }
 
+    /**
+     * Answers 404 when the UI is disabled and 403 when the access checker denies the request.
+     */
     public function onKernelController(ControllerEvent $event): void
     {
         if (!self::isWorkflowUiRoute($event->getRequest())) {
@@ -78,6 +84,9 @@ final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
         return is_string($controller) && str_starts_with(ltrim($controller, '\\'), self::CONTROLLER_NAMESPACE);
     }
 
+    /**
+     * Returns the kernel events this subscriber listens to.
+     */
     public static function getSubscribedEvents(): array
     {
         return [

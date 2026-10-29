@@ -18,6 +18,8 @@ use Symfony\Component\Routing\Attribute\Route;
 final class DashboardController extends AbstractController
 {
     /**
+     * Creates the controller with the definition repository, the page factory, the list page size and the page templates.
+     *
      * @param array<string, string> $templates web_ui.templates
      */
     public function __construct(
@@ -28,6 +30,9 @@ final class DashboardController extends AbstractController
     ) {
     }
 
+    /**
+     * Renders the Workflow UI dashboard (definition counters and the first page of definitions).
+     */
     #[Route('', name: 'dashboard', methods: ['GET'])]
     public function index(): Response
     {

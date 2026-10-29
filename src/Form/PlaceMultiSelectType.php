@@ -16,6 +16,9 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  */
 final class PlaceMultiSelectType extends AbstractType
 {
+    /**
+     * Configures a multiple choice of place names (TomSelect-enhanced on the transitions page).
+     */
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([
@@ -29,11 +32,17 @@ final class PlaceMultiSelectType extends AbstractType
         $resolver->setAllowedTypes('choices', 'array');
     }
 
+    /**
+     * Returns the parent form type (ChoiceType).
+     */
     public function getParent(): string
     {
         return ChoiceType::class;
     }
 
+    /**
+     * Returns the block prefix used by form themes.
+     */
     public function getBlockPrefix(): string
     {
         return 'place_multi_select';
