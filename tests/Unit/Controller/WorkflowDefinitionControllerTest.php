@@ -15,6 +15,7 @@ use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use Nowo\WorkflowBundle\Tests\Support\ControllerContainerFactory;
+use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use Nowo\WorkflowBundle\Tests\Support\WorkflowPageFixtures;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
@@ -144,6 +145,21 @@ final class WorkflowDefinitionControllerTest extends TestCase
         $controller->delete($request, 4);
     }
 
+    public function testDeleteLogsRejectedCsrfToken(): void
+    {
+        $logger     = new RecordingLogger();
+        $controller = $this->createController(definitionById: $this->definitionWithId(4), logger: $logger);
+
+        try {
+            $controller->delete(Request::create('/definitions/4/delete', 'POST', ['_token' => 'invalid']), 4);
+            self::fail('An invalid token must be rejected.');
+        } catch (AccessDeniedException) {
+        }
+
+        self::assertSame(['warning: Workflow definition delete rejected: invalid CSRF token.'], $logger->lines());
+        self::assertSame(['bundle' => 'NowoWorkflowBundle', 'action' => 'delete_definition', 'id' => 4], $logger->records[0]['context']);
+    }
+
     public function testDeleteRemovesDefinitionWhenCsrfValid(): void
     {
         $definition = $this->definitionWithId(4);
@@ -155,16 +171,20 @@ final class WorkflowDefinitionControllerTest extends TestCase
         $registry->method('findOneBySlug')->willReturn(null);
         $realRegistry = new DatabaseWorkflowRegistry($registry, new WorkflowDefinitionBuilder());
 
+        $logger     = new RecordingLogger();
         $controller = $this->createController(
             definitionById: $definition,
             entityManager: $em,
             registry: $realRegistry,
+            logger: $logger,
         );
 
         $request  = Request::create('/definitions/4/delete', 'POST', ['_token' => 'valid']);
         $response = $controller->delete($request, 4);
 
         self::assertSame(Response::HTTP_FOUND, $response->getStatusCode());
+        self::assertSame(['info: Workflow definition deleted.'], $logger->lines());
+        self::assertSame(['bundle' => 'NowoWorkflowBundle', 'action' => 'delete_definition', 'id' => 4, 'slug' => 'order'], $logger->records[0]['context']);
     }
 
     public function testShowBySlugThrowsWhenMissing(): void
@@ -374,6 +394,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
         ?DatabaseWorkflowRegistry $registry = null,
         ?ManagerRegistry $managerRegistry = null,
         array $templates = Configuration::DEFAULT_TEMPLATES,
+        ?RecordingLogger $logger = null,
     ): WorkflowDefinitionController {
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('paginateByName')->willReturn([
@@ -409,6 +430,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
             20,
             $managerRegistry,
             $templates,
+            $logger ?? new RecordingLogger(),
         );
         $controller->setContainer(ControllerContainerFactory::create());
 

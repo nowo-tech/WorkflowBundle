@@ -15,6 +15,8 @@ use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use Nowo\WorkflowBundle\View\WorkflowPageFactory;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -32,6 +34,8 @@ use Throwable;
 final class WorkflowDefinitionController extends AbstractController
 {
     /**
+     * Creates the controller with its persistence, registry, presentation and configuration dependencies and a PSR-3 logger.
+     *
      * @param array<string, string> $templates web_ui.templates
      */
     public function __construct(
@@ -44,9 +48,13 @@ final class WorkflowDefinitionController extends AbstractController
         private readonly int $listPageSize = 20,
         private readonly ?ManagerRegistry $managerRegistry = null,
         private readonly array $templates = Configuration::DEFAULT_TEMPLATES,
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
+    /**
+     * Lists the workflow definitions, paginated by name.
+     */
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(Request $request): Response
     {
@@ -60,6 +68,9 @@ final class WorkflowDefinitionController extends AbstractController
         ]);
     }
 
+    /**
+     * Shows and handles the form that creates a workflow definition (general section).
+     */
     #[Route('/new', name: 'new', methods: ['GET', 'POST'])]
     public function new(Request $request): Response
     {
@@ -85,54 +96,84 @@ final class WorkflowDefinitionController extends AbstractController
         ], $this->formResponse($form));
     }
 
+    /**
+     * Shows a workflow definition looked up by its slug.
+     */
     #[Route('/by-slug/{slug}', name: 'show_by_slug', requirements: ['slug' => '[a-z0-9_]+'], methods: ['GET'])]
     public function showBySlug(string $slug): Response
     {
         return $this->renderShow($this->requireDefinitionBySlug($slug));
     }
 
+    /**
+     * Redirects the legacy edit URL to the general section editor.
+     */
     #[Route('/{id}/edit', name: 'edit', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function edit(int $id): RedirectResponse
     {
         return $this->redirectToRoute('nowo_workflow_definition_edit_general', ['id' => $id]);
     }
 
+    /**
+     * Shows and handles the general section editor of a definition.
+     */
     #[Route('/{id}/edit/general', name: 'edit_general', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function editGeneral(Request $request, int $id): Response
     {
         return $this->editSection($request, $id, WorkflowDefinitionFormSection::General);
     }
 
+    /**
+     * Shows and handles the match rules editor of a definition.
+     */
     #[Route('/{id}/edit/match-rules', name: 'edit_match_rules', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function editMatchRules(Request $request, int $id): Response
     {
         return $this->editSection($request, $id, WorkflowDefinitionFormSection::MatchRules);
     }
 
+    /**
+     * Shows and handles the places editor of a definition.
+     */
     #[Route('/{id}/edit/places', name: 'edit_places', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function editPlaces(Request $request, int $id): Response
     {
         return $this->editSection($request, $id, WorkflowDefinitionFormSection::Places);
     }
 
+    /**
+     * Shows and handles the transitions editor of a definition.
+     */
     #[Route('/{id}/edit/transitions', name: 'edit_transitions', requirements: ['id' => '\d+'], methods: ['GET', 'POST'])]
     public function editTransitions(Request $request, int $id): Response
     {
         return $this->editSection($request, $id, WorkflowDefinitionFormSection::Transitions);
     }
 
+    /**
+     * Shows a workflow definition (details and flow diagram).
+     */
     #[Route('/{id}', name: 'show', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function show(int $id): Response
     {
         return $this->renderShow($this->requireDefinitionById($id));
     }
 
+    /**
+     * Deletes a workflow definition after a valid CSRF token check and redirects to the list.
+     */
     #[Route('/{id}/delete', name: 'delete', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function delete(Request $request, int $id): RedirectResponse
     {
         $definition = $this->requireDefinitionById($id);
 
         if (!$this->isCsrfTokenValid('delete' . $definition->getId(), (string) $request->request->get('_token'))) {
+            $this->logger->warning('Workflow definition delete rejected: invalid CSRF token.', [
+                'bundle' => 'NowoWorkflowBundle',
+                'action' => 'delete_definition',
+                'id'     => $id,
+            ]);
+
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
@@ -140,6 +181,12 @@ final class WorkflowDefinitionController extends AbstractController
         $this->entityManager->remove($definition);
         $this->flush();
         $this->registry->invalidate($slug);
+        $this->logger->info('Workflow definition deleted.', [
+            'bundle' => 'NowoWorkflowBundle',
+            'action' => 'delete_definition',
+            'id'     => $id,
+            'slug'   => $slug,
+        ]);
 
         $this->flash('flash.deleted');
 

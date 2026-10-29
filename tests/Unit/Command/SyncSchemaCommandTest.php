@@ -12,6 +12,7 @@ use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use Nowo\WorkflowBundle\Command\SyncSchemaCommand;
 use Nowo\WorkflowBundle\Tests\Integration\IntegrationEntityManagerFactory;
+use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -86,5 +87,47 @@ final class SyncSchemaCommandTest extends TestCase
             || str_contains($tester->getDisplay(), 'Skipped'),
             $tester->getDisplay(),
         );
+    }
+
+    public function testExecuteLogsStartAndSuccessWithCounts(): void
+    {
+        $em = IntegrationEntityManagerFactory::createInMemory();
+
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->method('getManager')->willReturn($em);
+        $logger = new RecordingLogger();
+
+        (new CommandTester(new SyncSchemaCommand($registry, 'default', $logger)))->execute([]);
+
+        self::assertSame(['info: Workflow schema sync started.', 'info: Workflow schema sync finished.'], $logger->lines());
+        $context = $logger->records[1]['context'];
+        self::assertSame('sync_schema', $context['action'] ?? null);
+        self::assertSame('default', $context['connection'] ?? null);
+        self::assertGreaterThan(0, $context['executed'] ?? 0);
+        self::assertIsInt($context['skipped'] ?? null);
+    }
+
+    public function testExecuteLogsAndRethrowsFailures(): void
+    {
+        $metadataFactory = $this->createMock(ClassMetadataFactory::class);
+        $metadataFactory->method('getAllMetadata')->willThrowException(new RuntimeException('metadata unavailable'));
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getMetadataFactory')->willReturn($metadataFactory);
+
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->method('getManager')->willReturn($em);
+        $logger = new RecordingLogger();
+        $tester = new CommandTester(new SyncSchemaCommand($registry, 'default', $logger));
+
+        try {
+            $tester->execute([]);
+            self::fail('The sync failure must be rethrown.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('metadata unavailable', $exception->getMessage());
+        }
+
+        self::assertSame(['info: Workflow schema sync started.', 'error: Workflow schema sync failed.'], $logger->lines());
+        self::assertInstanceOf(RuntimeException::class, $logger->records[1]['context']['exception'] ?? null);
     }
 }
