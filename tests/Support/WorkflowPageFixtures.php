@@ -9,6 +9,7 @@ use Nowo\WorkflowBundle\Entity\WorkflowMatchRule;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
+use Nowo\WorkflowBundle\Form\PlaceMultiSelectType;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormType;
 use Nowo\WorkflowBundle\Form\WorkflowMatchRuleType;
@@ -153,6 +154,7 @@ final class WorkflowPageFixtures
             ->addType(FormKitTestSupport::withMerger(new WorkflowPlaceType()))
             ->addType(FormKitTestSupport::withMerger(new WorkflowTransitionType()))
             ->addType(FormKitTestSupport::withMerger(new WorkflowMatchRuleType()))
+            ->addType(FormKitTestSupport::withMerger(new PlaceMultiSelectType()))
             ->getFormFactory();
     }
 

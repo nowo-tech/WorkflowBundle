@@ -40,6 +40,26 @@ The CSS stack, icon set and row-action display come from UiKit (`nowo_ui_kit.css
 `row_actions_display`); the form theme from the host (`twig.form_themes`) and the FormKit `workflow` profile
 (seeded with the classes of the UiKit stack when the host does not define it).
 
+Every form type of the bundle (`WorkflowDefinitionFormType`, `WorkflowPlaceType`, `WorkflowTransitionType`,
+`WorkflowMatchRuleType` and the embedded `PlaceMultiSelectType`) is a FormKit Type on the profile
+`nowo_form_kit.profiles.workflow` (REQ-TWIG-005 rule 11). To change field classes or conventions, define that profile
+in the host (the bundle then seeds nothing for it):
+
+```yaml
+# config/packages/nowo_form_kit.yaml
+nowo_form_kit:
+    profiles:
+        workflow:
+            alias: workflow
+            translation_domain: NowoWorkflowBundle
+            defaults:
+                attr: { class: 'nowo-ui-input nowo-ui-input--full form-control' }
+                row_attr: { class: 'mb-3' }
+```
+
+The place multiselects keep their own classes (`nowo-ui-input nowo-ui-input--full nowo-place-multiselect`; the
+transitions page script enhances `.nowo-place-multiselect`).
+
 ### Deprecated keys (since 1.9, removed in 2.0)
 
 Still read and mapped (a canonical key set explicitly wins); each one reports a deprecation:
