@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Support;
 
+use Composer\InstalledVersions;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Nowo\FormKitBundle\NowoFormKitBundle;
 use Nowo\UiKitBundle\NowoUiKitBundle;
@@ -18,7 +19,10 @@ use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
 
 use function dirname;
+use function str_starts_with;
 use function sys_get_temp_dir;
+
+use const PHP_VERSION_ID;
 
 /**
  * Kernel whose routing is the Symfony default `controllers: { resource: routing.controllers }`, optionally plus the
@@ -73,9 +77,15 @@ final class HostControllersRoutesKernel extends Kernel
             'http_method_override' => false,
             'translator'           => ['fallbacks' => ['en']],
         ]);
+        $orm = [];
+        // DoctrineBundle 2.x on PHP >= 8.4 with symfony/var-exporter 8 (no LazyGhost): opt in to native lazy objects
+        // (always on, and the option deprecated, in DoctrineBundle 3).
+        if (PHP_VERSION_ID >= 80400 && str_starts_with((string) InstalledVersions::getVersion('doctrine/doctrine-bundle'), '2.')) {
+            $orm['enable_native_lazy_objects'] = true;
+        }
         $container->extension('doctrine', [
             'dbal' => ['url' => 'sqlite:///:memory:'],
-            'orm'  => [],
+            'orm'  => $orm,
         ]);
         $container->extension('nowo_workflow', [
             'web_ui'   => ['path_prefix' => '/workflow', 'default_locale' => 'en', 'locales' => ['en', 'es']],
