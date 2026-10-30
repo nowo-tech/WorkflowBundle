@@ -64,6 +64,16 @@
 
 ## Unreleased
 
+The admin UI routes are no longer picked up by the Symfony >= 7.3 default `routing.controllers` import. If your
+application never imported them and reached the UI anyway (on `/` instead of `web_ui.path_prefix`), import them
+explicitly:
+
+```yaml
+# config/routes/nowo_workflow.yaml
+nowo_workflow:
+    resource: '@NowoWorkflowBundle/Resources/config/routes.yaml'
+```
+
 ## To 1.11.1
 
 From **1.11.0**:
