@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.12.0](#to-1120)
 - [To 1.11.2](#to-1112)
 - [To 1.11.1](#to-1111)
 - [To 1.11.0](#to-1110)
@@ -64,6 +65,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.12.0
+
+From **1.11.2**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 **FormKit `^2.16`:** `nowo-tech/form-kit-bundle` stays a required dependency, now `^2.16`, and
 `Nowo\FormKitBundle\NowoFormKitBundle` must be registered: every bundle form type, including the embedded

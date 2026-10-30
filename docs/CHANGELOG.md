@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.12.0] - 2026-10-30](#1120---2026-10-30)
 - [[1.11.2] - 2026-10-30](#1112---2026-10-30)
 - [[1.11.1] - 2026-10-29](#1111---2026-10-29)
 - [[1.11.0] - 2026-10-29](#1110---2026-10-29)
@@ -48,6 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-10-30
+
+Page forms are FormKit types with a bundle FormKit profile; requires nowo-tech/form-kit-bundle (REQ-TWIG-005 rule 11). See [UPGRADING](UPGRADING.md#to-1120).
+
 ### Changed
 
 - **Forms are FormKit Types (REQ-TWIG-005 rule 11):** `PlaceMultiSelectType` (the transition source / target place
@@ -56,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   labels, classes and field names; no convention help / placeholder). `PlaceMultiSelectType::widgetClass()` /
   `CSS_CLASS` expose the widget classes.
 - `nowo-tech/form-kit-bundle` constraint raised to `^2.16` (bundle and demo).
+
+[1.12.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.12.0
 
 ## [1.11.2] - 2026-10-30
 
