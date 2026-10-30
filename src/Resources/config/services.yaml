@@ -13,6 +13,14 @@ services:
             - '../../Entity/'
             - '../../Enum/'
             - '../../NowoWorkflowBundle.php'
+            - '../../Controller/'
+
+    # Routes stay opt-in (REQ-SF-004 rule 7): controllers are not autoconfigured, so the #[Route] classes never get
+    # the `routing.controller` tag and a host `routing.controllers` import does not mount them without the prefix.
+    Nowo\WorkflowBundle\Controller\:
+        resource: '../../Controller/'
+        autoconfigure: false
+        tags: ['controller.service_arguments', 'container.service_subscriber']
 
     Nowo\WorkflowBundle\Repository\:
         resource: '../../Repository/'
