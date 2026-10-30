@@ -48,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Forms are FormKit Types (REQ-TWIG-005 rule 11):** `PlaceMultiSelectType` (the transition source / target place
+  multiselect) now carries `#[FormKitConfig('workflow')]` + `FormOptionsTrait` like the other form types, and
+  `WorkflowTransitionType` resolves the `fromPlaces` / `toPlaces` options through the FormKit `workflow` profile (same
+  labels, classes and field names; no convention help / placeholder). `PlaceMultiSelectType::widgetClass()` /
+  `CSS_CLASS` expose the widget classes.
+- `nowo-tech/form-kit-bundle` constraint raised to `^2.16` (bundle and demo).
+
 ## [1.11.2] - 2026-10-30
 
 Bundle routes are opt-in again: controllers are no longer autoconfigured, so a host's routing.controllers import does not expose them (REQ-SF-004 rule 7). See [UPGRADING](UPGRADING.md#to-1112).

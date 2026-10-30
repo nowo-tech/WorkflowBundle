@@ -32,13 +32,13 @@ final class WorkflowTransitionType extends AbstractType
         $this->addText($builder, 'name', ['label' => 'form.field.name']);
         $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false]);
 
-        $builder->addEventListener(FormEvents::PRE_SET_DATA, static function (FormEvent $event) use ($options): void {
+        $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($options): void {
             /** @var WorkflowTransition|null $transition */
             $transition = $event->getData();
             $form       = $event->getForm();
 
-            self::configurePlaceField($form, 'fromPlaces', 'form.field.from_places', $options['place_choices'], $transition?->getFromPlaces() ?? []);
-            self::configurePlaceField($form, 'toPlaces', 'form.field.to_places', $options['place_choices'], $transition?->getToPlaces() ?? []);
+            $this->configurePlaceField($form, 'fromPlaces', 'form.field.from_places', $options['place_choices'], $transition?->getFromPlaces() ?? []);
+            $this->configurePlaceField($form, 'toPlaces', 'form.field.to_places', $options['place_choices'], $transition?->getToPlaces() ?? []);
         });
     }
 
@@ -61,7 +61,7 @@ final class WorkflowTransitionType extends AbstractType
      * @param list<string> $placeChoices
      * @param list<string> $selected
      */
-    private static function configurePlaceField(
+    private function configurePlaceField(
         FormInterface $form,
         string $field,
         string $label,
@@ -72,9 +72,15 @@ final class WorkflowTransitionType extends AbstractType
             $form->remove($field);
         }
 
-        $form->add($field, PlaceMultiSelectType::class, [
-            'label'   => $label,
-            'choices' => PlaceChoiceHelper::buildChoices($placeChoices, $selected),
-        ]);
+        // FormKit profile `workflow` (label / translation domain / row); the widget keeps its own classes (TomSelect
+        // marker) and renders no convention help or placeholder.
+        $form->add($field, PlaceMultiSelectType::class, $this->resolveFieldOptions($field, PlaceMultiSelectType::class, [
+            'label'              => $label,
+            'help'               => false,
+            'placeholder'        => false,
+            'translation_domain' => 'NowoWorkflowBundle',
+            'attr'               => ['class' => PlaceMultiSelectType::widgetClass()],
+            'choices'            => PlaceChoiceHelper::buildChoices($placeChoices, $selected),
+        ]));
     }
 }

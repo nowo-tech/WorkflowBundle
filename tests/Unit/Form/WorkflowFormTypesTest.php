@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Unit\Form;
 use Nowo\WorkflowBundle\Entity\WorkflowMatchRule;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
+use Nowo\WorkflowBundle\Form\PlaceMultiSelectType;
 use Nowo\WorkflowBundle\Form\WorkflowMatchRuleType;
 use Nowo\WorkflowBundle\Form\WorkflowPlaceType;
 use Nowo\WorkflowBundle\Form\WorkflowTransitionType;
@@ -26,6 +27,7 @@ final class WorkflowFormTypesTest extends TypeTestCase
             FormKitTestSupport::withMerger(new WorkflowPlaceType()),
             FormKitTestSupport::withMerger(new WorkflowMatchRuleType()),
             FormKitTestSupport::withMerger(new WorkflowTransitionType()),
+            FormKitTestSupport::withMerger(new PlaceMultiSelectType()),
         ];
     }
 
@@ -116,8 +118,25 @@ final class WorkflowFormTypesTest extends TypeTestCase
 
         $method = new ReflectionMethod(WorkflowTransitionType::class, 'configurePlaceField');
         $method->setAccessible(true);
-        $method->invoke(null, $form, 'fromPlaces', 'form.field.from_places', ['draft' => 'draft'], ['draft']);
+        $method->invoke(FormKitTestSupport::withMerger(new WorkflowTransitionType()), $form, 'fromPlaces', 'form.field.from_places', ['draft' => 'draft'], ['draft']);
 
         self::assertTrue($form->has('fromPlaces'));
+    }
+
+    public function testPlaceFieldsResolveThroughTheFormKitProfile(): void
+    {
+        $form = $this->factory->create(WorkflowTransitionType::class, new WorkflowTransition('approve', ['draft'], ['approved']), [
+            'place_choices' => ['draft' => 'draft', 'approved' => 'approved'],
+        ]);
+
+        foreach (['fromPlaces' => 'form.field.from_places', 'toPlaces' => 'form.field.to_places'] as $field => $label) {
+            $config = $form->get($field)->getConfig();
+            self::assertInstanceOf(PlaceMultiSelectType::class, $config->getType()->getInnerType());
+            self::assertSame($label, $config->getOption('label'));
+            self::assertSame('NowoWorkflowBundle', $config->getOption('translation_domain'));
+            self::assertNull($config->getOption('help'));
+            self::assertSame(PlaceMultiSelectType::widgetClass(), $config->getOption('attr')['class']);
+            self::assertArrayNotHasKey('placeholder', $config->getOption('attr'));
+        }
     }
 }

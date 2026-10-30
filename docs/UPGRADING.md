@@ -65,6 +65,12 @@
 
 ## Unreleased
 
+**FormKit `^2.16`:** `nowo-tech/form-kit-bundle` stays a required dependency, now `^2.16`, and
+`Nowo\FormKitBundle\NowoFormKitBundle` must be registered: every bundle form type, including the embedded
+`PlaceMultiSelectType`, is a FormKit Type on the profile `nowo_form_kit.profiles.workflow`. Field classes and
+conventions are customised through that profile (see [CONFIGURATION](CONFIGURATION.md)), not through `twig.form_themes`.
+Field names did not change.
+
 ## To 1.11.2
 
 From **1.11.1**:
