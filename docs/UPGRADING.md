@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.11.2](#to-1112)
 - [To 1.11.1](#to-1111)
 - [To 1.11.0](#to-1110)
 - [To 1.10.1](#to-1101)
@@ -63,6 +64,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.11.2
+
+From **1.11.1**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 The admin UI routes are no longer picked up by the Symfony >= 7.3 default `routing.controllers` import. If your
 application never imported them and reached the UI anyway (on `/` instead of `web_ui.path_prefix`), import them

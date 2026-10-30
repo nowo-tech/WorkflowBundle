@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.11.2] - 2026-10-30](#1112---2026-10-30)
 - [[1.11.1] - 2026-10-29](#1111---2026-10-29)
 - [[1.11.0] - 2026-10-29](#1110---2026-10-29)
 - [[1.10.1] - 2026-10-28](#1101---2026-10-28)
@@ -47,9 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-10-30
+
+Bundle routes are opt-in again: controllers are no longer autoconfigured, so a host's routing.controllers import does not expose them (REQ-SF-004 rule 7). See [UPGRADING](UPGRADING.md#to-1112).
+
 ### Fixed
 
 - **Routes are opt-in (REQ-SF-004 rule 7):** the admin controllers (`DashboardController`, `WorkflowDefinitionController`, `LocaleController`) are excluded from the autoconfigured `Nowo\WorkflowBundle\` glob and registered with `autoconfigure: false` plus explicit `controller.service_arguments` / `container.service_subscriber` tags. On Symfony >= 7.3 the host's default `config/routes.yaml` (`routing.controllers`) no longer mounts the `nowo_workflow_*` routes on `/`, `/definitions`, … without `web_ui.path_prefix`; they only exist when the host imports `@NowoWorkflowBundle/Resources/config/routes.yaml`.
+
+[1.11.2]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.11.2
 
 ## [1.11.1] - 2026-10-29
 
