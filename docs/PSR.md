@@ -28,7 +28,7 @@ Others are **N/A** (or already covered by Symfony) so the decision stays auditab
 | PSR-7 / PSR-17 HTTP messages | **N/A** | The only HTTP surface is the Symfony admin UI (HttpFoundation controllers); a PSR-7 bridge would not help consumers. |
 | PSR-18 HTTP client | **N/A** | No outbound HTTP client. |
 | PSR-11 Container | **N/A** | No container locator in the public API; constructor injection only. |
-| PSR-14 Event dispatcher | **Already satisfied via Symfony** | The bundle dispatches no events of its own; Symfony Workflow dispatches its `workflow.*` events through Symfony's PSR-14 compatible dispatcher, and the bundle only subscribes to kernel events. No separate FIG dependency required. |
+| PSR-14 Event dispatcher | **Already satisfied via Symfony** | The bundle dispatches no events of its own; since 1.13.0 the database workflows dispatch Symfony Workflow's `workflow.*` events through Symfony's PSR-14 compatible `event_dispatcher` (before 1.13.0 they were built without a dispatcher and no event fired), and the bundle only subscribes to kernel events. No separate FIG dependency required. |
 | PSR-15 HTTP middleware | **N/A** | No middleware pipeline: access and locale handling are Symfony kernel subscribers. |
 | PSR-20 Clock | **N/A** | Time is only used for the `createdAt` / `updatedAt` audit timestamps of the definition entity (no TTL, token or scheduling logic). Re-evaluate if time-dependent behaviour is added. |
 

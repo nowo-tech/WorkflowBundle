@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.13.0](#to-1130)
 - [To 1.12.0](#to-1120)
 - [To 1.11.2](#to-1112)
 - [To 1.11.1](#to-1111)
@@ -65,6 +66,61 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.13.0
+
+From **1.12.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+**Workflow events now fire.** Up to 1.12.0 the database workflows were built without an event dispatcher, so the
+standard Symfony workflow events were never dispatched. From 1.13.0 they are, on the application `event_dispatcher`,
+with the definition **slug** as workflow name:
+
+- Listeners on `workflow.guard`, `workflow.<slug>.guard[.<transition>]` are called by `can()`, `getEnabledTransitions*()`
+  and `apply*()`; a listener that calls `$event->setBlocked(true)` now **blocks** the transition (`apply*()` throws
+  `WorkflowTransitionBlockedException`, the transition disappears from `getEnabledTransitions*()`).
+- Listeners on `workflow.leave`, `workflow.transition`, `workflow.enter`, `workflow.entered`, `workflow.completed`,
+  `workflow.announce` (global ones included, e.g. a generic audit listener) start receiving the events of the
+  bundle's workflows too. Check that global listeners cope with subjects / workflow names they did not see before
+  (filter on `$event->getWorkflowName()` or the subject class). An exception thrown there aborts `apply*()`: the
+  marking is already changed in memory when `completed` / `announce` listeners run, and the flush has not happened.
+- `completed` / `announce` listeners run **before** the applicator's flush. Do not publish messages or call other
+  systems from them; record the event and dispatch it after the commit. See
+  [USAGE: Listeners run before the flush](USAGE.md#listeners-run-before-the-flush).
+- Guards keyed on `workflow.<slug>.guard.<transition>` stop applying when the slug or the transition is renamed in the
+  CRUD UI. Put invariants in a `workflow.guard` listener filtered on the subject class and the target place. See
+  [USAGE: Slugs and transition names are configuration](USAGE.md#slugs-and-transition-names-are-configuration).
+- **Slug collision check.** A database slug equal to the name of a workflow under `framework.workflows` would share
+  its `workflow.<name>.*` events (framework listeners and guard expressions would receive your database subjects).
+  The registry now throws `Nowo\WorkflowBundle\Exception\WorkflowNameCollisionException` when it builds such a
+  workflow. Before upgrading, check that no database slug equals a framework workflow name, and rename it if one does
+  (`php bin/console debug:container --tag=workflow` lists the framework names).
+
+**Blocked transitions throw `WorkflowTransitionBlockedException`.** `apply*()` no longer pre-checks `can()`: it calls
+Symfony's `apply()` directly, so each guard listener runs once per call (it used to run twice for the applied
+transition). A transition blocked by the marking or by a guard throws
+`Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException`, which **extends `InvalidArgumentException`**
+(existing `catch (InvalidArgumentException)` blocks keep working). Its message now contains the blocker messages, e.g.
+`Transition "approve" is not enabled on workflow "expense_approval": Budget exceeded.` (was `Transition "approve" is
+not enabled for the current marking on workflow "expense_approval".`); `getBlockerMessages()`, `getBlockerCodes()` and
+`getTransitionBlockerList()` expose them. An undefined transition name still throws a plain `InvalidArgumentException`,
+now with `Transition "x" is not defined on workflow "y".`. Update code that matches on the old message text.
+
+To keep the 1.12 behaviour (no events), override the service argument:
+
+```yaml
+services:
+    Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry:
+        arguments:
+            $eventDispatcher: null
+```
+
+**New option `runtime.flush_after_apply`** (default `true`, unchanged behaviour): set it to `false` to persist the
+subject yourself; `apply*()` then only changes the marking. See [CONFIGURATION.md](CONFIGURATION.md).
 
 ## To 1.12.0
 

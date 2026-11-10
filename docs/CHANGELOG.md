@@ -49,6 +49,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Target 1.13.0 (minor: workflows now dispatch the standard Symfony workflow events). See [UPGRADING](UPGRADING.md#to-1130).
+
+### Security
+
+- **Guard listeners were never called before 1.13.0** (affected `>= 1.0.0, < 1.13.0`; independent audit KR, finding G1):
+  the database workflows were built without an event dispatcher, so a host listener on `workflow.guard` or
+  `workflow.<slug>.guard[.<transition>]` (for example an authorization or business-rule check) never ran and every
+  transition the marking allowed was applied (fail-open). If you relied on such guards, review the transitions applied
+  while running an affected version. Fixed by the event dispatch below.
+
+### Fixed
+
+- **Workflow events are dispatched (DDD audit 2026-11-10, G1):** `DatabaseWorkflowRegistry` built every `StateMachine` /
+  `Workflow` with a `null` event dispatcher, so no `workflow.*` event (`guard`, `leave`, `transition`, `enter`,
+  `entered`, `completed`, `announce`) ever fired: host guard listeners could not block a transition, `can()` /
+  `getEnabledTransitions*()` offered transitions the domain refuses, and nothing could react to an applied transition.
+  The registry now receives the application `event_dispatcher` (optional `$eventDispatcher` constructor argument) and
+  the workflows dispatch the events with the definition **slug** as workflow name (`workflow.<slug>.guard.<transition>`, …).
+  Marking store unchanged (`MethodMarkingStore` on `marking_property`).
+
+- **Each guard runs once per `apply*()` and the blocker reason is kept (audit KR-W-L1):** `WorkflowApplicator` pre-checked
+  `can()` before `apply()`, so the guard of the applied transition ran twice, and a blocked transition threw a generic
+  "not enabled for the current marking" message without the guard's reason. `apply*()` now calls `apply()` directly
+  and turns Symfony's `NotEnabledTransitionException` into `WorkflowTransitionBlockedException` (extends
+  `InvalidArgumentException`) with the blocker messages in its message and `getBlockerMessages()` /
+  `getBlockerCodes()` / `getTransitionBlockerList()`. An undefined transition throws `InvalidArgumentException`
+  ("is not defined on workflow").
+
+### Added
+
+- **Slug collision check (audit KR-W-L3):** with events dispatched, `DatabaseWorkflowRegistry` refuses a database slug
+  equal to a `framework.workflows` name (`WorkflowNameCollisionException`): both would dispatch the same
+  `workflow.<name>.*` events. The names are collected by `FrameworkWorkflowNamesPass` into
+  `nowo_workflow.framework_workflow_names` (new optional `$frameworkWorkflowNames` registry argument).
+- **`runtime.flush_after_apply` (default `true`, DDD audit G2):** `false` makes `WorkflowApplicator::apply*()` only set
+  the marking and leave persisting to the host (its repository / transaction boundary) instead of flushing every
+  pending change of the default entity manager after each transition.
+
+### Documentation
+
+- USAGE: `completed` / `announce` listeners run before the applicator's flush, so domain events are recorded there and
+  published after the commit (KR-W-L2); guards keyed on editable slug / transition names stop applying when renamed,
+  use a `workflow.guard` listener filtered on the subject and the target place (KR-W-L3); the CRUD UI is deny-by-default
+  (`ROLE_ADMIN`), not open (KR-W-I4). FRANKENPHP-WORKER-AUDIT re-audited for the event dispatcher (KR-W-I2); PSR.md
+  notes that workflow events are only dispatched since 1.13.0.
+
 ## [1.12.0] - 2026-10-30
 
 Page forms are FormKit types with a bundle FormKit profile; requires nowo-tech/form-kit-bundle (REQ-TWIG-005 rule 11). See [UPGRADING](UPGRADING.md#to-1120).

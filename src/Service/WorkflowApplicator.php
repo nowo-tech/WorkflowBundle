@@ -11,8 +11,11 @@ use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
+use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Symfony\Component\Workflow\Exception\NotEnabledTransitionException;
+use Symfony\Component\Workflow\Exception\UndefinedTransitionException;
 use Symfony\Component\Workflow\Transition;
 use Throwable;
 
@@ -20,11 +23,18 @@ use function sprintf;
 
 /**
  * Applies database-backed workflow transitions to domain subjects.
+ *
+ * The Symfony workflow events (leave, transition, enter, entered, completed, announce) are dispatched inside
+ * WorkflowInterface::apply(), so their listeners run before the flush of this applicator: do not publish anything
+ * that must only happen once the transition is persisted from a completed / announce listener.
  */
 final class WorkflowApplicator
 {
     /**
      * Creates the applicator with the registry, repository, resolver and entity manager.
+     *
+     * With $flushAfterApply false (config nowo_workflow.runtime.flush_after_apply) apply*() only changes the marking
+     * of the subject and leaves persisting it to the caller.
      */
     public function __construct(
         private readonly WorkflowRegistryInterface $registry,
@@ -32,13 +42,16 @@ final class WorkflowApplicator
         private readonly WorkflowResolver $resolver,
         private readonly EntityManagerInterface $entityManager,
         private readonly ?ManagerRegistry $managerRegistry = null,
+        private readonly bool $flushAfterApply = true,
     ) {
     }
 
     /**
-     * Applies a transition with the workflow of the given slug and flushes the subject.
+     * Applies a transition with the workflow of the given slug and flushes (unless runtime.flush_after_apply is false).
      *
      * @throws WorkflowNotFoundException
+     * @throws WorkflowTransitionBlockedException when the marking or a guard listener blocks the transition
+     * @throws InvalidArgumentException when the subject is not supported or the transition is not defined
      */
     public function apply(object $subject, string $workflowSlug, string $transitionName): void
     {
@@ -46,9 +59,11 @@ final class WorkflowApplicator
     }
 
     /**
-     * Applies a transition with the workflow resolved from the context and flushes the subject.
+     * Applies a transition with the workflow resolved from the context and flushes (unless runtime.flush_after_apply is false).
      *
      * @throws WorkflowNotFoundException
+     * @throws WorkflowTransitionBlockedException when the marking or a guard listener blocks the transition
+     * @throws InvalidArgumentException when the subject is not supported or the transition is not defined
      */
     public function applyByContext(object $subject, WorkflowContext $context, string $transitionName): void
     {
@@ -57,9 +72,11 @@ final class WorkflowApplicator
     }
 
     /**
-     * Applies a transition with the workflow resolved from the subject and flushes it.
+     * Applies a transition with the workflow resolved from the subject and flushes (unless runtime.flush_after_apply is false).
      *
      * @throws WorkflowNotFoundException
+     * @throws WorkflowTransitionBlockedException when the marking or a guard listener blocks the transition
+     * @throws InvalidArgumentException when the subject is not supported or the transition is not defined
      */
     public function applyForSubject(object $subject, string $transitionName): void
     {
@@ -127,11 +144,18 @@ final class WorkflowApplicator
         $this->assertSubjectSupported($subject, $definition);
         $workflow = $this->registry->get($definition->getSlug());
 
-        if (!$workflow->can($subject, $transitionName)) {
-            throw new InvalidArgumentException(sprintf('Transition "%s" is not enabled for the current marking on workflow "%s".', $transitionName, $definition->getSlug()));
+        // No can() pre-check: apply() evaluates the guards itself, so each guard listener runs once per apply.
+        try {
+            $workflow->apply($subject, $transitionName);
+        } catch (NotEnabledTransitionException $exception) {
+            throw WorkflowTransitionBlockedException::fromNotEnabled($definition->getSlug(), $exception);
+        } catch (UndefinedTransitionException $exception) {
+            throw new InvalidArgumentException(sprintf('Transition "%s" is not defined on workflow "%s".', $transitionName, $definition->getSlug()), 0, $exception);
         }
 
-        $workflow->apply($subject, $transitionName);
+        if (!$this->flushAfterApply) {
+            return;
+        }
 
         try {
             $this->entityManager->flush();

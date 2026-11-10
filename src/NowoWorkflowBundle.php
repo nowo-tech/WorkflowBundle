@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle;
 
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\CsrfProtectionPass;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\FrameworkWorkflowNamesPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
@@ -18,7 +19,7 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 class NowoWorkflowBundle extends Bundle
 {
     /**
-     * Registers the Twig paths, Workflow UI security and CSRF protection compiler passes.
+     * Registers the Twig paths, Workflow UI security, CSRF protection and framework workflow names compiler passes.
      */
     public function build(ContainerBuilder $container): void
     {
@@ -26,6 +27,7 @@ class NowoWorkflowBundle extends Bundle
         $container->addCompilerPass(new TwigPathsPass());
         $container->addCompilerPass(new WorkflowUiSecurityPass());
         $container->addCompilerPass(new CsrfProtectionPass());
+        $container->addCompilerPass(new FrameworkWorkflowNamesPass());
     }
 
     /**

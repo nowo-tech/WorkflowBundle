@@ -8,14 +8,19 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
+use Nowo\WorkflowBundle\Exception\WorkflowNameCollisionException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Workflow\Event\Event;
+use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\StateMachine;
+use Symfony\Component\Workflow\Transition;
 
 final class DatabaseWorkflowRegistryTest extends TestCase
 {
@@ -248,6 +253,103 @@ final class DatabaseWorkflowRegistryTest extends TestCase
         self::assertSame('order_approval', $registry->createWorkflow($definition)->getName());
     }
 
+    public function testBuiltWorkflowsDispatchSymfonyWorkflowEventsNamedAfterTheSlug(): void
+    {
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn($this->definitionWithTransition('finish'));
+
+        $dispatcher = new EventDispatcher();
+        $seen       = [];
+        foreach ([
+            'workflow.guard',
+            'workflow.order_approval.guard.finish',
+            'workflow.order_approval.leave',
+            'workflow.order_approval.transition.finish',
+            'workflow.order_approval.enter.done',
+            'workflow.order_approval.entered',
+            'workflow.order_approval.completed.finish',
+            'workflow.order_approval.announce',
+        ] as $eventName) {
+            $dispatcher->addListener($eventName, static function (Event $event) use (&$seen, $eventName): void {
+                self::assertSame('order_approval', $event->getWorkflowName());
+                $seen[] = $eventName;
+            });
+        }
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder(), null, $dispatcher);
+        $subject  = new DatabaseWorkflowRegistryTestSubject('draft');
+        $registry->get('order_approval')->apply($subject, 'finish');
+
+        self::assertSame('done', $subject->getStatus());
+        foreach (['workflow.guard', 'workflow.order_approval.guard.finish', 'workflow.order_approval.transition.finish', 'workflow.order_approval.entered', 'workflow.order_approval.completed.finish'] as $expected) {
+            self::assertContains($expected, $seen);
+        }
+    }
+
+    public function testGuardListenerBlocksTransitionAndHidesItFromEnabledTransitions(): void
+    {
+        foreach ([WorkflowType::StateMachine, WorkflowType::Workflow] as $type) {
+            $definition = $this->definitionWithTransition('finish');
+            $definition->setType($type);
+
+            $repository = $this->createMock(WorkflowDefinitionRepository::class);
+            $repository->method('findOneBySlug')->willReturn($definition);
+
+            $dispatcher = new EventDispatcher();
+            $dispatcher->addListener('workflow.order_approval.guard.finish', static function (GuardEvent $event): void {
+                $event->setBlocked(true, 'Domain rule refuses it.');
+            });
+
+            $workflow = (new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder(), null, $dispatcher))->get('order_approval');
+            $subject  = new DatabaseWorkflowRegistryTestSubject($type === WorkflowType::Workflow ? ['draft' => 1] : 'draft');
+
+            self::assertFalse($workflow->can($subject, 'finish'), $type->value);
+            self::assertSame([], array_map(static fn (Transition $t): string => $t->getName(), $workflow->getEnabledTransitions($subject)));
+        }
+    }
+
+    public function testWithoutDispatcherNoEventIsNeeded(): void
+    {
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn($this->definitionWithTransition('finish'));
+
+        $workflow = (new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder()))->get('order_approval');
+
+        self::assertTrue($workflow->can(new DatabaseWorkflowRegistryTestSubject('draft'), 'finish'));
+    }
+
+    public function testSlugEqualToAFrameworkWorkflowNameIsRefusedWhenEventsAreDispatched(): void
+    {
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn($this->definitionWithTransition('finish'));
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder(), null, new EventDispatcher(), ['blog_publishing', 'order_approval']);
+
+        $this->expectException(WorkflowNameCollisionException::class);
+        $this->expectExceptionMessage('"order_approval"');
+        $registry->get('order_approval');
+    }
+
+    public function testSlugEqualToAFrameworkWorkflowNameIsAllowedWithoutDispatcher(): void
+    {
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn($this->definitionWithTransition('finish'));
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder(), null, null, ['order_approval']);
+
+        self::assertSame('order_approval', $registry->get('order_approval')->getName());
+    }
+
+    public function testDistinctSlugIsAllowedNextToFrameworkWorkflows(): void
+    {
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn($this->definitionWithTransition('finish'));
+
+        $registry = new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder(), null, new EventDispatcher(), ['blog_publishing']);
+
+        self::assertSame('order_approval', $registry->get('order_approval')->getName());
+    }
+
     private function definitionWithTransition(string $transition): WorkflowDefinition
     {
         $definition = new WorkflowDefinition('Order', 'order_approval', 'draft', 'App\\Entity\\DemoOrder');
@@ -261,5 +363,31 @@ final class DatabaseWorkflowRegistryTest extends TestCase
     private function requestStackWith(Request $request): RequestStack
     {
         return new RequestStack([$request]);
+    }
+}
+
+final class DatabaseWorkflowRegistryTestSubject
+{
+    /**
+     * @param array<string, int>|string $status
+     */
+    public function __construct(private string|array $status = 'draft')
+    {
+    }
+
+    /**
+     * @return array<string, int>|string
+     */
+    public function getStatus(): string|array
+    {
+        return $this->status;
+    }
+
+    /**
+     * @param array<string, int>|string $status
+     */
+    public function setStatus(string|array $status): void
+    {
+        $this->status = $status;
     }
 }
