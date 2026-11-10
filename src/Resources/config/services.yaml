@@ -72,6 +72,8 @@ services:
     Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry:
         arguments:
             $eventDispatcher: '@?event_dispatcher'
+            # A database slug equal to a framework.workflows name would share its workflow.<name>.* events.
+            $frameworkWorkflowNames: '%nowo_workflow.framework_workflow_names%'
 
     Nowo\WorkflowBundle\Service\WorkflowApplicator:
         arguments:

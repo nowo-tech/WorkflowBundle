@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit;
 
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\CsrfProtectionPass;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\FrameworkWorkflowNamesPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\NowoWorkflowBundle;
@@ -23,6 +24,7 @@ final class NowoWorkflowBundleTest extends TestCase
         $foundTwig = false;
         $foundSec  = false;
         $foundCsrf = false;
+        $foundName = false;
 
         foreach ($passes as $pass) {
             if ($pass instanceof TwigPathsPass) {
@@ -34,11 +36,15 @@ final class NowoWorkflowBundleTest extends TestCase
             if ($pass instanceof CsrfProtectionPass) {
                 $foundCsrf = true;
             }
+            if ($pass instanceof FrameworkWorkflowNamesPass) {
+                $foundName = true;
+            }
         }
 
         self::assertTrue($foundTwig);
         self::assertTrue($foundSec);
         self::assertTrue($foundCsrf);
+        self::assertTrue($foundName);
     }
 
     public function testGetContainerExtensionReturnsSameInstance(): void

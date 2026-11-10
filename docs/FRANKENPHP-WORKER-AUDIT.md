@@ -18,6 +18,7 @@
   - [W-01 — Workflow registry cache is never reset and is per worker (Medium)](#w-01--workflow-registry-cache-is-never-reset-and-is-per-worker-medium)
   - [W-02 — Cached workflows hold an entity from an earlier request (Low)](#w-02--cached-workflows-hold-an-entity-from-an-earlier-request-low)
   - [W-03 — `WorkflowApplicator` depends on Doctrine's resetter after a failed flush (Medium, scenario B only)](#w-03--workflowapplicator-depends-on-doctrines-resetter-after-a-failed-flush-medium-scenario-b-only)
+  - [Re-audit 2026-11-10: workflow event dispatcher (1.13.0)](#re-audit-2026-11-10-workflow-event-dispatcher-1130)
 - [Usage recommendations in worker mode](#usage-recommendations-in-worker-mode)
 - [Re-audit triggers](#re-audit-triggers)
 
@@ -94,6 +95,15 @@ A bundle that is safe under **B** is safe under **A** and under classic mode / P
 - **Status:** Resolved — new `src/Doctrine/ClosedEntityManagerResetter.php` resets the closed manager through `ManagerRegistry::resetManager()` (looked up by identity in `getManagers()`); `WorkflowApplicator` (new optional `?ManagerRegistry` argument) calls it when `flush()` throws and rethrows the original exception. The same guard was added to the three `flush()` calls in `src/Controller/WorkflowDefinitionController.php` (e.g. duplicate slug on create — there is no `UniqueEntity` constraint, so the unique index can close the manager). The bundle never calls `clear()` on the application's manager. Tests: `WorkflowApplicatorTest::testFailedFlushResetsClosedEntityManagerSoNextRequestCanFlush`, `WorkflowDefinitionControllerTest::testNewPostResetsClosedEntityManagerWhenFlushFails`, `tests/Unit/Doctrine/ClosedEntityManagerResetterTest.php`.
 
 No other findings. `LocaleManager` does not keep the resolved locale in a property, and the UI access checkers ask the authorization checker on every request, so no user data can leak between requests.
+
+### Re-audit 2026-11-10: workflow event dispatcher (1.13.0)
+
+`DatabaseWorkflowRegistry` now passes the application `event_dispatcher` to every built workflow, and gets the
+framework workflow names (a compile-time parameter). The dispatcher is a shared, stateless container service; the
+registry registers no listener when it builds a workflow, and keeps no new per-request state (built workflows are still
+memoized for the current main request only). So listeners do not accumulate and none is registered twice across
+requests. `WorkflowApplicator` gained no property. Result: still worker-safe. Host workflow listeners must themselves be
+stateless (or implement `ResetInterface`), like any event listener in worker mode.
 
 ## Usage recommendations in worker mode
 

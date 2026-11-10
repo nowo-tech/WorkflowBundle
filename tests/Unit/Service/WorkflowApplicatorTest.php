@@ -12,6 +12,7 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
+use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
@@ -23,7 +24,10 @@ use RuntimeException;
 use stdClass;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Workflow\Event\GuardEvent;
+use Symfony\Component\Workflow\Exception\NotEnabledTransitionException;
+use Symfony\Component\Workflow\Exception\UndefinedTransitionException;
 use Symfony\Component\Workflow\Marking;
+use Symfony\Component\Workflow\TransitionBlocker;
 use Symfony\Component\Workflow\WorkflowInterface;
 
 final class WorkflowApplicatorTest extends TestCase
@@ -61,8 +65,36 @@ final class WorkflowApplicatorTest extends TestCase
 
         self::assertSame([], $applicator->getEnabledTransitions($subject, 'order_approval'));
 
-        $this->expectException(InvalidArgumentException::class);
-        $applicator->apply($subject, 'order_approval', 'approve');
+        try {
+            $applicator->apply($subject, 'order_approval', 'approve');
+            self::fail('A blocked transition must throw.');
+        } catch (WorkflowTransitionBlockedException $exception) {
+            self::assertSame('Transition "approve" is not enabled on workflow "order_approval": Not allowed by the domain.', $exception->getMessage());
+            self::assertSame(['Not allowed by the domain.'], $exception->getBlockerMessages());
+            self::assertSame('order_approval', $exception->getWorkflowSlug());
+            self::assertSame('approve', $exception->getTransitionName());
+            self::assertCount(1, $exception->getTransitionBlockerList());
+            self::assertInstanceOf(NotEnabledTransitionException::class, $exception->getPrevious());
+        }
+
+        self::assertSame('draft', $subject->getStatus());
+    }
+
+    public function testApplyRunsTheGuardOfTheAppliedTransitionOnce(): void
+    {
+        $definition = $this->orderDefinition();
+        $subject    = new WorkflowApplicatorTestSubject('draft');
+
+        $calls      = 0;
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener('workflow.order_approval.guard.approve', static function () use (&$calls): void {
+            ++$calls;
+        });
+
+        $this->applicator($definition, null, null, $dispatcher)->apply($subject, 'order_approval', 'approve');
+
+        self::assertSame(1, $calls);
+        self::assertSame('approved', $subject->getStatus());
     }
 
     public function testApplyDoesNotFlushWhenFlushAfterApplyIsDisabled(): void
@@ -130,8 +162,30 @@ final class WorkflowApplicatorTest extends TestCase
         $definition = $this->orderDefinition();
         $subject    = new WorkflowApplicatorTestSubject('approved');
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->applicator($definition)->apply($subject, 'order_approval', 'approve');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+
+        try {
+            $this->applicator($definition, $em)->apply($subject, 'order_approval', 'approve');
+            self::fail('A transition the marking does not enable must throw.');
+        } catch (WorkflowTransitionBlockedException $exception) {
+            self::assertSame([TransitionBlocker::BLOCKED_BY_MARKING], $exception->getBlockerCodes());
+            self::assertStringStartsWith('Transition "approve" is not enabled on workflow "order_approval": ', $exception->getMessage());
+        }
+    }
+
+    public function testThrowsInvalidArgumentWhenTransitionIsNotDefined(): void
+    {
+        $subject = new WorkflowApplicatorTestSubject('draft');
+
+        try {
+            $this->applicator($this->orderDefinition())->apply($subject, 'order_approval', 'publish');
+            self::fail('An undefined transition must throw.');
+        } catch (InvalidArgumentException $exception) {
+            self::assertNotInstanceOf(WorkflowTransitionBlockedException::class, $exception);
+            self::assertSame('Transition "publish" is not defined on workflow "order_approval".', $exception->getMessage());
+            self::assertInstanceOf(UndefinedTransitionException::class, $exception->getPrevious());
+        }
     }
 
     public function testThrowsWhenSubjectClassMismatch(): void

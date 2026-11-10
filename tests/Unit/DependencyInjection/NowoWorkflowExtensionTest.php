@@ -81,6 +81,8 @@ final class NowoWorkflowExtensionTest extends TestCase
         self::assertInstanceOf(Reference::class, $dispatcher);
         self::assertSame('event_dispatcher', (string) $dispatcher);
         self::assertSame(ContainerInterface::IGNORE_ON_INVALID_REFERENCE, $dispatcher->getInvalidBehavior());
+        self::assertSame('%nowo_workflow.framework_workflow_names%', $registry->getArgument('$frameworkWorkflowNames'));
+        self::assertSame([], $container->getParameter('nowo_workflow.framework_workflow_names'));
 
         $applicator = $container->getDefinition(WorkflowApplicator::class);
         self::assertSame('%nowo_workflow.runtime.flush_after_apply%', $applicator->getArgument('$flushAfterApply'));

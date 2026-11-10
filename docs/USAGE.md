@@ -7,6 +7,8 @@
 - [Extending entities](#extending-entities)
 - [Protecting the CRUD UI](#protecting-the-crud-ui)
 - [Workflow events and guards](#workflow-events-and-guards)
+  - [Listeners run before the flush](#listeners-run-before-the-flush)
+  - [Slugs and transition names are configuration](#slugs-and-transition-names-are-configuration)
 - [Custom workflow registry](#custom-workflow-registry)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
@@ -61,7 +63,7 @@ $slug = $resolver->resolveSlugForSubject($expense);
 
 ## Protecting the CRUD UI
 
-By default every request to `nowo_workflow_*` routes is allowed. Implement `WorkflowUiAccessCheckerInterface` and alias it in the container to enforce your own access policy (roles, IP allowlist, etc.). See [SECURITY.md](SECURITY.md#protecting-the-crud-ui).
+Access is **deny-by-default**: the `nowo_workflow_*` routes require one of `security.access_roles` (default `[ROLE_ADMIN]`, checked by `RoleBasedWorkflowUiAccessChecker`). Without SecurityBundle the container does not compile unless you set `security.access_checker` or `security.allow_unauthenticated: true` (dev / demo only). Implement `WorkflowUiAccessCheckerInterface` and set it as `security.access_checker` to enforce your own policy (roles, IP allowlist, etc.). Also add an `access_control` rule for the UI path. See [SECURITY.md](SECURITY.md#protecting-the-crud-ui) and [CONFIGURATION.md](CONFIGURATION.md).
 
 ## Workflow events and guards
 
@@ -70,16 +72,27 @@ Since 1.13.0 the workflows built from the database dispatch the standard
 dispatcher. The workflow name is the definition **slug**:
 
 ```php
+use App\Domain\Expense\Approvable;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\Workflow\Event\CompletedEvent;
 use Symfony\Component\Workflow\Event\GuardEvent;
 
 final class ExpenseWorkflowListener
 {
-    #[AsEventListener('workflow.expense_approval.guard.approve')]
-    public function guardApprove(GuardEvent $event): void
+    public function __construct(private readonly ExpenseApprovedRecorder $recorder)
     {
-        if (!$event->getSubject()->canBeApproved()) {
+    }
+
+    // Invariant: keyed on the subject type and the target place, not on editable names (see below).
+    #[AsEventListener('workflow.guard')]
+    public function guard(GuardEvent $event): void
+    {
+        $subject = $event->getSubject();
+        if (!$subject instanceof Approvable || !in_array('approved', $event->getTransition()->getTos(), true)) {
+            return;
+        }
+
+        if (!$subject->canBeApproved()) {
             $event->setBlocked(true, 'Budget exceeded.');
         }
     }
@@ -87,14 +100,63 @@ final class ExpenseWorkflowListener
     #[AsEventListener('workflow.expense_approval.completed.approve')]
     public function onApproved(CompletedEvent $event): void
     {
-        // raise / publish a domain event
+        // Runs BEFORE the flush: only record the fact here, publish it after the commit (see below).
+        $this->recorder->record($event->getSubject());
     }
 }
 ```
 
 A blocking guard hides the transition from `getEnabledTransitions*()` and makes `apply*()` throw
-`InvalidArgumentException`.
+`Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException` (an `InvalidArgumentException`). Its message
+includes the blocker messages (`Transition "approve" is not enabled on workflow "expense_approval": Budget exceeded.`)
+and `getBlockerMessages()` / `getBlockerCodes()` / `getTransitionBlockerList()` return them. The same exception is
+thrown when the current marking does not enable the transition (code `TransitionBlocker::BLOCKED_BY_MARKING`); an
+unknown transition name throws a plain `InvalidArgumentException`.
 
+`apply*()` calls Symfony's `apply()` directly, so the guard of the applied transition runs **once** per call. Guards
+also run for `can()`, `getEnabledTransitions*()`, and, through the `announce` event, for every transition that leaves
+the new marking: keep guard listeners free of side effects and cheap (no writes, cached look-ups).
+
+### Listeners run before the flush
+
+`WorkflowApplicator::apply*()` changes the marking and dispatches `leave`, `transition`, `enter`, `entered`,
+`completed` and `announce` **inside** Symfony's `apply()`, then flushes (with the default
+`runtime.flush_after_apply: true`). So when a `completed` or `announce` listener runs:
+
+- the marking is already changed in memory but **not persisted yet**;
+- if the flush fails, or a later listener throws, the transition is not stored, but whatever the listener already did
+  (an e-mail, a message on a bus, an HTTP call) cannot be undone.
+
+Do not send e-mails, publish messages or call other systems directly from `completed` / `announce`. Instead:
+
+- record the domain event there and dispatch it after the commit: a Doctrine `postFlush` listener that dispatches the
+  recorded events, an outbox table written in the same flush, or Symfony Messenger with the
+  `DispatchAfterCurrentBusStamp` / a `doctrine_transaction` middleware when the transition runs inside a message
+  handler; or
+- publish it in your application service after `save()` (see the
+  [DDD example](#using-it-from-a-ddd--hexagonal-application)), with `runtime.flush_after_apply: false`.
+
+An exception thrown by any listener (including a global `workflow.*` listener that does not expect the subjects of the
+bundle's workflows) aborts `apply*()` after the marking was changed in memory, and before the flush.
+
+### Slugs and transition names are configuration
+
+Slugs and transition names can be edited in the CRUD UI by anyone with access to it (`security.access_roles`). A
+listener keyed on `workflow.<slug>.guard.<transition>` silently **stops applying** (fail-open) when an admin renames
+the slug or the transition, or adds a second transition with the same `from` / `to` under another name. For domain
+invariants and authorization checks:
+
+- use a `workflow.guard` listener that filters on the **subject** (`instanceof Approvable`) and on the **target
+  place** (`$event->getTransition()->getTos()`), as above, or enforce the invariant in the aggregate itself;
+- treat slug-specific event names as convenience hooks for reactions, not as the only line of defence;
+- restrict the CRUD UI to the people allowed to change the rules.
+
+Keep database slugs distinct from the names of the workflows configured under `framework.workflows`: both would
+dispatch the same `workflow.<name>.*` events, so the framework workflow's listeners and guard expressions would receive
+your database subjects. Since 1.13.0 the registry refuses such a slug while events are dispatched
+(`Nowo\WorkflowBundle\Exception\WorkflowNameCollisionException` when the workflow is built): rename it in the CRUD UI.
+
+## Custom workflow registry
 
 `WorkflowRegistryInterface` is the extension point for resolving Symfony `WorkflowInterface` instances. The default implementation is `DatabaseWorkflowRegistry`; `WorkflowApplicator` depends on the interface.
 
@@ -113,9 +175,12 @@ The bundle has two parts:
 
 - Implement `Contract\WorkflowContextAwareInterface` on the subject (or build a `Model\WorkflowContext` yourself) to
   pass the match parameters (`tenant`, `document_type`, …) as strings.
-- Put domain invariants in guard listeners (`workflow.<slug>.guard.<transition>`, see
-  [Workflow events and guards](#workflow-events-and-guards)): they take part in `can()` / `getEnabledTransitions*()`,
-  so the UI and your code only offer transitions the domain accepts.
+- Keep domain invariants in the aggregate, and mirror them in a `workflow.guard` listener filtered on the subject class
+  and the target place (not on `workflow.<slug>.guard.<transition>`: slugs and transition names are editable, see
+  [Slugs and transition names are configuration](#slugs-and-transition-names-are-configuration)). Guards take part in
+  `can()` / `getEnabledTransitions*()`, so the UI and your code only offer transitions the domain accepts.
+- Publish domain events after the commit, not from `completed` listeners (they run before the flush, see
+  [Listeners run before the flush](#listeners-run-before-the-flush)).
 - Set `runtime.flush_after_apply: false` and persist through your own repository, so the workflow never flushes
   unrelated pending changes of the entity manager outside your transaction boundary.
 - Wrap the runtime in your own application service:
@@ -134,9 +199,9 @@ final readonly class ApproveExpense
     {
         $expense = $this->expenses->get($id);
 
-        $this->workflow->applyForSubject($expense, 'approve'); // guard listeners can veto it
+        $this->workflow->applyForSubject($expense, 'approve'); // guards can veto it (WorkflowTransitionBlockedException)
         $this->expenses->save($expense);                       // with runtime.flush_after_apply: false
-        $this->events->publish(new ExpenseApproved($id, $approver));
+        $this->events->publish(new ExpenseApproved($id, $approver)); // after the commit
     }
 }
 ```
