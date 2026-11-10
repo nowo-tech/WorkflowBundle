@@ -129,15 +129,20 @@ the new marking: keep guard listeners free of side effects and cheap (no writes,
 
 Do not send e-mails, publish messages or call other systems directly from `completed` / `announce`. Instead:
 
-- record the domain event there and dispatch it after the commit: a Doctrine `postFlush` listener that dispatches the
-  recorded events, an outbox table written in the same flush, or Symfony Messenger with the
-  `DispatchAfterCurrentBusStamp` / a `doctrine_transaction` middleware when the transition runs inside a message
-  handler; or
-- publish it in your application service after `save()` (see the
+- record the domain event there and write it to a **transactional outbox** (a table written in the same flush /
+  transaction as the subject), relayed by a separate process; or
+- dispatch it after the **outermost transaction commits**. A Doctrine `postFlush` listener is not enough inside an
+  outer transaction (it runs before that commit, and a later rollback would leave the event published). With
+  Messenger, inside a message handler, use `DispatchAfterCurrentBusStamp` together with the `doctrine_transaction`
+  middleware, so the stamped messages are only sent once the handler's transaction committed; or
+- publish it in your application service after the transaction that saves the subject has committed (see the
   [DDD example](#using-it-from-a-ddd--hexagonal-application)), with `runtime.flush_after_apply: false`.
 
 An exception thrown by any listener (including a global `workflow.*` listener that does not expect the subjects of the
-bundle's workflows) aborts `apply*()` after the marking was changed in memory, and before the flush.
+bundle's workflows) aborts `apply*()` after the marking was changed in memory, and before the flush. The managed
+subject keeps the new marking, so a later `flush()` of the same entity manager would persist the failed transition:
+roll back your transaction and `refresh()` the subject (or discard it, the entity manager and any recorded events)
+before continuing.
 
 ### Slugs and transition names are configuration
 
@@ -146,8 +151,11 @@ listener keyed on `workflow.<slug>.guard.<transition>` silently **stops applying
 the slug or the transition, or adds a second transition with the same `from` / `to` under another name. For domain
 invariants and authorization checks:
 
-- use a `workflow.guard` listener that filters on the **subject** (`instanceof Approvable`) and on the **target
-  place** (`$event->getTransition()->getTos()`), as above, or enforce the invariant in the aggregate itself;
+- enforce the invariant in the domain (the aggregate refuses the state change), and mirror it in a `workflow.guard`
+  listener that filters on the **subject** (`instanceof Approvable`) and on the **target place**
+  (`$event->getTransition()->getTos()`), as above. A guard only runs for transitions: a definition whose **initial
+  place** is the protected place puts a new subject there without any guard, so check the initial place of the
+  definitions too;
 - treat slug-specific event names as convenience hooks for reactions, not as the only line of defence;
 - restrict the CRUD UI to the people allowed to change the rules.
 
@@ -201,7 +209,10 @@ final readonly class ApproveExpense
 
         $this->workflow->applyForSubject($expense, 'approve'); // guards can veto it (WorkflowTransitionBlockedException)
         $this->expenses->save($expense);                       // with runtime.flush_after_apply: false
-        $this->events->publish(new ExpenseApproved($id, $approver)); // after the commit
+
+        // Publish once the transaction that saved the expense has committed (no outer transaction is open here,
+        // or the publisher is an outbox written in that same transaction).
+        $this->events->publish(new ExpenseApproved($id, $approver));
     }
 }
 ```

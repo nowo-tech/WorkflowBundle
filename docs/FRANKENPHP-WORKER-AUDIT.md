@@ -102,8 +102,9 @@ No other findings. `LocaleManager` does not keep the resolved locale in a proper
 framework workflow names (a compile-time parameter). The dispatcher is a shared, stateless container service; the
 registry registers no listener when it builds a workflow, and keeps no new per-request state (built workflows are still
 memoized for the current main request only). So listeners do not accumulate and none is registered twice across
-requests. `WorkflowApplicator` gained no property. Result: still worker-safe. Host workflow listeners must themselves be
-stateless (or implement `ResetInterface`), like any event listener in worker mode.
+requests. `WorkflowApplicator` gained no property. Result: still worker-safe. Host workflow listeners must be
+stateless or have their per-request state cleared between requests: under scenario A they can implement
+`ResetInterface` (`services_resetter` calls it); under scenario B the application must reset them itself.
 
 ## Usage recommendations in worker mode
 
