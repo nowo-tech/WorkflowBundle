@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.13.0] - 2026-11-10](#1130---2026-11-10)
 - [[1.12.0] - 2026-10-30](#1120---2026-10-30)
 - [[1.11.2] - 2026-10-30](#1112---2026-10-30)
 - [[1.11.1] - 2026-10-29](#1111---2026-10-29)
@@ -49,7 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Target 1.13.0 (minor: workflows now dispatch the standard Symfony workflow events). See [UPGRADING](UPGRADING.md#to-1130).
+## [1.13.0] - 2026-11-10
+
+Database workflows now dispatch the standard Symfony workflow events, so guard listeners run (they never did before 1.13.0). See [UPGRADING](https://github.com/nowo-tech/WorkflowBundle/blob/v1.13.0/docs/UPGRADING.md#to-1130).
 
 ### Security
 
@@ -94,6 +97,8 @@ Target 1.13.0 (minor: workflows now dispatch the standard Symfony workflow event
   use a `workflow.guard` listener filtered on the subject and the target place (KR-W-L3); the CRUD UI is deny-by-default
   (`ROLE_ADMIN`), not open (KR-W-I4). FRANKENPHP-WORKER-AUDIT re-audited for the event dispatcher (KR-W-I2); PSR.md
   notes that workflow events are only dispatched since 1.13.0.
+
+[1.13.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.13.0
 
 ## [1.12.0] - 2026-10-30
 
