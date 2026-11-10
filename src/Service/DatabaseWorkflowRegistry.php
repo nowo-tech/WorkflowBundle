@@ -15,6 +15,7 @@ use Symfony\Component\Workflow\MarkingStore\MethodMarkingStore;
 use Symfony\Component\Workflow\StateMachine;
 use Symfony\Component\Workflow\Workflow;
 use Symfony\Component\Workflow\WorkflowInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Symfony\Contracts\Service\ResetInterface;
 use WeakReference;
 
@@ -24,6 +25,10 @@ use WeakReference;
  * Built workflows are memoized for the current main request only, so long-running workers
  * (FrankenPHP, RoadRunner, Messenger) never serve definitions loaded by an earlier request.
  * Outside of an HTTP request (CLI, Messenger) nothing is memoized.
+ *
+ * Workflows are built with the application event dispatcher, so the standard Symfony workflow events
+ * (workflow.guard, workflow.<slug>.guard, workflow.<slug>.transition.<name>, …) are dispatched with the
+ * definition slug as workflow name: guard listeners can block transitions and listeners can react to them.
  */
 final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, ResetInterface
 {
@@ -34,12 +39,14 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
     private ?WeakReference $cacheOwner = null;
 
     /**
-     * Creates the registry with the definition repository, the definition builder and the request stack.
+     * Creates the registry with the definition repository, the definition builder, the request stack and the event
+     * dispatcher the built workflows dispatch their events with (null: no workflow events, the 1.x behaviour).
      */
     public function __construct(
         private readonly WorkflowDefinitionRepository $repository,
         private readonly WorkflowDefinitionBuilder $builder,
         private readonly ?RequestStack $requestStack = null,
+        private readonly ?EventDispatcherInterface $eventDispatcher = null,
     ) {
     }
 
@@ -120,13 +127,13 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
             WorkflowType::StateMachine => new StateMachine(
                 $symfonyDefinition,
                 $markingStore,
-                null,
+                $this->eventDispatcher,
                 $definition->getSlug(),
             ),
             WorkflowType::Workflow => new Workflow(
                 $symfonyDefinition,
                 $markingStore,
-                null,
+                $this->eventDispatcher,
                 $definition->getSlug(),
             ),
         };

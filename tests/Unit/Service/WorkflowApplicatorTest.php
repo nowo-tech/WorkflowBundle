@@ -21,6 +21,8 @@ use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use stdClass;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\Marking;
 use Symfony\Component\Workflow\WorkflowInterface;
 
@@ -37,6 +39,41 @@ final class WorkflowApplicatorTest extends TestCase
         $em->expects(self::once())->method('flush');
 
         $applicator = $this->applicator($definition, $em);
+        $applicator->apply($subject, 'order_approval', 'approve');
+
+        self::assertSame('approved', $subject->getStatus());
+    }
+
+    public function testDomainGuardListenerVetoesApplyAndEnabledTransitions(): void
+    {
+        $definition = $this->orderDefinition();
+        $subject    = new WorkflowApplicatorTestSubject('draft');
+
+        $dispatcher = new EventDispatcher();
+        $dispatcher->addListener('workflow.order_approval.guard', static function (GuardEvent $event): void {
+            $event->setBlocked(true, 'Not allowed by the domain.');
+        });
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+
+        $applicator = $this->applicator($definition, $em, null, $dispatcher);
+
+        self::assertSame([], $applicator->getEnabledTransitions($subject, 'order_approval'));
+
+        $this->expectException(InvalidArgumentException::class);
+        $applicator->apply($subject, 'order_approval', 'approve');
+    }
+
+    public function testApplyDoesNotFlushWhenFlushAfterApplyIsDisabled(): void
+    {
+        $definition = $this->orderDefinition();
+        $subject    = new WorkflowApplicatorTestSubject('draft');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+
+        $applicator = $this->applicator($definition, $em, null, null, false);
         $applicator->apply($subject, 'order_approval', 'approve');
 
         self::assertSame('approved', $subject->getStatus());
@@ -235,6 +272,8 @@ final class WorkflowApplicatorTest extends TestCase
         WorkflowDefinition $definition,
         ?EntityManagerInterface $em = null,
         ?ManagerRegistry $managerRegistry = null,
+        ?EventDispatcher $dispatcher = null,
+        bool $flushAfterApply = true,
     ): WorkflowApplicator {
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('findOneBySlug')->with('order_approval')->willReturn($definition);
@@ -243,11 +282,12 @@ final class WorkflowApplicatorTest extends TestCase
         $em ??= $this->createMock(EntityManagerInterface::class);
 
         return new WorkflowApplicator(
-            new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder()),
+            new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder(), null, $dispatcher),
             $repository,
             new WorkflowResolver($repository),
             $em,
             $managerRegistry,
+            $flushAfterApply,
         );
     }
 }

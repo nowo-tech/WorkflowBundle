@@ -22,6 +22,7 @@ final class ConfigurationTest extends TestCase
         self::assertArrayNotHasKey('enabled', $config);
         self::assertSame('default', $config['connection']);
         self::assertSame('workflow_', $config['table_prefix']);
+        self::assertTrue($config['runtime']['flush_after_apply']);
         self::assertTrue($config['web_ui']['enabled']);
         self::assertSame('/workflow', $config['web_ui']['path_prefix']);
         self::assertNull($config['web_ui']['layout_template']);

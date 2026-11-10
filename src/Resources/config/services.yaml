@@ -68,6 +68,15 @@ services:
         tags:
             - { name: doctrine.event_subscriber }
 
+    # Built workflows dispatch the standard Symfony workflow events (guard, transition, completed, announce…).
+    Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry:
+        arguments:
+            $eventDispatcher: '@?event_dispatcher'
+
+    Nowo\WorkflowBundle\Service\WorkflowApplicator:
+        arguments:
+            $flushAfterApply: '%nowo_workflow.runtime.flush_after_apply%'
+
     Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface: '@Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry'
 
     # Form Kit injects FormOptionsMerger into tagged form types (FormOptionsMergerInjectorCompilerPass).

@@ -49,6 +49,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Target 1.13.0 (minor: workflows now dispatch the standard Symfony workflow events). See [UPGRADING](UPGRADING.md#to-1130).
+
+### Fixed
+
+- **Workflow events are dispatched (DDD audit 2026-11-10, G1):** `DatabaseWorkflowRegistry` built every `StateMachine` /
+  `Workflow` with a `null` event dispatcher, so no `workflow.*` event (`guard`, `leave`, `transition`, `enter`,
+  `entered`, `completed`, `announce`) ever fired: host guard listeners could not block a transition, `can()` /
+  `getEnabledTransitions*()` offered transitions the domain refuses, and nothing could react to an applied transition.
+  The registry now receives the application `event_dispatcher` (optional `$eventDispatcher` constructor argument) and
+  the workflows dispatch the events with the definition **slug** as workflow name (`workflow.<slug>.guard.<transition>`, …).
+  Marking store unchanged (`MethodMarkingStore` on `marking_property`).
+
+### Added
+
+- **`runtime.flush_after_apply` (default `true`, DDD audit G2):** `false` makes `WorkflowApplicator::apply*()` only set
+  the marking and leave persisting to the host (its repository / transaction boundary) instead of flushing every
+  pending change of the default entity manager after each transition.
+
 ## [1.12.0] - 2026-10-30
 
 Page forms are FormKit types with a bundle FormKit profile; requires nowo-tech/form-kit-bundle (REQ-TWIG-005 rule 11). See [UPGRADING](UPGRADING.md#to-1120).

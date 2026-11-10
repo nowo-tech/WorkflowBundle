@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.13.0](#to-1130)
 - [To 1.12.0](#to-1120)
 - [To 1.11.2](#to-1112)
 - [To 1.11.1](#to-1111)
@@ -65,6 +66,39 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.13.0
+
+From **1.12.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+**Workflow events now fire.** Up to 1.12.0 the database workflows were built without an event dispatcher, so the
+standard Symfony workflow events were never dispatched. From 1.13.0 they are, on the application `event_dispatcher`,
+with the definition **slug** as workflow name:
+
+- Listeners on `workflow.guard`, `workflow.<slug>.guard[.<transition>]` are called by `can()`, `getEnabledTransitions*()`
+  and `apply*()`; a listener that calls `$event->setBlocked(true)` now **blocks** the transition (`apply*()` throws
+  `InvalidArgumentException`, the transition disappears from `getEnabledTransitions*()`).
+- Listeners on `workflow.leave`, `workflow.transition`, `workflow.enter`, `workflow.entered`, `workflow.completed`,
+  `workflow.announce` (global ones included, e.g. a generic audit listener) start receiving the events of the
+  bundle's workflows too. Check that global listeners cope with subjects / workflow names they did not see before
+  (filter on `$event->getWorkflowName()`).
+
+To keep the 1.12 behaviour (no events), override the service argument:
+
+```yaml
+services:
+    Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry:
+        arguments:
+            $eventDispatcher: null
+```
+
+**New option `runtime.flush_after_apply`** (default `true`, unchanged behaviour): set it to `false` to persist the
+subject yourself; `apply*()` then only changes the marking. See [CONFIGURATION.md](CONFIGURATION.md).
 
 ## To 1.12.0
 

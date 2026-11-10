@@ -5,6 +5,8 @@
 nowo_workflow:
     connection: default
     table_prefix: workflow_
+    runtime:
+        flush_after_apply: true     # false = WorkflowApplicator::apply*() does not flush; persist the subject yourself
     web_ui:
         enabled: true
         path_prefix: '/workflow'
@@ -23,6 +25,7 @@ nowo_workflow:
 |--------|---------|-------------|
 | `connection` | `default` | **Entity manager name** used by `nowo:workflow:sync-schema`. The bundle mapping (`NowoWorkflowBundle`) is always prepended to the **default** entity manager; to store workflow tables elsewhere, map `NowoWorkflowBundle` on that entity manager yourself and set this option to its name. |
 | `table_prefix` | `workflow_` | Prefix for Doctrine table and constraint names (`workflow_definition` → `{prefix}definition`) |
+| `runtime.flush_after_apply` | `true` | `WorkflowApplicator::apply*()` flushes the injected (default) entity manager after each transition, which commits **every** pending change of its unit of work. `false` = only the marking is changed; the caller persists the subject (repository, transaction boundary). |
 | `web_ui.enabled` | `true` | When `false`, every Workflow UI route (`nowo_workflow_*`) answers 404; UI access checks stay wired (fail-closed). The registry keeps working. |
 | `web_ui.path_prefix` | `/workflow` | Base path of the UI routes (use it as Symfony `access_control` path prefix) |
 | `web_ui.layout_template` | `null` | Layout the pages extend. `null` = UiKit's `nowo_ui_kit.layouts.admin` (recommended: configure the layout once in UiKit). A custom value must render the UiKit canonical blocks (REQ-UI-003). |

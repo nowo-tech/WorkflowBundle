@@ -7,12 +7,16 @@ namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection;
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\DoctrineExtension;
 use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
+use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
+use Nowo\WorkflowBundle\Service\WorkflowApplicator;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use Symfony\Bundle\FrameworkBundle\DependencyInjection\FrameworkExtension;
 use Symfony\Bundle\TwigBundle\DependencyInjection\TwigExtension;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
+use Symfony\Component\DependencyInjection\Reference;
 
 use function array_key_exists;
 use function is_array;
@@ -62,6 +66,33 @@ final class NowoWorkflowExtensionTest extends TestCase
         self::assertSame(['ROLE_ADMIN'], $container->getParameter('nowo_workflow.ui.required_roles'));
         self::assertSame(['ROLE_ADMIN'], $container->getParameter('nowo_workflow.security.access_roles'));
         self::assertFalse($container->getParameter('nowo_workflow.security.allow_unauthenticated'));
+    }
+
+    public function testRegistryGetsTheEventDispatcherAndApplicatorTheFlushOption(): void
+    {
+        $container = new ContainerBuilder();
+        $container->registerExtension(new NowoWorkflowExtension());
+        $container->getExtension('nowo_workflow')->load([[]], $container);
+
+        self::assertTrue($container->getParameter('nowo_workflow.runtime.flush_after_apply'));
+
+        $registry   = $container->getDefinition(DatabaseWorkflowRegistry::class);
+        $dispatcher = $registry->getArgument('$eventDispatcher');
+        self::assertInstanceOf(Reference::class, $dispatcher);
+        self::assertSame('event_dispatcher', (string) $dispatcher);
+        self::assertSame(ContainerInterface::IGNORE_ON_INVALID_REFERENCE, $dispatcher->getInvalidBehavior());
+
+        $applicator = $container->getDefinition(WorkflowApplicator::class);
+        self::assertSame('%nowo_workflow.runtime.flush_after_apply%', $applicator->getArgument('$flushAfterApply'));
+    }
+
+    public function testFlushAfterApplyCanBeDisabled(): void
+    {
+        $container = new ContainerBuilder();
+        $container->registerExtension(new NowoWorkflowExtension());
+        $container->getExtension('nowo_workflow')->load([['runtime' => ['flush_after_apply' => false]]], $container);
+
+        self::assertFalse($container->getParameter('nowo_workflow.runtime.flush_after_apply'));
     }
 
     public function testLoadMapsDeprecatedUiKeys(): void

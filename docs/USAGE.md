@@ -6,7 +6,9 @@
 - [Runtime API](#runtime-api)
 - [Extending entities](#extending-entities)
 - [Protecting the CRUD UI](#protecting-the-crud-ui)
+- [Workflow events and guards](#workflow-events-and-guards)
 - [Custom workflow registry](#custom-workflow-registry)
+- [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
 - [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
 - [Overriding translations (REQ-I18N-001)](#overriding-translations-req-i18n-001)
@@ -61,11 +63,96 @@ $slug = $resolver->resolveSlugForSubject($expense);
 
 By default every request to `nowo_workflow_*` routes is allowed. Implement `WorkflowUiAccessCheckerInterface` and alias it in the container to enforce your own access policy (roles, IP allowlist, etc.). See [SECURITY.md](SECURITY.md#protecting-the-crud-ui).
 
-## Custom workflow registry
+## Workflow events and guards
+
+Since 1.13.0 the workflows built from the database dispatch the standard
+[Symfony workflow events](https://symfony.com/doc/current/workflow.html#using-events) on the application event
+dispatcher. The workflow name is the definition **slug**:
+
+```php
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\Component\Workflow\Event\CompletedEvent;
+use Symfony\Component\Workflow\Event\GuardEvent;
+
+final class ExpenseWorkflowListener
+{
+    #[AsEventListener('workflow.expense_approval.guard.approve')]
+    public function guardApprove(GuardEvent $event): void
+    {
+        if (!$event->getSubject()->canBeApproved()) {
+            $event->setBlocked(true, 'Budget exceeded.');
+        }
+    }
+
+    #[AsEventListener('workflow.expense_approval.completed.approve')]
+    public function onApproved(CompletedEvent $event): void
+    {
+        // raise / publish a domain event
+    }
+}
+```
+
+A blocking guard hides the transition from `getEnabledTransitions*()` and makes `apply*()` throw
+`InvalidArgumentException`.
+
 
 `WorkflowRegistryInterface` is the extension point for resolving Symfony `WorkflowInterface` instances. The default implementation is `DatabaseWorkflowRegistry`; `WorkflowApplicator` depends on the interface.
 
 See demo playgrounds: 0-param orders, 1-param documents, 2-param expenses, 3-param purchase orders, plus `/playground/resolver`.
+
+## Using it from a DDD / hexagonal application
+
+The bundle has two parts:
+
+- **Definitions** (places, transitions, match rules) are a small bounded context of the bundle: its own Doctrine
+  entities and CRUD UI. They never reference your entities except by class name (`subject_class`).
+- **The runtime** (`WorkflowResolver`, `WorkflowApplicator`, `WorkflowRegistryInterface`) builds Symfony
+  workflows from those definitions and applies them to your subjects.
+
+### Keep the domain in charge
+
+- Implement `Contract\WorkflowContextAwareInterface` on the subject (or build a `Model\WorkflowContext` yourself) to
+  pass the match parameters (`tenant`, `document_type`, …) as strings.
+- Put domain invariants in guard listeners (`workflow.<slug>.guard.<transition>`, see
+  [Workflow events and guards](#workflow-events-and-guards)): they take part in `can()` / `getEnabledTransitions*()`,
+  so the UI and your code only offer transitions the domain accepts.
+- Set `runtime.flush_after_apply: false` and persist through your own repository, so the workflow never flushes
+  unrelated pending changes of the entity manager outside your transaction boundary.
+- Wrap the runtime in your own application service:
+
+```php
+final readonly class ApproveExpense
+{
+    public function __construct(
+        private WorkflowApplicator $workflow,
+        private ExpenseRepository $expenses,
+        private DomainEventPublisher $events,
+    ) {
+    }
+
+    public function __invoke(ExpenseId $id, UserId $approver): void
+    {
+        $expense = $this->expenses->get($id);
+
+        $this->workflow->applyForSubject($expense, 'approve'); // guard listeners can veto it
+        $this->expenses->save($expense);                       // with runtime.flush_after_apply: false
+        $this->events->publish(new ExpenseApproved($id, $approver));
+    }
+}
+```
+
+- Match on an interface (`subject_class: App\Domain\Expense\Approvable`) rather than a concrete class, so renaming
+  classes does not orphan definitions.
+
+### Known limitations
+
+- The marking is read and written with `MethodMarkingStore`: the subject needs a public getter and setter for the
+  configured marking property (default `status`). Use a dedicated state-holder object if your aggregate only changes
+  state through intention-revealing methods.
+- With the default `runtime.flush_after_apply: true`, `apply*()` flushes the default entity manager after each
+  transition (including your other pending changes).
+- `WorkflowApplicator` and `WorkflowResolver` are final classes without interfaces; `WorkflowRegistryInterface` is
+  the replaceable port.
 
 ## FrankenPHP / long-running workers
 

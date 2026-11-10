@@ -272,6 +272,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.environments', $config['environments']);
         $container->setParameter(Configuration::ALIAS . '.connection', $config['connection']);
         $container->setParameter(Configuration::ALIAS . '.table_prefix', $config['table_prefix']);
+        $container->setParameter(Configuration::ALIAS . '.runtime.flush_after_apply', $config['runtime']['flush_after_apply']);
 
         $container->setParameter(Configuration::ALIAS . '.web_ui.enabled', $webUi['enabled']);
         $container->setParameter(Configuration::ALIAS . '.web_ui.path_prefix', $webUi['path_prefix']);
