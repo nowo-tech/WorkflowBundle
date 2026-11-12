@@ -19,6 +19,7 @@ use Nowo\WorkflowBundle\Tests\Support\Access\DualPredicate;
 use Nowo\WorkflowBundle\Tests\Support\Access\LegacyPredicateChecker;
 use Nowo\WorkflowBundle\Tests\Support\Access\LegacyPredicateCheckerV1130;
 use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughLegacyDecorator;
+use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughPolicyDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Access\PolicyPredicate;
 use Nowo\WorkflowBundle\Tests\Support\Legacy\RoleBasedWorkflowUiAccessCheckerV1130;
 use Nowo\WorkflowBundle\Tests\Support\Legacy\WorkflowUiAccessCheckerInterfaceV1130;
@@ -82,8 +83,8 @@ final class AccessDecisionEquivalenceMatrixTest extends TestCase
         $differences = $this->compare(static fn (string $policy, string $variant, TokenStorage $tokens, Closure $authorization, bool $enabled): ?WorkflowUiAccessSubscriber => null, $outcomes);
 
         self::assertSame([], array_slice($differences, 0, 10), sprintf('%d differences', count($differences)));
-        // 2 enabled × 7 routes × 2 request types × 7 tokens × 10 policies, each compared with 4 variants (+ the unwired
-        // subscriber for deny-all): 8,036 pairs.
+        // 2 enabled × 7 routes × 2 request types × 7 tokens × 10 policies, each compared with 6 variants (+ the unwired
+        // subscriber for deny-all): 11,956 pairs.
         self::assertCount(1960, $outcomes, 'reference cells');
         $distribution = array_count_values($outcomes);
         self::assertArrayHasKey('pass', $distribution);
@@ -131,7 +132,7 @@ final class AccessDecisionEquivalenceMatrixTest extends TestCase
             return new WorkflowUiAccessSubscriber(null, $enabled, new AllowAllWorkflowUiAccessChecker(), $tokens);
         }];
         yield 'deprecated port ignored in both mode' => [static function (string $policy, string $variant, TokenStorage $tokens, Closure $authorization, bool $enabled): ?WorkflowUiAccessSubscriber {
-            if ($variant !== 'both') {
+            if ($variant !== 'both' && $variant !== 'both-decorated') {
                 return null;
             }
 
@@ -182,7 +183,7 @@ final class AccessDecisionEquivalenceMatrixTest extends TestCase
                             $reference  = $this->outcome($this->reference($policy, $tokens, $authorization, $enabled), $requestFactory, $type);
                             $outcomes[] = $reference;
                             // Fail closed: a subscriber with no port wired decides like deny-all.
-                            foreach ($policy === 'deny' ? ['policy', 'legacy', 'dual', 'both', 'unwired'] : ['policy', 'legacy', 'dual', 'both'] as $variant) {
+                            foreach ($policy === 'deny' ? ['policy', 'legacy', 'dual', 'both', 'both-decorated', 'policy-decorated', 'unwired'] : ['policy', 'legacy', 'dual', 'both', 'both-decorated', 'policy-decorated'] as $variant) {
                                 $subscriber = $override($policy, $variant, $tokens, $authorization, $enabled) ?? $this->variant($policy, $variant, $tokens, $authorization, $enabled);
                                 $actual     = $this->outcome($subscriber, $requestFactory, $type);
                                 if ($actual !== $reference) {
@@ -297,6 +298,10 @@ final class AccessDecisionEquivalenceMatrixTest extends TestCase
             // A host service on both ports: asked through the new one (its deprecated method throws).
             'dual'    => new WorkflowUiAccessSubscriber(null, $enabled, str_starts_with($policy, 'custom:') ? new DualPredicate(substr($policy, 7)) : self::policyFor($policy, $authorization), $tokens),
             'unwired' => new WorkflowUiAccessSubscriber(null, $enabled),
+            // NF-1: a host decorator of the 1.14 port over the configured built-in / host service.
+            'policy-decorated' => new WorkflowUiAccessSubscriber(null, $enabled, new PassThroughPolicyDecorator(self::policyFor($policy, $authorization)), $tokens),
+            // NF-1b: decorators of both ports, both asked.
+            'both-decorated' => new WorkflowUiAccessSubscriber(new PassThroughLegacyDecorator($this->legacyFor($policy, $tokens, $authorization)), $enabled, new PassThroughPolicyDecorator(self::policyFor($policy, $authorization)), $tokens),
             // A host decorator of the deprecated port with the same rule on the new port: both asked.
             default => new WorkflowUiAccessSubscriber(new PassThroughLegacyDecorator($this->legacyFor($policy, $tokens, $authorization)), $enabled, self::policyFor($policy, $authorization), $tokens),
         };

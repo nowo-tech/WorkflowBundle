@@ -19,6 +19,7 @@ use Nowo\WorkflowBundle\Tests\Integration\Ddd\Domain\PurchaseOrder;
 use Nowo\WorkflowBundle\Tests\Support\Access\DualPredicate;
 use Nowo\WorkflowBundle\Tests\Support\Access\LegacyPredicateChecker;
 use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughLegacyDecorator;
+use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughPolicyDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Access\PolicyPredicate;
 use Nowo\WorkflowBundle\Tests\Support\Access\TestTokenListener;
 use Psr\Log\NullLogger;
@@ -51,6 +52,8 @@ use const PHP_VERSION_ID;
  * - `legacy`: access_checker on a service implementing only the deprecated port;
  * - `both`: access_checker on a service implementing both ports;
  * - `decorator`: the built-in policy with a host decorator on the deprecated port;
+ * - `policy-decorator`: the built-in policy with a host decorator on the 1.14 port (it wraps the role-based policy);
+ * - `both-decorators`: the built-in policy with host decorators on both ports (both asked);
  * Every variant also maps the host aggregate {@see PurchaseOrder}
  * (on the default manager) and takes `runtime.flush_after_apply` from the constructor.
  *
@@ -67,7 +70,7 @@ final class PortsTestKernel extends Kernel
 
     public const CACHE_ROOT = '/nowo-workflow-ports-kernel';
 
-    public const VARIANTS = ['builtin', 'new', 'legacy', 'both', 'decorator', 'ddd'];
+    public const VARIANTS = ['builtin', 'new', 'legacy', 'both', 'decorator', 'policy-decorator', 'both-decorators', 'ddd'];
 
     public function __construct(private readonly string $variant, bool $debug = true, private readonly bool $flushAfterApply = false)
     {
@@ -192,6 +195,19 @@ final class PortsTestKernel extends Kernel
                     ->decorate(WorkflowUiAccessCheckerInterface::class)
                     ->args([service('.inner')])
                     ->public();
+                break;
+            case 'policy-decorator':
+            case 'both-decorators':
+                $services->set('app.workflow_policy_audit', PassThroughPolicyDecorator::class)
+                    ->decorate(WorkflowUiAccessPolicyInterface::class)
+                    ->args([service('.inner')])
+                    ->public();
+                if ($this->variant === 'both-decorators') {
+                    $services->set('app.workflow_audit', PassThroughLegacyDecorator::class)
+                        ->decorate(WorkflowUiAccessCheckerInterface::class)
+                        ->args([service('.inner')])
+                        ->public();
+                }
                 break;
             case 'ddd':
                 $services->set('app.workflow_policy', PolicyPredicate::class)->args(['non_impersonated_admin']);

@@ -20,6 +20,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Reference;
 
 use function class_exists;
+use function implode;
 use function in_array;
 use function is_a;
 use function is_string;
@@ -43,12 +44,14 @@ use function trigger_deprecation;
  *   request as in 1.13 (a deprecation is triggered at build time); a class that implements neither port fails the
  *   build; a service whose class cannot be known before compilation (factory, synthetic) keeps the 1.13 wiring;
  * - no `access_checker`: the built-in policy (role based, allow-all for allow_unauthenticated, deny-all) sits behind
- *   both ports;
+ *   both ports; a host decorator of the 1.14 port wraps that built-in (audit NF-1a);
  * - the host aliased (or decorated) the 1.14 port to its own service: that service wins over the built-in and is
  *   asked; a deprecated-port service the host configured too is asked as well;
  * - a host decorator of the deprecated port keeps that port asked (the decorator always runs): alone over the built-in
- *   (exactly 1.13), together with the host's 1.14 service otherwise. A decorator of the 1.14 port makes the 1.14 port
- *   the only one asked.
+ *   (exactly 1.13), together with the host's 1.14 service or 1.14 decorator otherwise (audit NF-1b: a decorator of the
+ *   deprecated port is never skipped, so it can never widen access by being dropped).
+ *
+ * Whenever both ports are asked (both must grant), a deprecation names the deprecated-port service(s) to migrate.
  *
  * Runs before optimization: host definitions are loaded, decorators are not applied yet (they follow the aliases).
  */
@@ -78,7 +81,8 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
      * when no safe option is configured.
      *
      * @throws InvalidConfigurationException when the UI is enabled without security, allow_unauthenticated or a checker
-     * @throws LogicException when security.access_checker implements neither port
+     * @throws LogicException when security.access_checker implements neither port, or the 1.14 port is decorated over a
+     *                        deprecated-port-only access_checker
      */
     public function process(ContainerBuilder $container): void
     {
@@ -93,11 +97,12 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
         $allowUnauthenticated = (bool) $container->getParameter('nowo_workflow.security.allow_unauthenticated');
         $hasSecurity          = $container->has('security.authorization_checker');
         $accessCheckerId      = $container->getParameter('nowo_workflow.security.access_checker');
-        $hostPolicy           = $this->isHostPolicy($container);
+        $hostPolicyAlias      = $this->isHostPolicyAlias($container);
+        $hostPolicy           = $hostPolicyAlias || $this->isDecorated($container, WorkflowUiAccessPolicyInterface::class);
 
         if (!$hasSecurity && !$allowUnauthenticated && (!is_string($accessCheckerId) || $accessCheckerId === '')) {
             if (!$enabled) {
-                $this->wire($container, $this->builtIn($container, DenyAllWorkflowUiAccessChecker::class, $hostPolicy));
+                $this->wire($container, $this->builtIn($container, DenyAllWorkflowUiAccessChecker::class, $hostPolicyAlias, $hostPolicy));
 
                 return;
             }
@@ -106,13 +111,13 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
         }
 
         if (is_string($accessCheckerId) && $accessCheckerId !== '') {
-            $this->wire($container, $this->configured($container, $accessCheckerId, $hostPolicy));
+            $this->wire($container, $this->configured($container, $accessCheckerId, $hostPolicyAlias, $hostPolicy));
 
             return;
         }
 
         if ($allowUnauthenticated || !$hasSecurity) {
-            $this->wire($container, $this->builtIn($container, AllowAllWorkflowUiAccessChecker::class, $hostPolicy));
+            $this->wire($container, $this->builtIn($container, AllowAllWorkflowUiAccessChecker::class, $hostPolicyAlias, $hostPolicy));
 
             return;
         }
@@ -125,43 +130,45 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
             ->setArgument('$authorizationChecker', new Reference('security.authorization_checker'))
             ->setPublic(false);
 
-        $this->wire($container, $this->builtIn($container, RoleBasedWorkflowUiAccessChecker::class, $hostPolicy));
+        $this->wire($container, $this->builtIn($container, RoleBasedWorkflowUiAccessChecker::class, $hostPolicyAlias, $hostPolicy));
     }
 
     /**
-     * A built-in service behind both ports (the host's own 1.14 service, when there is one, keeps the 1.14 port).
+     * A built-in service behind both ports (the host's own 1.14 alias, when there is one, keeps the 1.14 port; a host
+     * decorator of the 1.14 port wraps the built-in).
      *
      * @param class-string $builtIn
      */
-    private function builtIn(ContainerBuilder $container, string $builtIn, bool $hostPolicy): string
+    private function builtIn(ContainerBuilder $container, string $builtIn, bool $hostPolicyAlias, bool $hostPolicy): string
     {
         $this->aliasLegacy($container, $builtIn);
-        if (!$hostPolicy) {
+        if (!$hostPolicyAlias) {
             $container->setAlias(WorkflowUiAccessPolicyInterface::class, $builtIn)->setPublic(false);
         }
 
-        if (!$this->legacyDecoratorRuns($container)) {
+        if (!$this->isDecorated($container, WorkflowUiAccessCheckerInterface::class)) {
             return self::MODE_POLICY;
         }
 
         // A host decorator of the deprecated port always runs: alone over the built-in (exactly 1.13), with the host's
-        // 1.14 service otherwise.
-        return $hostPolicy ? self::MODE_BOTH : self::MODE_LEGACY;
+        // 1.14 service or 1.14 decorator otherwise.
+        return $hostPolicy ? $this->both($this->decoratorsOf($container, WorkflowUiAccessCheckerInterface::class)) : self::MODE_LEGACY;
     }
 
     /**
      * The service named by `security.access_checker`.
      */
-    private function configured(ContainerBuilder $container, string $id, bool $hostPolicy): string
+    private function configured(ContainerBuilder $container, string $id, bool $hostPolicyAlias, bool $hostPolicy): string
     {
         $class = $this->classOf($container, $id);
 
         if ($class === null) {
+            $this->assertPolicyDecoratorHasAService($container, $id, $hostPolicyAlias);
             // Unknown class (factory, synthetic, missing service): the 1.13 wiring (the subscriber's typed argument
             // still refuses a service of the wrong type), without a deprecation.
             $container->setAlias(WorkflowUiAccessCheckerInterface::class, $id)->setPublic(false);
 
-            return $hostPolicy ? self::MODE_BOTH : self::MODE_LEGACY;
+            return $hostPolicy ? $this->both([$id]) : self::MODE_LEGACY;
         }
 
         $implementsPolicy = is_a($class, WorkflowUiAccessPolicyInterface::class, true);
@@ -179,23 +186,40 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
         }
 
         if (!$implementsPolicy) {
+            $this->assertPolicyDecoratorHasAService($container, $id, $hostPolicyAlias);
             trigger_deprecation(Configuration::PACKAGE, '1.14', 'The Workflow UI access checker "%s" (%s) implements only "%s"; implement "%s" instead (the deprecated interface is removed in 2.0).', $id, $class, WorkflowUiAccessCheckerInterface::class, WorkflowUiAccessPolicyInterface::class);
 
-            return $hostPolicy ? self::MODE_BOTH : self::MODE_LEGACY;
+            return $hostPolicy ? $this->both([$id]) : self::MODE_LEGACY;
         }
 
         $container->setAlias(WorkflowUiAccessPolicyInterface::class, $id)->setPublic(false);
 
-        return $implementsLegacy && $this->legacyDecoratorRuns($container) ? self::MODE_BOTH : self::MODE_POLICY;
+        return $implementsLegacy && $this->isDecorated($container, WorkflowUiAccessCheckerInterface::class)
+            ? $this->both($this->decoratorsOf($container, WorkflowUiAccessCheckerInterface::class))
+            : self::MODE_POLICY;
     }
 
     /**
-     * A host decorator of the deprecated port, and none of the 1.14 port.
+     * A decorator of the 1.14 port needs a 1.14 service to wrap: with an access_checker on the deprecated port only (or
+     * of an unknown class) and no host alias of the 1.14 port, it would wrap the fail-closed deny-all default.
      */
-    private function legacyDecoratorRuns(ContainerBuilder $container): bool
+    private function assertPolicyDecoratorHasAService(ContainerBuilder $container, string $id, bool $hostPolicyAlias): void
     {
-        return $this->isDecorated($container, WorkflowUiAccessCheckerInterface::class)
-            && !$this->isDecorated($container, WorkflowUiAccessPolicyInterface::class);
+        if (!$hostPolicyAlias && $this->isDecorated($container, WorkflowUiAccessPolicyInterface::class)) {
+            throw new LogicException(sprintf('"%s" decorates "%s", but nowo_workflow.security.access_checker "%s" does not implement it: implement "%s" on that service (or alias the interface to a service that does).', implode('", "', $this->decoratorsOf($container, WorkflowUiAccessPolicyInterface::class)), WorkflowUiAccessPolicyInterface::class, $id, WorkflowUiAccessPolicyInterface::class));
+        }
+    }
+
+    /**
+     * Both ports are asked (both must grant): a deprecation names the deprecated-port service(s) to migrate.
+     *
+     * @param list<string> $legacyServices
+     */
+    private function both(array $legacyServices): string
+    {
+        trigger_deprecation(Configuration::PACKAGE, '1.14', 'The Workflow UI access is decided by both "%s" and the deprecated "%s" (both must grant) because of the deprecated-port service(s) "%s"; migrate them to "%s" (the deprecated interface is removed in 2.0).', WorkflowUiAccessPolicyInterface::class, WorkflowUiAccessCheckerInterface::class, implode('", "', $legacyServices), WorkflowUiAccessPolicyInterface::class);
+
+        return self::MODE_BOTH;
     }
 
     private function aliasLegacy(ContainerBuilder $container, string $id): void
@@ -223,14 +247,10 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
     }
 
     /**
-     * True when the host aliased (or decorated) the 1.14 port itself, i.e. it no longer resolves to a built-in.
+     * True when the host aliased (or defined) the 1.14 port itself, i.e. it no longer resolves to a built-in.
      */
-    private function isHostPolicy(ContainerBuilder $container): bool
+    private function isHostPolicyAlias(ContainerBuilder $container): bool
     {
-        if ($this->isDecorated($container, WorkflowUiAccessPolicyInterface::class)) {
-            return true;
-        }
-
         if (!$container->hasAlias(WorkflowUiAccessPolicyInterface::class)) {
             return $container->hasDefinition(WorkflowUiAccessPolicyInterface::class);
         }
@@ -240,13 +260,22 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
 
     private function isDecorated(ContainerBuilder $container, string $port): bool
     {
-        foreach ($container->getDefinitions() as $definition) {
+        return $this->decoratorsOf($container, $port) !== [];
+    }
+
+    /**
+     * @return list<string> ids of the definitions that decorate the port
+     */
+    private function decoratorsOf(ContainerBuilder $container, string $port): array
+    {
+        $ids = [];
+        foreach ($container->getDefinitions() as $id => $definition) {
             if (($definition->getDecoratedService()[0] ?? null) === $port) {
-                return true;
+                $ids[] = $id;
             }
         }
 
-        return false;
+        return $ids;
     }
 
     private function resolveAlias(ContainerBuilder $container, string $id): string
