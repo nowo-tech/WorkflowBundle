@@ -10,6 +10,7 @@ use LogicException;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
+use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use Nowo\WorkflowBundle\Tests\Support\SqliteManagerRegistry;
 use Nowo\WorkflowBundle\Tests\Support\TenantFilter;
 use PHPUnit\Framework\Attributes\Test;
@@ -102,6 +103,60 @@ final class WorkflowEntityManagerTest extends TestCase
         $source->getFilters()->enable('tenant')->setParameterList('slug', ['x', 'y']);
         $private->live();
         self::assertTrue($private->live()->getFilters()->isEnabled('tenant'));
+    }
+
+    #[Test]
+    public function aBoundaryThatDropsPendingChangesLogsThemPerClass(): void
+    {
+        $logger     = new RecordingLogger();
+        [$doctrine] = $this->synced();
+        $private    = new WorkflowEntityManager($doctrine, null, $logger);
+        $private->persist($this->definition('kept'));
+        $private->flush();
+        $loaded = $private->createQueryBuilder()->select('d')->from(WorkflowDefinition::class, 'd')->getQuery()->getSingleResult();
+        self::assertInstanceOf(WorkflowDefinition::class, $loaded);
+        $loaded->setName('Edited, never saved');
+        $private->persist($this->definition('new'));
+
+        $private->reset();
+
+        self::assertCount(1, $logger->records);
+        self::assertSame('warning', $logger->records[0]['level']);
+        self::assertSame(2, $logger->records[0]['context']['count']);
+        self::assertSame([WorkflowDefinition::class => 2], $logger->records[0]['context']['changes']);
+        self::assertFalse($private->isCreated());
+
+        $private->live();
+        $private->reset();
+        $closed = $private->live();
+        $closed->close();
+        $private->reset();
+        (new WorkflowEntityManager($doctrine))->reset();
+        self::assertCount(1, $logger->records, 'nothing pending, a closed manager or no logger: no warning');
+    }
+
+    #[Test]
+    public function aSourceManagerThatDoesNotMapTheEntitiesFails(): void
+    {
+        $entities = ['Nowo\\WorkflowBundle\\Entity' => dirname(__DIR__, 3) . '/src/Entity'];
+        $doctrine = new SqliteManagerRegistry(['default' => [], 'workflow' => $entities]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('"default"');
+        (new WorkflowEntityManager($doctrine))->source();
+    }
+
+    #[Test]
+    public function listFilterParametersKeepTheirType(): void
+    {
+        [$doctrine, $private] = $this->synced();
+        $source               = $doctrine->getManager();
+        self::assertInstanceOf(EntityManagerInterface::class, $source);
+        $source->getConfiguration()->addFilter('tenant', TenantFilter::class);
+        $source->getFilters()->enable('tenant')->setParameterList('ids', [1, 2], 'integer')->setParameter('slug', 'x');
+
+        $copy = $private->live()->getFilters()->getFilter('tenant');
+        self::assertSame((string) $source->getFilters()->getFilter('tenant'), (string) $copy, 'same values, list flag and types');
     }
 
     /**

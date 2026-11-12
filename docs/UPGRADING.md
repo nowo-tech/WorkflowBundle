@@ -80,8 +80,19 @@ From **1.13.0**:
 composer update nowo-tech/workflow-bundle
 ```
 
-No change is required: every 1.13 configuration keeps its behaviour. Three deprecations may appear when the container
-is built; each one says what to change before 2.0.
+Every 1.13 **configuration** keeps its behaviour, but **one code pattern changes silently**, check it first:
+
+> **Do you edit workflow definitions in your own code?** If your code loads a definition through
+> `WorkflowDefinitionRepository` or `$entityManager->getRepository(WorkflowDefinition::class)` (both return the
+> bundle's repository), changes it and then calls `$entityManager->flush()` on **your** manager, 1.14 **persists
+> nothing and raises no error**: the definition is managed by the bundle's private entity manager. Call
+> `$repository->save($definition)` (or `remove()`) instead. Likewise, one of your entities that references a
+> definition loaded through the repository now fails your flush with Doctrine's *"A new entity was found through the
+> relationship…"*: reference it by slug or id, or load it with your own manager's query builder. As a safety net,
+> changes still pending in the private manager when a request, message or command ends are dropped and logged as a
+> warning (entity class and count). See [Private entity manager for the definitions](#private-entity-manager-for-the-definitions).
+
+Deprecations may appear when the container is built; each one says what to change before 2.0.
 
 ### Workflow UI access port
 
@@ -117,7 +128,15 @@ final class WorkflowUiAccessChecker implements WorkflowUiAccessPolicyInterface
 }
 ```
 
-Implementing both interfaces during the transition is fine: the new one is asked. The constructor of the internal
+**Keep implementing both interfaces until no service of yours injects `WorkflowUiAccessCheckerInterface`.** The new
+one is asked either way, but the deprecated alias is only registered for a class that implements that interface: with
+a class that implements only `WorkflowUiAccessPolicyInterface`, any service (or decorator) that still injects or
+decorates `WorkflowUiAccessCheckerInterface` fails the container build. A decorator of `WorkflowUiAccessPolicyInterface`
+wraps the policy selected by the configuration (role-based, allow-all, deny-all or your service); it needs an
+`access_checker` that implements the new interface (the build fails otherwise). Whenever both ports end up being asked
+(both must grant), a deprecation names the deprecated-port service(s) to migrate.
+
+The constructor of the internal
 `WorkflowUiAccessSubscriber` gained two optional arguments (`$accessPolicy`, `$tokenStorage`) and its first argument
 is now nullable.
 
@@ -149,8 +168,18 @@ Visible differences:
   Creating a `new WorkflowDefinition()` and persisting it with your own manager still works;
 - in long-running workers the definitions are re-read at each request, Messenger message and console command.
 
-`doctrine.private_entity_manager: false` restores the 1.13 behaviour for one minor (deprecated, removed in 2.0).
-`doctrine.entity_manager` names the source manager when the entities are mapped on a dedicated one.
+Notes:
+
+- `save($definition, false)` / `remove($definition, false)` only schedule the change in the private manager. Flushing
+  it later is supported within the same request, message or command; keeping such unflushed changes across a rollback
+  of a transaction your application opened is **not** supported (the private manager may be replaced after the
+  rollback and the change dropped). Flush right away (the default) when you work inside your own transactions.
+- `doctrine.private_entity_manager: false` restores the 1.13 behaviour for one minor (deprecated, removed in 2.0). In
+  that mode `save()` / `remove()` flush the application's **default** entity manager, including every change your
+  application left pending in it.
+- `doctrine.entity_manager` names the source manager when the entities are mapped on a dedicated one. Without it, the
+  source is the **default** manager, which must map the bundle entities (it does with the default
+  `doctrine.register_mapping: true`); the build fails otherwise.
 
 ### XML mapping
 

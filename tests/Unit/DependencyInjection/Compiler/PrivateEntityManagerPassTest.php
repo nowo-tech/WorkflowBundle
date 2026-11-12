@@ -94,6 +94,37 @@ final class PrivateEntityManagerPassTest extends TestCase
         self::assertFalse($container->hasDefinition(PrivateEntityManagerMiddleware::class));
     }
 
+    public function testTheSourceManagerMustMapTheEntities(): void
+    {
+        $container = $this->container();
+        $container->setDefinition('doctrine.orm.default_metadata_driver', (new Definition('Chain'))
+            ->addMethodCall('setDefaultDriver', [new Reference('x')])
+            ->addMethodCall('addDriver', [new Reference('app'), 'App\\Entity']));
+
+        try {
+            (new PrivateEntityManagerPass())->process($container);
+            self::fail('The default manager does not map the bundle entities.');
+        } catch (InvalidConfigurationException $exception) {
+            self::assertStringContainsString('"default"', $exception->getMessage());
+        }
+
+        foreach (['Nowo\\WorkflowBundle\\Entity', 'Nowo\\WorkflowBundle', 'Nowo\\WorkflowBundle\\Entity\\'] as $namespace) {
+            $container->getDefinition('doctrine.orm.default_metadata_driver')->addMethodCall('addDriver', [new Reference('wf'), $namespace]);
+            (new PrivateEntityManagerPass())->process($container);
+            self::assertSame([['connection' => 'default']], $container->getDefinition(PrivateEntityManagerMiddleware::class)->getTag('doctrine.middleware'));
+        }
+    }
+
+    public function testANamespaceThatOnlySharesAPrefixDoesNotCount(): void
+    {
+        $container = $this->container();
+        $container->setDefinition('doctrine.orm.default_metadata_driver', (new Definition('Chain'))
+            ->addMethodCall('addDriver', [new Reference('wf'), 'Nowo\\WorkflowBundle\\EntityExtra']));
+
+        $this->expectException(InvalidConfigurationException::class);
+        (new PrivateEntityManagerPass())->process($container);
+    }
+
     private function container(): ContainerBuilder
     {
         $container = new ContainerBuilder();

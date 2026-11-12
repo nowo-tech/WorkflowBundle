@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\DependencyInjection\Compiler;
 use Doctrine\DBAL\Driver\Connection;
 use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
+use Nowo\WorkflowBundle\Doctrine\WorkflowManagerRegistry;
 use ReflectionMethod;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
@@ -19,13 +20,16 @@ use function interface_exists;
 use function is_array;
 use function is_string;
 use function preg_match;
+use function rtrim;
 use function sprintf;
+use function str_starts_with;
 
 /**
  * Private entity manager wiring (1.14.0, REQ-ARCH-001 rule 6):
  *
  * - fails the build when `nowo_workflow.doctrine.entity_manager` names a manager DoctrineBundle does not know (a
- *   mistyped name included);
+ *   mistyped name included), or when the source manager (that one, else the default manager) does not map the bundle
+ *   entities (audit NF-3: {@see WorkflowEntityManager::source()} uses the same manager);
  * - attaches {@see PrivateEntityManagerMiddleware} only to the connection of the source manager of
  *   {@see WorkflowEntityManager} (the configured manager, else the default one): the host's other connections are
  *   never wrapped.
@@ -67,12 +71,15 @@ final class PrivateEntityManagerPass implements CompilerPassInterface
             }
         }
 
+        $manager = is_string($configured) && $configured !== '' ? $configured : ($container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null);
+        $manager = is_string($manager) && $manager !== '' ? $manager : 'default';
+        $this->assertMapsTheEntities($container, $manager);
+
         if (!$container->hasDefinition(PrivateEntityManagerMiddleware::class)) {
             return;
         }
 
-        $manager = is_string($configured) && $configured !== '' ? $configured : ($container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null);
-        $id      = sprintf('doctrine.orm.%s_entity_manager', is_string($manager) && $manager !== '' ? $manager : 'default');
+        $id = sprintf('doctrine.orm.%s_entity_manager', $manager);
         // DoctrineBundle passes the connection as the manager's first argument.
         $argument   = $container->hasDefinition($id) ? ($container->getDefinition($id)->getArguments()[0] ?? null) : null;
         $connection = $argument instanceof Reference && preg_match('/^doctrine\.dbal\.(.+)_connection$/D', (string) $argument, $match) === 1 ? $match[1] : null;
@@ -84,5 +91,26 @@ final class PrivateEntityManagerPass implements CompilerPassInterface
         $container->getDefinition(PrivateEntityManagerMiddleware::class)
             ->clearTag('doctrine.middleware')
             ->addTag('doctrine.middleware', ['connection' => $connection]);
+    }
+
+    /**
+     * The source manager's mapping driver chain must have a driver for the bundle namespace (a chain DoctrineBundle did
+     * not build, e.g. a host's own driver service, is not inspected).
+     */
+    private function assertMapsTheEntities(ContainerBuilder $container, string $manager): void
+    {
+        $chainId = sprintf('doctrine.orm.%s_metadata_driver', $manager);
+        if (!$container->hasDefinition($chainId)) {
+            return;
+        }
+
+        foreach ($container->getDefinition($chainId)->getMethodCalls() as [$method, $arguments]) {
+            $namespace = $method === 'addDriver' ? ($arguments[1] ?? null) : null;
+            if (is_string($namespace) && str_starts_with(WorkflowManagerRegistry::ENTITY_NAMESPACE . '\\', rtrim($namespace, '\\') . '\\')) {
+                return;
+            }
+        }
+
+        throw new InvalidConfigurationException(sprintf('The Doctrine entity manager "%s" (nowo_workflow.doctrine.entity_manager, else the default manager) does not map %s. Keep doctrine.register_mapping: true, or map the entities on that manager, or set nowo_workflow.doctrine.entity_manager to the manager that maps them.', $manager, WorkflowManagerRegistry::ENTITY_NAMESPACE));
     }
 }

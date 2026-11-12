@@ -4,21 +4,26 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Doctrine;
 
+use Closure;
 use Doctrine\Common\EventManager;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Decorator\EntityManagerDecorator;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query\Filter\Parameter;
+use Doctrine\ORM\Query\Filter\SQLFilter;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\EventListener\WorkflowUnitOfWorkSubscriber;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Service\ResetInterface;
 
 use function array_keys;
-use function is_array;
+use function array_sum;
 use function is_string;
+use function ksort;
 use function sprintf;
-use function unserialize;
 
 /**
  * The bundle's private entity manager for the workflow definitions (1.14.0, REQ-ARCH-001 rule 6).
@@ -27,8 +32,9 @@ use function unserialize;
  * manager, so saving a definition flushed every change the application had left pending, and a failed save reset the
  * application's manager. The bundle now writes the definitions through a **private** manager created on the
  * connection, configuration (mapping, metadata cache, proxies, repository factory) and event manager (table prefix,
- * host listeners) of the source manager: `doctrine.entity_manager` when set, else the manager that maps
- * {@see WorkflowDefinition} (the default manager of a standard application). Its unit of work holds only definition
+ * host listeners) of the source manager: `doctrine.entity_manager` when set, else the application's default manager
+ * (where the bundle registers its mapping; the same manager {@see PrivateEntityManagerPass} attaches the rollback
+ * middleware to, audit NF-3). The source must map {@see WorkflowDefinition}. Its unit of work holds only definition
  * rows: a bundle flush never commits an application change, and a failed write closes only this manager. The tables
  * do not move. The connection is shared, so a transaction the application opened around a bundle call includes the
  * bundle's rows.
@@ -42,7 +48,8 @@ use function unserialize;
  *   scheduled inserts, updates or deletes is **kept** (replacing it would silently drop them) until that work is
  *   flushed or the next unit-of-work boundary;
  * - {@see reset()} ran: at every outermost unit-of-work boundary ({@see WorkflowUnitOfWorkSubscriber}) and at
- *   `kernel.reset`.
+ *   `kernel.reset`. Changes still pending at that moment are dropped and logged as a warning (audit NF-2: a host that
+ *   edits a definition and flushes its own manager instead of calling `WorkflowDefinitionRepository::save()`).
  *
  * The SQL filters enabled on the source manager, with their parameters, are mirrored on the private manager on every
  * call, and a filter whose parameters changed is re-created, so a parameter the source no longer has never survives.
@@ -58,11 +65,13 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
 
     /**
      * @param ManagerRegistry $registry The application's Doctrine registry (the source manager is resolved per call)
-     * @param string|null $sourceManagerName `doctrine.entity_manager` (null = the manager that maps the bundle entities)
+     * @param string|null $sourceManagerName `doctrine.entity_manager` (null = the default manager)
+     * @param LoggerInterface|null $logger warns when a boundary drops pending changes
      */
     public function __construct(
         private readonly ManagerRegistry $registry,
         private readonly ?string $sourceManagerName = null,
+        private readonly ?LoggerInterface $logger = null,
     ) {
         // No wrapped manager yet: every read of $this->wrapped goes through __get() (resolved per call).
         unset($this->{'wrapped'});
@@ -146,9 +155,11 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
 
     /**
      * Drops the private manager (a unit-of-work boundary or `kernel.reset`); the next call creates a fresh one.
+     * Changes still pending are lost: they are logged as a warning with their entity classes and counts.
      */
     public function reset(): void
     {
+        $this->warnAboutDroppedChanges();
         $this->clear();
         // @igor-ignore - Boundary drop of the bundle's own manager (no state kept).
         $this->current = null;
@@ -159,17 +170,48 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
     /**
      * The application's manager whose connection, configuration, events and filters the private one shares. Never
      * flushed, cleared, closed or reset by the bundle.
+     *
+     * @throws LogicException when the source is not an ORM manager or does not map the bundle entities
      */
     public function source(): EntityManagerInterface
     {
-        $source = $this->sourceManagerName !== null
-            ? $this->registry->getManager($this->sourceManagerName)
-            : $this->registry->getManagerForClass(WorkflowDefinition::class);
-        if (!$source instanceof EntityManagerInterface) {
-            throw new LogicException(sprintf('No Doctrine ORM entity manager maps %s: keep the bundle mapping on the default manager or set nowo_workflow.doctrine.entity_manager (see docs/CONFIGURATION.md, "Doctrine").', WorkflowDefinition::class));
+        $source = $this->registry->getManager($this->sourceManagerName);
+        if (!$source instanceof EntityManagerInterface || $source->getMetadataFactory()->isTransient(WorkflowDefinition::class)) {
+            throw new LogicException(sprintf('The Doctrine entity manager "%s" does not map %s: keep the bundle mapping on the default manager, or set nowo_workflow.doctrine.entity_manager to the manager that maps it (see docs/CONFIGURATION.md, "Doctrine").', $this->sourceManagerName ?? $this->registry->getDefaultManagerName(), WorkflowDefinition::class));
         }
 
         return $source;
+    }
+
+    /**
+     * Audit NF-2 safety net: a boundary that drops the private manager while it still has inserts, updates or deletes
+     * waiting (a definition edited and never saved through the bundle) logs them, per entity class.
+     */
+    private function warnAboutDroppedChanges(): void
+    {
+        if (!$this->logger instanceof LoggerInterface || !$this->current instanceof EntityManagerInterface || !$this->current->isOpen()) {
+            return;
+        }
+
+        $unitOfWork = $this->current->getUnitOfWork();
+        $unitOfWork->computeChangeSets();
+        $changes = [];
+        foreach ([$unitOfWork->getScheduledEntityInsertions(), $unitOfWork->getScheduledEntityUpdates(), $unitOfWork->getScheduledEntityDeletions()] as $entities) {
+            foreach ($entities as $entity) {
+                $class           = WorkflowManagerRegistry::realClass($entity::class);
+                $changes[$class] = ($changes[$class] ?? 0) + 1;
+            }
+        }
+        if ($changes === []) {
+            return;
+        }
+
+        ksort($changes);
+        $this->logger->warning('Workflow definitions: {count} pending change(s) of the bundle\'s private entity manager were dropped at a unit-of-work boundary. Save definitions with WorkflowDefinitionRepository::save(); the application\'s flush() does not write them.', [
+            'bundle'  => 'NowoWorkflowBundle',
+            'count'   => array_sum($changes),
+            'changes' => $changes,
+        ]);
     }
 
     /**
@@ -189,8 +231,9 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
 
     /**
      * Mirrors the SQL filters enabled on the source manager, with their parameters, on the private one, and disables
-     * the others. A filter whose serialized parameters differ is disabled and enabled again (a fresh instance) before
-     * its parameters are copied, so a parameter the source no longer has (a previous tenant) never survives.
+     * the others. A filter whose parameters differ (its state string) is disabled and enabled again (a fresh instance)
+     * before its parameters are copied, so a parameter the source no longer has (a previous tenant) never survives.
+     * The parameters are read as they are stored (audit NF-7): values, list flag and the list type are kept.
      */
     private function syncFilters(EntityManagerInterface $source, EntityManagerInterface $target): void
     {
@@ -210,18 +253,30 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
                 $filters->disable($name);
             }
             $copy = $filters->enable($name);
-            // The state is the source filter's own in-process serialization (SQLFilter::__toString()), never user input;
-            // object parameter values (a Uuid, a date) must come back as objects.
-            /** @var array<string, array{value: mixed, type: int|string|null, is_list?: bool}> $parameters */
-            $parameters = unserialize($state);
-            // SQLFilter::setParameter() takes a string type or null: a non-string type was inferred, null infers it again.
-            foreach ($parameters as $parameter => $definition) {
-                if (($definition['is_list'] ?? false) === true && is_array($definition['value'])) {
-                    $copy->setParameterList($parameter, $definition['value'], is_string($definition['type']) ? $definition['type'] : 'string');
+            foreach ($this->filterParameters($filter) as $parameter => $value) {
+                if ($value->isList) {
+                    /** @var array<mixed> $list */
+                    $list = $value->value;
+                    $copy->setParameterList($parameter, $list, is_string($value->type) ? $value->type : Types::STRING);
                 } else {
-                    $copy->setParameter($parameter, $definition['value'], is_string($definition['type']) ? $definition['type'] : null);
+                    // SQLFilter::setParameter() takes a string type or null: a non-string type was inferred, null infers it again.
+                    $copy->setParameter($parameter, $value->value, is_string($value->type) ? $value->type : null);
                 }
             }
         }
+    }
+
+    /**
+     * The raw parameters of a filter (SQLFilter keeps them private and only exposes quoted values).
+     *
+     * @return array<string, Parameter>
+     */
+    private function filterParameters(SQLFilter $filter): array
+    {
+        $read = static fn (SQLFilter $filter): array => $filter->parameters; // @phpstan-ignore property.private (bound to SQLFilter below)
+        /** @var array<string, Parameter> $parameters */
+        $parameters = Closure::bind($read, null, SQLFilter::class)($filter);
+
+        return $parameters;
     }
 }

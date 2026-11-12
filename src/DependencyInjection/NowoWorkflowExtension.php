@@ -378,7 +378,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     private function registerPrivateEntityManager(ContainerBuilder $container): void
     {
         $container->register(WorkflowEntityManager::class, WorkflowEntityManager::class)
-            ->setArguments([new Reference('doctrine'), '%' . PrivateEntityManagerPass::ENTITY_MANAGER_PARAMETER . '%'])
+            ->setArguments([new Reference('doctrine'), '%' . PrivateEntityManagerPass::ENTITY_MANAGER_PARAMETER . '%', new Reference('logger', ContainerInterface::IGNORE_ON_INVALID_REFERENCE)])
             ->addTag('kernel.reset', ['method' => 'reset']);
         $container->register(WorkflowManagerRegistry::class, WorkflowManagerRegistry::class)
             ->setArguments([new Reference('doctrine'), new Reference(WorkflowEntityManager::class)]);

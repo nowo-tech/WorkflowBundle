@@ -84,6 +84,12 @@ for new installs and an XML mapping (REQ-ARCH-001 rules 2, 3 and 6). See [UPGRAD
   container build (it failed with a `TypeError` on the first request before).
 - `WorkflowUiAccessSubscriber` (internal): the first constructor argument is nullable; `$accessPolicy` and
   `$tokenStorage` were added. With no port wired it denies.
+- Decorators of the 1.14 port wrap the policy selected by the configuration; with a decorator of the deprecated port
+  as well, both ports are asked (both must grant) and a deprecation names the deprecated-port service to migrate. A
+  1.14-port decorator over an `access_checker` that implements only the deprecated port fails the build (audit NF-1).
+- Without `doctrine.entity_manager` the private manager's source is the default manager, which must map the bundle
+  entities (build-time check, audit NF-3). SQL filter parameters are copied as stored, list types included (NF-7).
+- A boundary that drops pending private-manager changes logs a warning with the entity classes and count (NF-2).
 
 ### Deprecated
 

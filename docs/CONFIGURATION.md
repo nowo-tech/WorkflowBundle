@@ -30,8 +30,8 @@ nowo_workflow:
 | `connection` | `default` | **Entity manager name** used by `nowo:workflow:sync-schema`. The bundle mapping (`NowoWorkflowBundle`) is always prepended to the **default** entity manager; to store workflow tables elsewhere, map `NowoWorkflowBundle` on that entity manager yourself and set this option to its name. |
 | `table_prefix` | `workflow_` | Prefix for Doctrine table and constraint names (`workflow_definition` → `{prefix}definition`) |
 | `runtime.flush_after_apply` | `true` when unset (deprecated), `false` in the 1.14 recipe | `true`: `WorkflowApplicator::apply*()` flushes the application's default entity manager after each transition, which commits **every** pending change of its unit of work (1.13 behaviour). `false`: only the marking is changed; the caller persists the subject (repository, transaction boundary). Not setting the key keeps `true` and triggers a deprecation (since 1.14): the default becomes `false` in 2.0. See [Flushing after apply](#flushing-after-apply-new-installs-and-upgrades). |
-| `doctrine.entity_manager` | `null` | Since 1.14. Source manager of the bundle's **private** entity manager (connection, mapping configuration, event manager, SQL filters). `null` = the manager that maps the bundle entities (the default manager of a standard application). A name must exist under `doctrine.orm.entity_managers` (the build fails otherwise) and that manager must map the bundle entities. The bundle never flushes, clears or resets it. |
-| `doctrine.private_entity_manager` | `true` | Since 1.14. `false` restores the 1.13 behaviour (the admin UI, demo seeder and repository use the application's default manager). **Deprecated** as soon as it is set; removed in 2.0. |
+| `doctrine.entity_manager` | `null` | Since 1.14. Source manager of the bundle's **private** entity manager (connection, mapping configuration, event manager, SQL filters). `null` = the application's **default** manager (where `register_mapping: true` maps the entities). The source must exist under `doctrine.orm.entity_managers` and map the bundle entities: the build fails otherwise. The bundle never flushes, clears or resets it. |
+| `doctrine.private_entity_manager` | `true` | Since 1.14. `false` restores the 1.13 behaviour (the admin UI, demo seeder and repository use the application's default manager; `WorkflowDefinitionRepository::save()` / `remove()` then flush that manager, including the application's pending changes). **Deprecated** as soon as it is set; removed in 2.0. |
 | `doctrine.register_mapping` | `true` | Since 1.14. `false` = the bundle does not prepend its mapping; map `Nowo\WorkflowBundle\Entity` yourself (e.g. only on a dedicated manager, from the shipped XML). |
 | `doctrine.mapping_type` | `attribute` | Since 1.14. `xml` = the bundle registers `src/Resources/config/doctrine/*.orm.xml` (same tables, columns, indexes and constraints as the attributes; a test asserts the parity). |
 | `web_ui.enabled` | `true` | When `false`, every Workflow UI route (`nowo_workflow_*`) answers 404; UI access checks stay wired (fail-closed). The registry keeps working. |
@@ -119,6 +119,9 @@ definition rows:
   replaced at the next use, unless it still has pending changes, which are kept until flushed or the next boundary.
 
 The connection is shared: a transaction your code opens around a bundle call includes the bundle's writes.
+Unflushed `save($definition, false)` / `remove($definition, false)` changes kept across a rollback of your transaction
+are not supported (flush right away inside your own transactions). Changes still pending when a boundary drops the
+private manager are logged as a warning (entity classes and count).
 `WorkflowDefinitionRepository` returns entities managed by the private manager: change and persist them through the
 bundle (admin UI) or with `$repository->save($definition)` / `remove()` (1.14), not through your own manager. Set
 `doctrine.private_entity_manager: false` (deprecated) to keep the 1.13 behaviour for one minor while you migrate.

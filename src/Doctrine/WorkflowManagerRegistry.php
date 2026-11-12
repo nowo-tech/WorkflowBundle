@@ -105,11 +105,16 @@ final readonly class WorkflowManagerRegistry implements ManagerRegistry
      */
     public static function isBundleEntity(string $class): bool
     {
-        $marker = strrpos($class, '\\__CG__\\');
-        if ($marker !== false) {
-            $class = substr($class, $marker + 8);
-        }
+        return str_starts_with(self::realClass($class), self::ENTITY_NAMESPACE . '\\');
+    }
 
-        return str_starts_with($class, self::ENTITY_NAMESPACE . '\\');
+    /**
+     * The entity class of a Doctrine proxy class name (`…\__CG__\App\Entity\X` → `App\Entity\X`), or the class itself.
+     */
+    public static function realClass(string $class): string
+    {
+        $marker = strrpos($class, '\\__CG__\\');
+
+        return $marker !== false ? substr($class, $marker + 8) : $class;
     }
 }

@@ -39,6 +39,8 @@ final class WorkflowManagerRegistryTest extends TestCase
         self::assertSame(['default' => 'em.default'], $registry->getManagerNames());
         self::assertNotSame($host, $registry->resetManager(), 'Delegated to the application registry (never called by the bundle).');
         self::assertFalse(WorkflowManagerRegistry::isBundleEntity('App\\Entity\\Page'));
+        self::assertSame('App\\Entity\\Page', WorkflowManagerRegistry::realClass('Proxies\\__CG__\\App\\Entity\\Page'));
+        self::assertSame('App\\Entity\\Page', WorkflowManagerRegistry::realClass('App\\Entity\\Page'));
     }
 
     public function testPrivateManagerLifecycle(): void
