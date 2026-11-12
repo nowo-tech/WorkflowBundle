@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.15.0] - 2026-11-12](#1150---2026-11-12)
 - [[1.14.1] - 2026-11-12](#1141---2026-11-12)
 - [[1.14.0] - 2026-11-12](#1140---2026-11-12)
 - [[1.13.0] - 2026-11-10](#1130---2026-11-10)
@@ -51,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-06-10](#100---2026-06-10)
 
 ## [Unreleased]
+
+## [1.15.0] - 2026-11-12
 
 Multitenant workflows (owner request D-20261112-10, Beacon): tenant-scoped definitions with global templates,
 versions pinned per subject, an embeddable per-organization UI, per-transition guards configured in the editor, an
@@ -172,6 +175,7 @@ Hardening from the immediate audit NO of this release (before it shipped):
   `WorkflowRuntimeInterface`. It stays the SPI `WorkflowApplicator` asks until 2.0; a host implementation or decorator
   triggers a deprecation when the container is built.
 
+[1.15.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.15.0
 
 ## [1.14.1] - 2026-11-12
 
