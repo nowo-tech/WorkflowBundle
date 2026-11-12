@@ -129,6 +129,38 @@ final class WorkflowDefinitionFormTypeTest extends TypeTestCase
         }
     }
 
+    /**
+     * 1.15.2: the shape is checked on the submitted type: switching a workflow to state_machine in General cannot leave
+     * a transition with several targets behind; a transition without source or target is refused for every type.
+     */
+    public function testSwitchingToStateMachineChecksTheExistingTransitions(): void
+    {
+        $definition = new WorkflowDefinition('Order', 'order', 'draft', 'App\\Entity\\Order', WorkflowType::Workflow);
+        foreach (['draft', 'done', 'cancelled'] as $place) {
+            $definition->addPlace(new WorkflowPlace($place));
+        }
+        $definition->addTransition(new WorkflowTransition('close', ['draft'], ['done', 'cancelled']));
+        $general = [
+            'name' => 'Order', 'slug' => 'order', 'initialPlace' => 'draft', 'subjectClass' => 'App\\Entity\\Order',
+            'markingProperty' => 'status', 'enabled' => true, 'priority' => 0, 'description' => '',
+        ];
+
+        $form = $this->factory->create(WorkflowDefinitionFormType::class, $definition, ['section' => WorkflowDefinitionFormSection::General]);
+        $form->submit($general + ['type' => WorkflowType::StateMachine->value]);
+        self::assertFalse($form->isValid());
+        self::assertStringContainsString('Transition "close": a state machine transition has exactly one target place.', (string) $form->get('type')->getErrors());
+
+        $definition->setType(WorkflowType::Workflow);
+        $form = $this->factory->create(WorkflowDefinitionFormType::class, $definition, ['section' => WorkflowDefinitionFormSection::General]);
+        $form->submit($general + ['type' => WorkflowType::Workflow->value]);
+        self::assertTrue($form->isValid(), 'a workflow may have several targets');
+
+        $form = $this->factory->create(WorkflowDefinitionFormType::class, $definition, ['section' => WorkflowDefinitionFormSection::Transitions]);
+        $form->submit(['transitions' => [['name' => 'close', 'label' => '', 'fromPlaces' => [], 'toPlaces' => ['done']]]]);
+        self::assertFalse($form->isValid());
+        self::assertStringContainsString('at least one source place and one target place', (string) $form->getErrors());
+    }
+
     public function testPlacesSectionSubmit(): void
     {
         $definition = new WorkflowDefinition('Order', 'order', 'draft', 'App\\Entity\\Order');

@@ -14,10 +14,15 @@ use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use Nowo\WorkflowBundle\Tests\Support\GuardProbeSubject;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Workflow\Transition;
 
 use function array_map;
+use function restore_error_handler;
+use function set_error_handler;
+
+use const E_USER_DEPRECATED;
 
 final class WorkflowDefinitionBuilderTest extends TestCase
 {
@@ -64,31 +69,74 @@ final class WorkflowDefinitionBuilderTest extends TestCase
     }
 
     /**
-     * 1.15.2: a state machine transition needs exactly one target and at least one source (FrameworkBundle's
-     * StateMachineValidator refuses the same name from the same place twice); refused when the workflow is built.
+     * 1.15.2 (owner decision): a stored state machine transition FrameworkBundle would refuse still runs as in 1.15.1
+     * (several targets: the subject lands on the first one; no source: one transition without source), with a
+     * deprecation and a warning naming the workflow and the transition. 1.16.0 refuses it.
      *
-     * @return iterable<string, array{list<string>, list<string>}>
+     * @return iterable<string, array{list<string>, list<string>, list<array{list<string>, list<string>}>}>
      */
     public static function invalidStateMachineTransitions(): iterable
     {
-        yield 'two targets' => [['review'], ['done', 'cancelled']];
-        yield 'no target' => [['review'], []];
-        yield 'no source' => [[], ['done']];
+        yield 'two targets' => [['draft', 'review'], ['done', 'cancelled'], [[['draft'], ['done', 'cancelled']], [['review'], ['done', 'cancelled']]]];
+        yield 'no target' => [['review'], [], [[['review'], []]]];
+        yield 'no source' => [[], ['done'], [[[], ['done']]]];
     }
 
     /**
      * @param list<string> $from
      * @param list<string> $to
+     * @param list<array{list<string>, list<string>}> $expected
      */
     #[DataProvider('invalidStateMachineTransitions')]
-    public function testStateMachineTransitionWithoutExactlyOneTargetIsRefused(array $from, array $to): void
+    public function testInvalidStateMachineTransitionKeepsThe1151BehaviourWithADeprecation(array $from, array $to, array $expected): void
     {
         $entity = $this->cancellable(WorkflowType::StateMachine);
         $entity->addTransition(new WorkflowTransition('fork', $from, $to));
+        $logger       = new RecordingLogger();
+        $deprecations = [];
+        set_error_handler(static function (int $level, string $message) use (&$deprecations): bool {
+            $deprecations[] = $message;
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Transition "fork" of state machine "order" must have at least one source place and exactly one target place.');
-        (new WorkflowDefinitionBuilder())->build($entity);
+            return true;
+        }, E_USER_DEPRECATED);
+
+        try {
+            $transitions = (new WorkflowDefinitionBuilder($logger))->build($entity)->getTransitions();
+        } finally {
+            restore_error_handler();
+        }
+
+        $fork = [];
+        foreach ($transitions as $transition) {
+            if ($transition->getName() === 'fork') {
+                $fork[] = [$transition->getFroms(), $transition->getTos()];
+            }
+        }
+        self::assertSame($expected, $fork);
+        self::assertCount(1, $deprecations);
+        self::assertStringContainsString('Workflow "order", transition "fork"', $deprecations[0]);
+        self::assertStringContainsString('1.16.0 refuses to build it', $deprecations[0]);
+        self::assertCount(1, $logger->records);
+        self::assertSame('warning', $logger->records[0]['level']);
+    }
+
+    public function testSeveralTargetsOnAStateMachineStillLandOnTheFirstOne(): void
+    {
+        $entity = $this->cancellable(WorkflowType::StateMachine);
+        $entity->addTransition(new WorkflowTransition('fork', ['review'], ['done', 'cancelled']));
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->willReturn($entity);
+        set_error_handler(static fn (): bool => true, E_USER_DEPRECATED);
+
+        try {
+            $workflow = (new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder()))->get('order');
+            $subject  = new GuardProbeSubject('review');
+            $workflow->apply($subject, 'fork');
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame('done', $subject->getStatus());
     }
 
     public function testWorkflowTransitionMayHaveSeveralTargets(): void

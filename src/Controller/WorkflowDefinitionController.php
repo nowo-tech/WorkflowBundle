@@ -12,6 +12,7 @@ use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
+use Nowo\WorkflowBundle\Exception\WorkflowInvalidShapeException;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormType;
 use Nowo\WorkflowBundle\Http\WorkflowUiTenancy;
@@ -34,6 +35,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Throwable;
+
+use function implode;
 
 /**
  * Workflow definitions CRUD (UiKit page scaffolds, REQ-UI-003): index → page/list, show → page/show,
@@ -229,7 +232,14 @@ final class WorkflowDefinitionController extends AbstractController
         if (!$definition->isDraft()) {
             throw $this->createNotFoundException('Only a draft can be published.');
         }
-        $published = $this->versioning()->publish($definition);
+        try {
+            $published = $this->versioning()->publish($definition);
+        } catch (WorkflowInvalidShapeException $exception) {
+            // Since 1.15.2: transitions FrameworkBundle would refuse (no source / target, several targets on a state machine).
+            $this->addFlash('error', $this->translator->trans('error.invalid_shape', ['%violations%' => implode(' ', $exception->violations)], WorkflowPageFactory::DOMAIN));
+
+            return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
+        }
         $this->logger->info('Workflow definition published.', ['bundle' => 'NowoWorkflowBundle', 'action' => 'publish_definition', 'id' => $published->getId(), 'slug' => $published->getSlug(), 'version' => $published->getVersion()]);
         $this->flash('flash.published');
 

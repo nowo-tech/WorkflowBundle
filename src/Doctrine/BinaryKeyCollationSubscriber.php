@@ -16,6 +16,7 @@ use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
+use Psr\Log\LoggerInterface;
 
 use function is_array;
 use function is_callable;
@@ -68,6 +69,7 @@ final readonly class BinaryKeyCollationSubscriber
 
     public function __construct(
         private ManagerRegistry $doctrine,
+        private ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -99,6 +101,9 @@ final readonly class BinaryKeyCollationSubscriber
         }
         $connection = $manager->getConnection();
         $platform   = $connection->getDatabasePlatform();
+        if ($class === WorkflowDefinition::class) {
+            $this->warnAboutPartialVersion($connection, $platform);
+        }
         $collation  = self::collationFor($platform, $platform instanceof MySQL80Platform ? self::serverVersion($connection) : null);
         if ($collation === null) {
             return;
@@ -140,15 +145,42 @@ final readonly class BinaryKeyCollationSubscriber
     }
 
     /**
+     * Since 1.15.2: one warning per schema generation when a MySQL server version is configured without its patch
+     * number and that leaves the key columns on `utf8mb4_bin`, which is PAD SPACE (`'abc '` = `'abc'`): `8` (DBAL picks
+     * a generic platform) or `8.0` (8.0.17+ cannot be told apart). `9.7` or `8.4` are fine.
+     */
+    private function warnAboutPartialVersion(Connection $connection, AbstractPlatform $platform): void
+    {
+        if (!$platform instanceof AbstractMySQLPlatform || $platform instanceof MariaDBPlatform) {
+            return;
+        }
+        $version = self::configuredVersion($connection);
+        if ($version === null || preg_match('/^\d+\.\d+\.\d+/', $version) === 1 || self::collationFor($platform, $version) !== self::COLLATION) {
+            return;
+        }
+        $this->logger?->warning('doctrine.dbal.server_version "{version}" has no patch number: the Workflow key columns get the PAD SPACE collation utf8mb4_bin. Configure the full version (e.g. 8.4.3) to get utf8mb4_0900_bin.', ['bundle' => 'NowoWorkflowBundle', 'version' => $version]);
+    }
+
+    /**
+     * The server version configured on the connection (also on a primary / replica connection), if any.
+     */
+    private static function configuredVersion(Connection $connection): ?string
+    {
+        $params  = $connection->getParams();
+        $primary = $params['primary'] ?? null;
+        $version = $params['serverVersion'] ?? (is_array($primary) ? ($primary['serverVersion'] ?? null) : null);
+
+        return is_string($version) && $version !== '' ? $version : null;
+    }
+
+    /**
      * The configured server version (`doctrine.dbal.server_version` / `?serverVersion=`, also on a primary / replica
      * connection), else the one the server reports (null when it cannot be read: unknown).
      */
     private static function serverVersion(Connection $connection): ?string
     {
-        $params  = $connection->getParams();
-        $primary = $params['primary'] ?? null;
-        $version = $params['serverVersion'] ?? (is_array($primary) ? ($primary['serverVersion'] ?? null) : null);
-        if (is_string($version) && $version !== '') {
+        $version = self::configuredVersion($connection);
+        if ($version !== null) {
             return $version;
         }
         // doctrine/dbal 4: public Connection::getServerVersion(); doctrine/dbal 3 keeps it private (the wrapped driver

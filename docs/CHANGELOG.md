@@ -73,12 +73,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **State machine transitions with several `from` places (Beacon):** the definition builder now mirrors
   FrameworkBundle: a `state_machine` transition becomes one Symfony `Transition` per `from` place with the same name,
   so it fires from any of its `from` places (before, a single `Transition` needed all of them marked and never fired
-  on a state machine). As with FrameworkBundle's `StateMachineValidator`, a state machine transition needs at least one
-  `from` and exactly one `to` place: the builder refuses another shape with an explicit `InvalidArgumentException`
-  (before, several `to` places silently moved the subject to the first one) and the transition editor refuses to save
-  it. A `workflow` transition is unchanged (all `from` places must be marked, any number of `to` places).
-- **DoctrineBundle 3 with a custom `table_prefix`:** see UPGRADING before generating the migration (rename the tables
-  by hand; the generated diff drops and recreates them).
+  on a state machine). A `workflow` transition is unchanged (all `from` places must be marked).
+- **Transition shapes FrameworkBundle refuses (owner decision, audit OD M1):** a stored transition without `from` or
+  `to` places, or a `state_machine` transition with several `to` places, **still runs as in 1.15.1** (several targets:
+  the subject lands on the first one) but triggers a deprecation and a logged warning naming the workflow and the
+  transition. 1.16.0 refuses to build them. The editor (on the submitted type, so switching General to
+  `state_machine` is checked too) and `WorkflowVersioning::publish()` (`WorkflowInvalidShapeException`) refuse them
+  now. New command **`nowo:workflow:lint`** lists the stored definitions with such transitions (exit code 1): run it
+  before upgrading to 1.16.0.
+- **⚠ DoctrineBundle 3 with a custom `table_prefix` (audit OD M2):** your tables were created **without** the prefix
+  (1.15.0 / 1.15.1 ignored it there). Schema generation (`doctrine:migrations:diff`, `schema:update`,
+  `nowo:workflow:sync-schema`) now **stops with an error that lists the exact rename statements** instead of
+  generating a diff that drops the tables and creates empty ones (`Doctrine\UnprefixedTablesGuard`). Back up, run the
+  statements, then generate the migration. See UPGRADING.
+- **MySQL `server_version` without patch number (audit OD L1):** one warning per schema generation when the
+  configured version has no patch number and leaves the key columns on the PAD SPACE `utf8mb4_bin` (`8`, `8.0`).
 - **SQL filter mirroring (audit NZ-I6):** the private manager registers the class of each enabled source filter
   *instance* (not the class named in the source configuration), so the mirror is exact, also when a filter is
   registered again under the same name with another class.

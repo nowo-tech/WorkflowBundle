@@ -21,6 +21,7 @@ use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
+use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -102,6 +103,29 @@ final class BinaryKeyCollationSubscriberTest extends TestCase
         $args = $this->args(WorkflowSubjectPin::class, ['other']);
         (new BinaryKeyCollationSubscriber($this->registry(new MySQL84Platform(), ['serverVersion' => '8.4.3'])))->postGenerateSchemaTable($args);
         self::assertFalse($args->classTableWasMutated(), 'no key column: the table is not replaced');
+    }
+
+    #[Test]
+    public function aMysqlServerVersionWithoutPatchIsWarnedAboutOncePerSchema(): void
+    {
+        $logger = new RecordingLogger();
+        foreach ([[new MySQL80Platform(), '8.0', 1], [new MySQLPlatform(), '8', 1], [new MySQL84Platform(), '8.4.3', 0], [new MySQL84Platform(), '9.7', 0], [new MariaDBPlatform(), '11.4', 0], [new MySQL84Platform(), null, 0]] as [$platform, $version, $warnings]) {
+            $logger->records = [];
+            $registry        = $this->registry($platform, $version === null ? [] : ['serverVersion' => $version], $version === null ? '8.4.3' : null);
+            $listener        = new BinaryKeyCollationSubscriber($registry, $logger);
+            $listener->postGenerateSchemaTable($this->args(WorkflowDefinition::class));
+            $listener->postGenerateSchemaTable($this->args(WorkflowSubjectPin::class));
+            self::assertCount($warnings, $logger->records, (string) $version);
+        }
+        self::assertStringContainsString('has no patch number', $this->warn($logger));
+    }
+
+    private function warn(RecordingLogger $logger): string
+    {
+        $listener = new BinaryKeyCollationSubscriber($this->registry(new MySQL80Platform(), ['serverVersion' => '8.0']), $logger);
+        $listener->postGenerateSchemaTable($this->args(WorkflowDefinition::class));
+
+        return $logger->records[0]['message'] ?? '';
     }
 
     #[Test]

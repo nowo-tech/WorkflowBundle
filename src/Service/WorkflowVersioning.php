@@ -9,6 +9,7 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use LogicException;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
+use Nowo\WorkflowBundle\Exception\WorkflowInvalidShapeException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
@@ -131,11 +132,18 @@ final readonly class WorkflowVersioning
      * Publishes this (already authorised) draft.
      *
      * @throws LogicException when the definition is not a draft
+     * @throws WorkflowInvalidShapeException since 1.15.2, see {@see WorkflowShapeValidator}
      */
     public function publish(WorkflowDefinition $draft): WorkflowDefinition
     {
         if (!$draft->isDraft()) {
             throw new LogicException(sprintf('Version %d of workflow "%s" is not a draft.', $draft->getVersion(), $draft->getSlug()));
+        }
+
+        // Since 1.15.2: never publish a shape FrameworkBundle would refuse.
+        $violations = WorkflowShapeValidator::violations($draft);
+        if ($violations !== []) {
+            throw new WorkflowInvalidShapeException($draft->getSlug(), $violations);
         }
 
         $draft->publish();
