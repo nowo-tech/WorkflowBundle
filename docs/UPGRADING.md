@@ -74,10 +74,10 @@
 
 ## Unreleased
 
-- A `repository_factory` you configured on the Doctrine entity manager is not used for the bundle's private manager:
-  it has its own `DefaultRepositoryFactory` (your `default_repository_class` is still honoured). `getRepository(WorkflowDefinition::class)` through the bundle's
-  registry still returns the service repository; call `getRepository()` on the private manager directly only for
-  entities without a service repository.
+- The bundle's private entity manager has its own repository factory. A `repository_factory` you configured on the
+  Doctrine entity manager is used by it only for service repositories (repositories implementing
+  `ServiceEntityRepositoryInterface`); every other repository of the private manager is built by the bundle, from the
+  mapped `repositoryClass` or your `default_repository_class`.
 
 ## To 1.15.0
 

@@ -10,7 +10,6 @@ use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Doctrine\WorkflowManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
-use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Tests\Support\SqliteManagerRegistry;
 use PHPUnit\Framework\TestCase;
 
@@ -28,7 +27,6 @@ final class WorkflowManagerRegistryTest extends TestCase
         self::assertTrue(WorkflowManagerRegistry::isBundleEntity('Proxies\\__CG__\\' . WorkflowDefinition::class), 'Doctrine proxy class names count.');
         self::assertNull($registry->getManagerForClass(self::class));
         self::assertInstanceOf(EntityRepository::class, $registry->getRepository(WorkflowPlace::class));
-        self::assertInstanceOf(WorkflowDefinitionRepository::class, $registry->getRepository(WorkflowDefinition::class), 'A service repository is built on this registry.');
         self::assertInstanceOf(EntityRepository::class, $registry->getRepository(WorkflowPlace::class, 'default'));
         self::assertSame('default', $registry->getDefaultConnectionName());
         self::assertSame($doctrine->getConnection(), $registry->getConnection());
