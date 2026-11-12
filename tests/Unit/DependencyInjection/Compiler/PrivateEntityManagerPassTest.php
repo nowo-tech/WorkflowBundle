@@ -17,6 +17,7 @@ use Symfony\Component\DependencyInjection\Reference;
 
 use function restore_error_handler;
 use function set_error_handler;
+use function sprintf;
 
 use const E_USER_DEPRECATED;
 
@@ -194,6 +195,45 @@ final class PrivateEntityManagerPassTest extends TestCase
 
         self::assertSame([], $container->getDefinition(WorkflowEntityManager::class)->getArguments(), 'getManagerForClass() at runtime');
         self::assertSame([['connection' => 'default']], $container->getDefinition(PrivateEntityManagerMiddleware::class)->getTag('doctrine.middleware'));
+    }
+
+    /**
+     * Audit NF3-1: when a chain cannot be inspected, getManagerForClass() may pick any manager not proven to not map
+     * the entities (up to the first one that maps them): the middleware is on each of their connections, in order,
+     * once per connection.
+     */
+    public function testTheRuntimeRuleGetsTheMiddlewareOnEveryCandidateConnection(): void
+    {
+        $container = $this->container();
+        $container->setParameter('doctrine.default_entity_manager', 'a');
+        $container->setParameter('doctrine.entity_managers', ['a' => 'x', 'b' => 'x', 'c' => 'x', 'd' => 'x', 'e' => 'x', 'f' => 'x']);
+        $container->setDefinition('doctrine.orm.a_metadata_driver', new Definition('Chain'));
+        $container->setDefinition('doctrine.orm.c_metadata_driver', (new Definition('Chain'))->addMethodCall('addDriver', [new Reference('app'), 'App\\Entity']));
+        $container->setDefinition('doctrine.orm.e_metadata_driver', (new Definition('Chain'))->addMethodCall('addDriver', [new Reference('wf'), 'Nowo\\WorkflowBundle\\Entity']));
+        foreach (['a' => 'conn_a', 'b' => 'conn_b', 'c' => 'conn_c', 'd' => 'conn_b', 'e' => 'conn_e', 'f' => 'conn_f'] as $manager => $connection) {
+            $container->setDefinition(sprintf('doctrine.orm.%s_entity_manager', $manager), new Definition('EM', [new Reference(sprintf('doctrine.dbal.%s_connection', $connection))]));
+        }
+
+        (new PrivateEntityManagerPass())->process($container);
+
+        self::assertSame([], $container->getDefinition(WorkflowEntityManager::class)->getArguments(), 'getManagerForClass() at runtime');
+        self::assertSame([['connection' => 'conn_b'], ['connection' => 'conn_e']], $container->getDefinition(PrivateEntityManagerMiddleware::class)->getTag('doctrine.middleware'));
+    }
+
+    /**
+     * Audit NF3-1: only uninspectable managers after the proven ones: each of their connections, the default
+     * connection for a manager definition that does not name one.
+     */
+    public function testTheRuntimeRuleWithOnlyUninspectableManagers(): void
+    {
+        $container = $this->container();
+        $container->setParameter('doctrine.default_connection', 'primary');
+        $container->setParameter('doctrine.entity_managers', ['a' => 'x', 'b' => 'x']);
+        $container->setDefinition('doctrine.orm.b_entity_manager', new Definition('EM', [new Reference('doctrine.dbal.other_connection')]));
+
+        (new PrivateEntityManagerPass())->process($container);
+
+        self::assertSame([['connection' => 'primary'], ['connection' => 'other']], $container->getDefinition(PrivateEntityManagerMiddleware::class)->getTag('doctrine.middleware'));
     }
 
     /**

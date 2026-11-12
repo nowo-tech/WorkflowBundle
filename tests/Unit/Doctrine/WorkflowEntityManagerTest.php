@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit\Doctrine;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Events;
 use Doctrine\ORM\Tools\SchemaTool;
 use LogicException;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
@@ -159,6 +160,45 @@ final class WorkflowEntityManagerTest extends TestCase
         self::assertSame(RuntimeException::class, $logger->records[0]['context']['exception'] ?? null);
 
         $private->persist($this->definition('next'));
+        $private->flush();
+        $private->reset();
+        self::assertCount(1, $logger->records, 'the next unit of work and boundary work');
+    }
+
+    /**
+     * Audit NF3-2: a host onClear listener that throws never aborts the resetter: the manager is dropped, the failure
+     * is logged and the next unit of work works.
+     */
+    #[Test]
+    public function aThrowingOnClearListenerNeverBreaksTheBoundary(): void
+    {
+        $logger     = new RecordingLogger();
+        [$doctrine] = $this->synced();
+        $private    = new WorkflowEntityManager($doctrine, null, $logger);
+        $private->live();
+        $listener = new class {
+            public bool $armed = true;
+
+            public function onClear(): void
+            {
+                if ($this->armed) {
+                    throw new RuntimeException('host onClear');
+                }
+            }
+        };
+        $host = $doctrine->getManager();
+        self::assertInstanceOf(EntityManagerInterface::class, $host);
+        $host->getEventManager()->addEventListener(Events::onClear, $listener);
+
+        $private->reset();
+
+        self::assertFalse($private->isCreated(), 'dropped although clear() failed');
+        self::assertCount(1, $logger->records);
+        self::assertStringContainsString('clearing it failed', $logger->records[0]['message']);
+        self::assertSame(RuntimeException::class, $logger->records[0]['context']['exception'] ?? null);
+
+        $listener->armed = false;
+        $private->persist($this->definition('after-clear'));
         $private->flush();
         $private->reset();
         self::assertCount(1, $logger->records, 'the next unit of work and boundary work');

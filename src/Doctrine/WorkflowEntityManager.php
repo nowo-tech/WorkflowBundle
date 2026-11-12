@@ -177,7 +177,13 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
             // Computing the change sets can throw (invalid association, detached or half-built entity).
             $this->logGenericWarning($exception);
         }
-        $current->clear();
+
+        try {
+            $current->clear();
+        } catch (Throwable $exception) {
+            // A host onClear listener that throws never aborts the resetter (audit NF3-2): the manager is dropped anyway.
+            $this->logGenericWarning($exception, 'Workflow definitions: the bundle\'s private entity manager was dropped at a unit-of-work boundary; clearing it failed ({exception}).');
+        }
     }
 
     /**
@@ -201,10 +207,10 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
     /**
      * The fallback warning of {@see reset()}; a failing logger never breaks the boundary.
      */
-    private function logGenericWarning(Throwable $exception): void
+    private function logGenericWarning(Throwable $exception, string $message = 'Workflow definitions: the bundle\'s private entity manager was dropped at a unit-of-work boundary; its pending changes could not be inspected ({exception}).'): void
     {
         try {
-            $this->logger?->warning('Workflow definitions: the bundle\'s private entity manager was dropped at a unit-of-work boundary; its pending changes could not be inspected ({exception}).', [
+            $this->logger?->warning($message, [
                 'bundle'    => 'NowoWorkflowBundle',
                 'exception' => $exception::class,
             ]);
