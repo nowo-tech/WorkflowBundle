@@ -51,6 +51,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Fixes for three Low findings of the 1.14.0 audit (NF3). Nothing to change in your application. See
+[UPGRADING](UPGRADING.md#to-1141).
+
+### Fixed
+
+- **Rollback middleware on every candidate connection (audit NF3-1):** when a Doctrine mapping driver chain cannot be
+  inspected at build time, the private entity manager keeps the 1.13 runtime rule (`getManagerForClass()`), and the
+  rollback middleware was attached to the default manager's connection, which may not be the one that rule picks. It
+  is now attached, in order, to the connection of every manager that rule may pick: each manager not proven to not map
+  the bundle entities, up to and including the first one proven to map them (once per connection).
+- **A throwing `onClear` listener no longer aborts the boundary (audit NF3-2):** `WorkflowEntityManager::reset()`
+  wrapped the pending-changes inspection but not the final `clear()` of the dropped private manager. A host `onClear`
+  listener that throws is now caught and logged as a warning (exception class only), like the inspection failure; the
+  manager was already dropped before.
+- **Optional deprecated-port decorators no longer fail the build (audit NF3-3):** with
+  `security.access_checker` implementing only `WorkflowUiAccessPolicyInterface`, a decorator of the deprecated
+  `WorkflowUiAccessCheckerInterface` registered with `on_invalid: ignore` (`IGNORE_ON_INVALID_REFERENCE`) made
+  `WorkflowUiSecurityPass` fail the build. Such a decorator asked to be dropped when there is nothing to decorate, so it
+  is now skipped and Symfony removes it; a decorator without that flag still fails the build (audit NF2-4b).
+
 ## [1.14.0] - 2026-11-12
 
 Framework-free Workflow UI access port, a private entity manager for the definitions, an explicit `flush_after_apply`

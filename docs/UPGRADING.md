@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.14.1](#to-1141)
 - [To 1.14.0](#to-1140)
   - [Workflow UI access port](#workflow-ui-access-port)
   - [flush_after_apply](#flush_after_apply)
@@ -71,6 +72,26 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.14.1
+
+From **1.14.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+**What changes for you:** nothing to change in your code or configuration. Three edge cases of 1.14.0 behave better:
+
+- if a Doctrine mapping driver chain cannot be inspected when the container is built (a custom chain service), the
+  rollback middleware of the private entity manager is now on the connection of every manager the runtime rule may
+  pick, not only on the default one. A rollback on one of those connections may replace the private manager once
+  more than needed; nothing else changes;
+- a Doctrine `onClear` listener of yours that throws no longer breaks the end of a request, message or command: the
+  failure is logged as a warning;
+- a decorator of the deprecated `WorkflowUiAccessCheckerInterface` registered with `on_invalid: ignore` no longer fails
+  the build when your `access_checker` implements only `WorkflowUiAccessPolicyInterface`: Symfony drops it, as that
+  flag asks. Without the flag, the build still fails (migrate the decorator to `WorkflowUiAccessPolicyInterface`).
 
 ## To 1.14.0
 

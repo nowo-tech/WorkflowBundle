@@ -23,6 +23,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use stdClass;
+use Symfony\Component\DependencyInjection\Compiler\DecoratorServicePass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Definition;
@@ -164,12 +165,37 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     {
         $container = $this->container(accessChecker: 'app.policy');
         $container->register('app.policy', PolicyPredicate::class);
-        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class, null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
+        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class);
+        $container->register('app.optional', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class, null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
 
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('"app.audit"');
+        try {
+            (new WorkflowUiSecurityPass())->process($container);
+            self::fail('NF2-4b: a required deprecated-port decorator would be dropped.');
+        } catch (LogicException $exception) {
+            self::assertStringContainsString('"app.audit"', $exception->getMessage());
+            self::assertStringNotContainsString('"app.optional"', $exception->getMessage(), 'NF3-3: an optional decorator is not a failure.');
+        }
+    }
+
+    /**
+     * Audit NF3-3: a deprecated-port decorator registered with on_invalid: ignore asked to be dropped when there is
+     * nothing to decorate: the build passes, only the 1.14 port is asked and Symfony removes the decorator.
+     */
+    #[Test]
+    public function anOptionalDeprecatedPortDecoratorOverANewPortOnlyServiceIsDropped(): void
+    {
+        $container = $this->container(accessChecker: 'app.policy');
+        $container->register('app.policy', PolicyPredicate::class);
+        $container->register('app.optional', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class, null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
 
         (new WorkflowUiSecurityPass())->process($container);
+
+        self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
+        self::assertFalse($container->hasAlias(WorkflowUiAccessCheckerInterface::class));
+        self::assertSame('app.policy', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
+
+        (new DecoratorServicePass())->process($container);
+        self::assertFalse($container->hasDefinition('app.optional'), 'Symfony drops it (nothing to decorate).');
     }
 
     #[Test]

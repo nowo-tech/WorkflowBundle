@@ -117,6 +117,10 @@ definition rows:
   command start and end (a nested command or a command inside a message keeps the outer unit); and at `kernel.reset`;
 - after a rollback on its connection (doctrine/dbal 4 middleware on that connection only) its identity map is
   replaced at the next use, unless it still has pending changes, which are kept until flushed or the next boundary.
+  When a mapping driver chain cannot be inspected at build time, the source is resolved at runtime
+  (`getManagerForClass()`) and the middleware is on the connection of every manager that may be picked (1.14.1);
+- a Doctrine `onClear` listener that throws while a boundary drops the private manager is logged as a warning and never
+  breaks the boundary (1.14.1).
 
 The connection is shared: a transaction your code opens around a bundle call includes the bundle's writes.
 Unflushed `save($definition, false)` / `remove($definition, false)` changes kept across a rollback of your transaction
