@@ -15,7 +15,6 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Workflow\Event\CompletedEvent;
 use Symfony\Component\Workflow\Transition;
 
-use function array_key_exists;
 use function array_values;
 use function is_int;
 use function is_string;
@@ -42,8 +41,7 @@ final readonly class TransitionAuditSubscriber implements EventSubscriberInterfa
 
     public function onCompleted(CompletedEvent $event): void
     {
-        $metadata = $event->getWorkflow()->getMetadataStore()->getWorkflowMetadata();
-        if (!array_key_exists(DatabaseMetadataStore::DEFINITION_ID, $metadata)) {
+        if ($event->getMetadata(DatabaseMetadataStore::BUNDLE_MARKER, null) !== true) {
             return;
         }
 
@@ -54,8 +52,8 @@ final readonly class TransitionAuditSubscriber implements EventSubscriberInterfa
 
         $subject   = $event->getSubject();
         $slug      = $event->getWorkflowName();
-        $version   = $metadata[DatabaseMetadataStore::DEFINITION_VERSION] ?? 1;
-        $owner     = $metadata[DatabaseMetadataStore::DEFINITION_TENANT] ?? '';
+        $version   = $event->getMetadata(DatabaseMetadataStore::DEFINITION_VERSION, null);
+        $owner     = $event->getMetadata(DatabaseMetadataStore::DEFINITION_TENANT, null);
         $tenant    = $this->tenancy->tenantOf($subject, $slug);
         $reference = $this->tenancy->referenceOf($subject, $slug);
         $actor     = $this->tenancy->currentActor();

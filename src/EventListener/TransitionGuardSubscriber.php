@@ -18,7 +18,6 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\TransitionBlocker;
 
-use function array_key_exists;
 use function is_string;
 
 /**
@@ -54,7 +53,8 @@ final readonly class TransitionGuardSubscriber implements EventSubscriberInterfa
 
     public function onGuard(GuardEvent $event): void
     {
-        if (!array_key_exists(DatabaseMetadataStore::DEFINITION_ID, $event->getWorkflow()->getMetadataStore()->getWorkflowMetadata())) {
+        // Event::getMetadata() (Symfony 7.4 and 8; Event::getWorkflow() is gone in 8).
+        if ($event->getMetadata(DatabaseMetadataStore::BUNDLE_MARKER, null) !== true) {
             return;
         }
 

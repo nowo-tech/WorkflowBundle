@@ -67,7 +67,7 @@ final class TenancyListenersTest extends TestCase
 
         $dispatcher = new AfterCommitDispatcher();
         (new TransitionAuditSubscriber($dispatcher, new TenancyContext()))->onCompleted(new CompletedEvent(new stdClass(), new Marking(['b' => 1]), $transition, $workflow));
-        [$bundleWorkflow] = $this->workflow([DatabaseMetadataStore::DEFINITION_ID => 1]);
+        [$bundleWorkflow] = $this->workflow([DatabaseMetadataStore::BUNDLE_MARKER => true, DatabaseMetadataStore::DEFINITION_ID => 1]);
         (new TransitionAuditSubscriber($dispatcher, new TenancyContext()))->onCompleted(new CompletedEvent(new stdClass(), new Marking(['b' => 1]), null, $bundleWorkflow));
         self::assertSame(0, $dispatcher->countPending());
     }
@@ -76,7 +76,7 @@ final class TenancyListenersTest extends TestCase
     public function guardsWithoutTheirPortOrWithABrokenConditionBlock(): void
     {
         $guards                  = [DatabaseMetadataStore::GUARD_PERMISSION => 'leave.approve', DatabaseMetadataStore::GUARD_EXPRESSION => 'days <= 2'];
-        [$workflow, $transition] = $this->workflow([DatabaseMetadataStore::DEFINITION_ID => 1], $guards);
+        [$workflow, $transition] = $this->workflow([DatabaseMetadataStore::BUNDLE_MARKER => true, DatabaseMetadataStore::DEFINITION_ID => 1], $guards);
         $guard                   = new GuardEvent(new stdClass(), new Marking(['a' => 1]), $transition, $workflow);
         (new TransitionGuardSubscriber(new TenancyContext()))->onGuard($guard);
         self::assertCount(2, $guard->getTransitionBlockerList());
@@ -93,7 +93,7 @@ final class TenancyListenersTest extends TestCase
     #[Test]
     public function theIsolationGuardBlocksAVersionThatIsNotFound(): void
     {
-        [$workflow, $transition] = $this->workflow([DatabaseMetadataStore::DEFINITION_ID => 5]);
+        [$workflow, $transition] = $this->workflow([DatabaseMetadataStore::BUNDLE_MARKER => true, DatabaseMetadataStore::DEFINITION_ID => 5]);
         $guard                   = new GuardEvent(new stdClass(), new Marking(['a' => 1]), $transition, $workflow);
         (new TenantIsolationGuardSubscriber($this->nothingLocator()))->onGuard($guard);
         $codes = [];

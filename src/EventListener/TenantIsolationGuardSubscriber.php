@@ -11,7 +11,6 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\TransitionBlocker;
 
-use function array_key_exists;
 use function is_int;
 
 /**
@@ -41,12 +40,12 @@ final readonly class TenantIsolationGuardSubscriber implements EventSubscriberIn
 
     public function onGuard(GuardEvent $event): void
     {
-        $metadata = $event->getWorkflow()->getMetadataStore()->getWorkflowMetadata();
-        if (!array_key_exists(DatabaseMetadataStore::DEFINITION_ID, $metadata)) {
+        if ($event->getMetadata(DatabaseMetadataStore::BUNDLE_MARKER, null) !== true) {
             return;
         }
 
-        $id = $metadata[DatabaseMetadataStore::DEFINITION_ID];
+        // An unsaved definition (id null) never matches: it is blocked.
+        $id = $event->getMetadata(DatabaseMetadataStore::DEFINITION_ID, null);
         try {
             $expected = $this->locator->forSubject($event->getSubject(), $event->getWorkflowName())->getId();
         } catch (WorkflowNotFoundException) {

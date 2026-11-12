@@ -17,6 +17,9 @@ use function is_string;
  */
 final class DatabaseMetadataStore implements MetadataStoreInterface
 {
+    /** Workflow metadata key: true on every workflow built by the bundle (since 1.15). */
+    public const BUNDLE_MARKER = 'nowo_workflow';
+
     /** Workflow metadata key: id of the stored definition version (since 1.15). */
     public const DEFINITION_ID = 'nowo_definition_id';
 
@@ -57,6 +60,7 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
             'slug' => $definition->getSlug(),
             'type' => $definition->getType()->value,
             // Since 1.15: which stored version runs (tenant isolation, version pinning, audit).
+            self::BUNDLE_MARKER      => true,
             self::DEFINITION_ID      => $definition->getId(),
             self::DEFINITION_VERSION => $definition->getVersion(),
             self::DEFINITION_TENANT  => $definition->getTenantKey(),
