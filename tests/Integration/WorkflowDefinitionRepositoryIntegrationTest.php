@@ -167,4 +167,19 @@ final class WorkflowDefinitionRepositoryIntegrationTest extends TestCase
         self::assertSame(1, $page['pages']);
         self::assertCount(3, $page['items']);
     }
+
+    public function testSaveAndRemoveWriteThroughTheRepositoryManager(): void
+    {
+        $definition = new WorkflowDefinition('Saved', 'saved_flow', 'draft', 'App\\Entity\\Order');
+        $definition->addPlace(new WorkflowPlace('draft'));
+        $this->repository->save($definition, false);
+        self::assertNull($this->repository->findOneBySlug('saved_flow')?->getId(), 'not flushed yet');
+        $this->repository->save($definition);
+        self::assertNotNull($definition->getId());
+
+        $this->repository->remove($definition, false);
+        self::assertNotNull($this->repository->find($definition->getId()));
+        $this->repository->remove($definition);
+        self::assertNull($this->repository->findOneBySlug('saved_flow'));
+    }
 }

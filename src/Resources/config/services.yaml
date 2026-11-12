@@ -14,6 +14,12 @@ services:
             - '../../Enum/'
             - '../../NowoWorkflowBundle.php'
             - '../../Controller/'
+            # Explicit wiring only: the private entity manager services exist only in private mode (1.14), and the
+            # DBAL middleware must never be autoconfigured onto every connection.
+            - '../../Doctrine/'
+            - '../../Http/'
+            - '../../Internal/'
+            - '../../Model/'
 
     # Routes stay opt-in (REQ-SF-004 rule 7): controllers are not autoconfigured, so the #[Route] classes never get
     # the `routing.controller` tag and a host `routing.controllers` import does not mount them without the prefix.
@@ -38,13 +44,20 @@ services:
 
     Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker: ~
 
-    # Fail-closed default alias; WorkflowUiSecurityPass replaces this after extensions merge.
+    # Fail-closed default aliases; WorkflowUiSecurityPass replaces them after extensions merge (1.14: the
+    # framework-free port, and the deprecated port only for a class that implements it).
+    Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface:
+        alias: Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker
+
     Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface:
         alias: Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker
 
     Nowo\WorkflowBundle\EventListener\WorkflowUiAccessSubscriber:
         arguments:
+            $accessChecker: null
             $enabled: '%nowo_workflow.web_ui.enabled%'
+            $accessPolicy: '@Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface'
+            $tokenStorage: '@?security.token_storage'
 
     # Deprecated 1.x Twig globals (nowo_workflow_layout_template, nowo_workflow_css_framework…), removed in 2.0.
     Nowo\WorkflowBundle\Twig\WorkflowExtension:

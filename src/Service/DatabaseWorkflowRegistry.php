@@ -129,7 +129,7 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
      */
     public function createWorkflow(WorkflowDefinition $definition): WorkflowInterface
     {
-        if ($this->eventDispatcher !== null && in_array($definition->getSlug(), $this->frameworkWorkflowNames, true)) {
+        if ($this->eventDispatcher instanceof EventDispatcherInterface && in_array($definition->getSlug(), $this->frameworkWorkflowNames, true)) {
             throw WorkflowNameCollisionException::forSlug($definition->getSlug());
         }
 

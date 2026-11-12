@@ -6,9 +6,11 @@ namespace Nowo\WorkflowBundle;
 
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\CsrfProtectionPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\FrameworkWorkflowNamesPass;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
+use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
@@ -19,7 +21,8 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 class NowoWorkflowBundle extends Bundle
 {
     /**
-     * Registers the Twig paths, Workflow UI security, CSRF protection and framework workflow names compiler passes.
+     * Registers the Twig paths, Workflow UI security, CSRF protection, framework workflow names and private entity
+     * manager compiler passes.
      */
     public function build(ContainerBuilder $container): void
     {
@@ -28,6 +31,8 @@ class NowoWorkflowBundle extends Bundle
         $container->addCompilerPass(new WorkflowUiSecurityPass());
         $container->addCompilerPass(new CsrfProtectionPass());
         $container->addCompilerPass(new FrameworkWorkflowNamesPass());
+        // Before DoctrineBundle's MiddlewaresPass (priority 0).
+        $container->addCompilerPass(new PrivateEntityManagerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
     }
 
     /**
