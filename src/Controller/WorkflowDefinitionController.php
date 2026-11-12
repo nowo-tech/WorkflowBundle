@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Controller;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
 use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormType;
 use Nowo\WorkflowBundle\Http\WorkflowUiTenancy;
@@ -102,10 +104,27 @@ final class WorkflowDefinitionController extends AbstractController
         if ($form->isSubmitted() && $this->tenancy->enabled() && $this->repository->existsInScope($definition->getSlug(), $tenant)) {
             $form->get('slug')->addError(new FormError($this->translator->trans('error.slug_taken', [], WorkflowPageFactory::DOMAIN)));
         }
+        if ($form->isSubmitted() && !$this->tenancy->bindTenantSubject($definition, $tenant)) {
+            // Audit NO M2: a tenant only creates workflows for the subject classes the host allows (tenancy.subject_classes).
+            $form->get('subjectClass')->addError(new FormError($this->translator->trans('error.subject_class_not_allowed', [], WorkflowPageFactory::DOMAIN)));
+        }
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->entityManager->persist($definition);
-            $this->flush();
+            try {
+                $this->flush();
+            } catch (UniqueConstraintViolationException $exception) {
+                if (!$this->tenancy->enabled()) {
+                    throw $exception;
+                }
+                // Audit NO L3: a concurrent request created the same slug in this scope first.
+                $form->get('slug')->addError(new FormError($this->translator->trans('error.slug_taken', [], WorkflowPageFactory::DOMAIN)));
+
+                return $this->render($this->template('new'), [
+                    'page'    => $this->pages->newForm($form->createView()),
+                    'section' => WorkflowDefinitionFormSection::General,
+                ], new Response(null, Response::HTTP_UNPROCESSABLE_ENTITY));
+            }
             $this->registry->invalidate($definition->getSlug());
 
             $this->flash('flash.created');
@@ -192,8 +211,8 @@ final class WorkflowDefinitionController extends AbstractController
     #[Route('/{id}/draft', name: 'draft', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function draft(Request $request, int $id): RedirectResponse
     {
-        [$definition, $tenant] = $this->tenancyAction($request, $id, WorkflowUiAction::Edit, 'draft');
-        $draft                 = $this->versioning()->createDraft($definition->getSlug(), $tenant);
+        [$definition] = $this->tenancyAction($request, $id, WorkflowUiAction::Edit, 'draft');
+        $draft        = $this->versioning()->createDraftOf($definition);
 
         return $this->redirectToRoute('nowo_workflow_definition_edit_general', ['id' => $draft->getId()]);
     }
@@ -204,11 +223,11 @@ final class WorkflowDefinitionController extends AbstractController
     #[Route('/{id}/publish', name: 'publish', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function publish(Request $request, int $id): RedirectResponse
     {
-        [$definition, $tenant] = $this->tenancyAction($request, $id, WorkflowUiAction::Publish, 'publish');
+        [$definition] = $this->tenancyAction($request, $id, WorkflowUiAction::Publish, 'publish');
         if (!$definition->isDraft()) {
             throw $this->createNotFoundException('Only a draft can be published.');
         }
-        $published = $this->versioning()->publishDraft($definition->getSlug(), $tenant);
+        $published = $this->versioning()->publish($definition);
         $this->logger->info('Workflow definition published.', ['bundle' => 'NowoWorkflowBundle', 'action' => 'publish_definition', 'id' => $published->getId(), 'slug' => $published->getSlug(), 'version' => $published->getVersion()]);
         $this->flash('flash.published');
 
@@ -261,7 +280,14 @@ final class WorkflowDefinitionController extends AbstractController
 
         $slug = $definition->getSlug();
         if ($this->tenancy->enabled()) {
-            $this->versioning()->delete($definition);
+            try {
+                $this->versioning()->delete($definition);
+            } catch (WorkflowDefinitionInUseException $exception) {
+                // Owner decision 2026-11-12: never delete versions running subjects are pinned to.
+                $this->addFlash('error', $this->translator->trans('error.definition_in_use', ['%count%' => $exception->pinnedSubjects], WorkflowPageFactory::DOMAIN));
+
+                return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
+            }
         } else {
             $this->entityManager->remove($definition);
             $this->flush();
@@ -296,6 +322,10 @@ final class WorkflowDefinitionController extends AbstractController
             'section'     => $section,
             'guards'      => $this->tenancy->guardFields($definition),
             'slug_locked' => $this->tenancy->enabled(),
+            // Audit NO M2: in a tenant scope the runtime binding (type, subject class, marking property) is fixed and
+            // place / transition names are identifiers.
+            'binding_locked' => $tenant instanceof WorkflowTenant,
+            'strict_names'   => $this->tenancy->enabled(),
         ]);
         $form->handleRequest($request);
 

@@ -10,6 +10,7 @@ use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Regex;
 
 /**
  * Form type for a workflow place row.
@@ -26,7 +27,7 @@ final class WorkflowPlaceType extends AbstractType
      */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $this->addText($builder, 'name', ['label' => 'form.field.name']);
+        $this->addText($builder, 'name', ['label' => 'form.field.name'] + ($options['strict_names'] ? ['constraints' => [new Regex(WorkflowTransitionType::STRICT_NAME_PATTERN, 'Use 1 to 64 lower-case letters, digits or underscores.')]] : []));
         $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false]);
         $this->addInteger($builder, 'sortOrder', ['label' => 'form.field.order']);
     }
@@ -40,6 +41,8 @@ final class WorkflowPlaceType extends AbstractType
             'data_class'         => WorkflowPlace::class,
             'empty_data'         => static fn (): WorkflowPlace => new WorkflowPlace(''),
             'translation_domain' => 'NowoWorkflowBundle',
+            'strict_names'       => false,
         ]);
+        $resolver->setAllowedTypes('strict_names', 'bool');
     }
 }

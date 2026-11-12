@@ -92,6 +92,11 @@ services:
         tags:
             - { name: doctrine.event_subscriber }
 
+    # Since 1.15 (audit NO M1): binary collation of tenant keys and subject references on MySQL / MariaDB.
+    Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber:
+        tags:
+            - { name: doctrine.event_subscriber }
+
     # Built workflows dispatch the standard Symfony workflow events (guard, transition, completed, announce…).
     Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry:
         arguments:

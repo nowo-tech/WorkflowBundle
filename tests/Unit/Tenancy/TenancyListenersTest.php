@@ -193,7 +193,7 @@ final class TenancyListenersTest extends TestCase
         self::assertSame($definition, $locator->forSubject(new stdClass(), 'x'));
         self::assertSame($definition, $locator->resolveForSubject(new stdClass()));
         self::assertSame($definition, $locator->resolveForContext(new stdClass(), new WorkflowContext(subjectClass: stdClass::class)));
-        $locator->pin(new stdClass(), $definition);
+        self::assertSame($definition, $locator->ensurePinned(new stdClass(), $definition));
     }
 
     /**

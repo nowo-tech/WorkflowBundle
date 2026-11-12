@@ -18,6 +18,7 @@ use Nowo\WorkflowBundle\Service\WorkflowApplicator;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use Nowo\WorkflowBundle\Service\WorkflowVersioning;
 use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
+use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
 use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\AnyUserTokenListener;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\ArrayCsrfTokenStorage;
@@ -171,6 +172,7 @@ final class TenancyTestKernel extends Kernel
             $workflow['tenancy'] = [
                 'tenant_resolver'            => 'app.workflow_tenancy',
                 'subject_reference_resolver' => 'app.workflow_tenancy',
+                'subject_classes'            => [LeaveRequest::class => 'status'],
                 'ui'                         => ['tenant_resolver' => 'app.workflow_tenancy', 'action_checker' => 'app.workflow_tenancy'],
             ];
             $workflow['web_ui'] = ['path_prefix' => self::PREFIX . '/workflow'];

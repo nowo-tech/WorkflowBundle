@@ -90,7 +90,7 @@ composer update nowo-tech/workflow-bundle
    rows become global (`tenant_key ''`), version 1, published: nothing else changes for them.
 2. **Nothing else, unless you opt in.** Without `nowo_workflow.tenancy.tenant_resolver` (and without the guard ports)
    the runtime, the events and the UI behave as in 1.14 (tested: same workflow events in the same order, same
-   markings, no tenancy service registered).
+   markings, and the tenancy-only services are not registered).
 3. **If you replaced or decorated `WorkflowRegistryInterface`**, you get a deprecation when the container is built:
    it keeps working until 2.0. Call the new framework-free `WorkflowRuntimeInterface` from your code instead (it
    returns `WorkflowTransitionResult` / `WorkflowMarkingView`, and reports a blocked transition in the result instead
@@ -108,6 +108,8 @@ nowo_workflow:
     tenancy:
         tenant_resolver: App\Workflow\WorkflowTenancy            # WorkflowTenantResolverInterface
         subject_reference_resolver: App\Workflow\WorkflowTenancy # pins in-flight subjects to their version
+        subject_classes:                                          # what tenants may create workflows for
+            App\Leave\LeaveRequest: status
         ui:
             tenant_resolver: App\Workflow\WorkflowTenancy        # required with the UI
             action_checker: App\Workflow\WorkflowTenancy         # required with the UI
@@ -116,8 +118,17 @@ nowo_workflow:
         variables_provider: App\Workflow\WorkflowTenancy
 ```
 
+On **MySQL / MariaDB** the migration also switches `tenant_key` and `subject_ref` to the binary collation
+`utf8mb4_bin` (exact tenant keys, audit NO M1). Tenant keys and subject references must be printable ASCII without
+spaces (UUIDs, slugs): other values are refused by the value objects.
+
+A long-running process that runs console commands in-process (or consumes messages) no longer loses the console
+boundary of the bundle's private entity manager when another console listener throws or stops the propagation (audit
+NM); nothing to change.
+
 When you turn tenancy on, your existing definitions become the global templates (published version 1); the editor
-then edits drafts and "Publish" makes them run. Other 1.15 notes:
+then edits drafts and "Publish" makes them run. A published definition that running subjects are pinned to cannot be
+deleted (disable it instead). Other 1.15 notes:
 
 - the internal controller actions take the `Request` (only code that calls them directly is affected);
 - built workflows carry three more workflow metadata keys (`nowo_definition_*`) and the guard settings as transition

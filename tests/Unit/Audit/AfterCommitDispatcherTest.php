@@ -47,7 +47,7 @@ final class AfterCommitDispatcherTest extends TestCase
         $dispatcher->transactionStarted($other = new stdClass());
         self::assertSame(0, $dispatcher->dispatchPending(), 'committed, but another transaction is open');
         $dispatcher->transactionEnded($other, true);
-        $dispatcher->postFlush();
+        $dispatcher->dispatchPending();
         self::assertSame([$one, $three], $seen->events);
     }
 

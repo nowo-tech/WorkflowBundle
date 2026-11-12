@@ -27,8 +27,13 @@ use function strcasecmp;
  *   transaction begins before the end of the request, console command or Messenger message, the marking was never
  *   persisted: the event is dropped and a warning is logged.
  * - Committed events are dispatched at the next safe point where no transaction is open: right after
- *   `WorkflowApplicator` flushed, Doctrine `postFlush`, and the end of the request, command or message. Never from
- *   inside a driver commit. A listener that throws is logged; the other events are still dispatched.
+ *   `WorkflowApplicator` flushed, and at the end of the request, console command or Messenger message (not from a
+ *   Doctrine `postFlush`, where an application listener may still be inside its own unit of work, audit NO M4). Never
+ *   from inside a driver commit. A listener that throws is logged; the other events are still dispatched.
+ * - At the end of the request, console command or Messenger message, anything not committed (not persisted, or held
+ *   by a transaction still open) is dropped with a warning, never carried over (audit NO L1).
+ * - Only the transactions of the connections of the definitions' manager and of the application's default manager
+ *   (where `WorkflowApplicator` persists the subject) are observed.
  *
  * Worker-safe: the state is keyed weakly by the driver connection, everything is either dispatched or dropped at each
  * boundary, and `kernel.reset` drops it all.
@@ -114,27 +119,22 @@ final class AfterCommitDispatcher implements TransactionObserverInterface, Event
     }
 
     /**
-     * Doctrine `postFlush`: the flush's own commit returned.
-     */
-    public function postFlush(): void
-    {
-        $this->dispatchPending();
-    }
-
-    /**
      * End of the request, console command or Messenger message: committed events are dispatched; events whose
      * marking change was never persisted are dropped.
      */
     public function onBoundary(): void
     {
         $this->dispatchPending();
-        if ($this->awaiting !== [] && $this->safe()) {
-            $this->logger?->warning('Workflow audit: {count} applied transition(s) were never persisted (no transaction began after them); their audit events are dropped.', [
+        $dropped = $this->countPending();
+        if ($dropped > 0) {
+            // Never persisted, or held by a transaction still open at the end of the unit of work (a leaked transaction
+            // that will never commit in this request / command / message): dropped, never carried over (audit NO L1).
+            $this->logger?->warning('Workflow audit: {count} applied transition(s) were not committed by the end of the request, command or message; their audit events are dropped.', [
                 'bundle' => 'NowoWorkflowBundle',
-                'count'  => count($this->awaiting),
+                'count'  => $dropped,
             ]);
-            $this->awaiting = [];
         }
+        $this->reset();
     }
 
     public function countPending(): int

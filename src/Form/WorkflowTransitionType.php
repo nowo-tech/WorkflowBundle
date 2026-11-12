@@ -17,6 +17,7 @@ use Symfony\Component\Form\FormInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\Callback;
 use Symfony\Component\Validator\Constraints\Length;
+use Symfony\Component\Validator\Constraints\Regex;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 use function implode;
@@ -32,13 +33,15 @@ use function trim;
 final class WorkflowTransitionType extends AbstractType
 {
     use FormOptionsTrait;
+    /** Since 1.15 (audit NO M2): place and transition names with tenancy. */
+    public const STRICT_NAME_PATTERN = '/^[a-z0-9_]{1,64}$/D';
 
     /**
      * Adds the transition name, label, source places and target places fields.
      */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $this->addText($builder, 'name', ['label' => 'form.field.name']);
+        $this->addText($builder, 'name', ['label' => 'form.field.name'] + ($options['strict_names'] ? ['constraints' => [new Regex(self::STRICT_NAME_PATTERN, 'Use 1 to 64 lower-case letters, digits or underscores.')]] : []));
         $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false]);
 
         // Since 1.15: guards an editor configures per transition, shown only when the host configured their port.
@@ -91,7 +94,9 @@ final class WorkflowTransitionType extends AbstractType
             'translation_domain' => 'NowoWorkflowBundle',
             'place_choices'      => [],
             'guards'             => ['permission' => false, 'variables' => null, 'automatic' => false],
+            'strict_names'       => false,
         ]);
+        $resolver->setAllowedTypes('strict_names', 'bool');
         $resolver->setAllowedTypes('place_choices', 'array');
         $resolver->setAllowedTypes('guards', 'array');
     }

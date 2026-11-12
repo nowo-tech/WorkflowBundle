@@ -13,7 +13,9 @@ use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
 use Nowo\WorkflowBundle\Event\WorkflowTransitionAppliedEvent;
 use Nowo\WorkflowBundle\EventListener\TransitionGuardSubscriber;
+use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
 use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
+use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
 use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
@@ -162,9 +164,23 @@ final class GuardsVersionsAuditKernelTest extends TestCase
         $pins = self::hostManager($kernel)->getRepository(WorkflowSubjectPin::class)->findBy([], ['subjectRef' => 'ASC']);
         self::assertSame([[$v1->getId(), 'leave-x'], [$v2->getId(), 'leave-y']], array_map(static fn (WorkflowSubjectPin $p): array => [$p->getDefinition()->getId(), $p->getSubjectRef()], $pins));
 
-        // Deleting the tenant's versions drops their pins: the subjects follow the global template again.
+        // Owner decision 2026-11-12: a definition running subjects are pinned to cannot be deleted.
+        try {
+            self::versioning($kernel)->delete($v2);
+            self::fail('Pinned subjects block the deletion.');
+        } catch (WorkflowDefinitionInUseException $exception) {
+            self::assertSame(2, $exception->pinnedSubjects);
+            self::assertSame('leave', $exception->workflowSlug);
+        }
+        $draft = self::versioning($kernel)->createDraft('leave', $a);
+        self::versioning($kernel)->delete($draft);
+        self::assertNull(self::repository($kernel)->findDraft('leave', $a), 'a draft is never pinned: deleted');
+
+        // Once the subjects are forgotten, the definition can go: they follow the global template again.
+        self::versioning($kernel)->forgetSubject(new WorkflowSubjectRef('leave-x'), $a);
+        self::versioning($kernel)->forgetSubject(new WorkflowSubjectRef('leave-y'), $a);
         self::versioning($kernel)->delete($v2);
-        self::assertSame(0, (int) self::hostManager($kernel)->getConnection()->fetchOne('SELECT COUNT(*) FROM workflow_subject_pin'));
+        self::assertNull(self::repository($kernel)->findCurrent('leave', $a));
         self::assertSame('', self::registry($kernel)->forSubject($x, 'leave')->getMetadataStore()->getWorkflowMetadata()['nowo_definition_tenant']);
     }
 
@@ -189,7 +205,16 @@ final class GuardsVersionsAuditKernelTest extends TestCase
         self::assertSame([], self::audit($kernel)->events);
         $connection->commit();
         self::hostManager($kernel)->flush();
-        self::assertCount(1, self::audit($kernel)->events, 'after the outermost commit');
+        self::assertSame([], self::audit($kernel)->events, 'not from a Doctrine postFlush (audit NO M4)');
+        self::service($kernel, AfterCommitDispatcher::class, 'test.' . AfterCommitDispatcher::class)->onBoundary();
+        self::assertCount(1, self::audit($kernel)->events, 'after the outermost commit, at the end of the request');
+
+        $leave = self::persistLeave($kernel, new LeaveRequest('leave-3', 'org-a', 5));
+        $connection->beginTransaction();
+        self::applicator($kernel)->apply($leave, 'leave', 'submit');
+        self::service($kernel, AfterCommitDispatcher::class, 'test.' . AfterCommitDispatcher::class)->onBoundary();
+        $connection->rollBack();
+        self::assertCount(1, self::audit($kernel)->events, 'a transaction still open at the end of the unit: dropped (audit NO L1)');
     }
 
     #[Test]
@@ -203,6 +228,7 @@ final class GuardsVersionsAuditKernelTest extends TestCase
         self::applicator($kernel)->apply($leave, 'leave', 'submit');
         self::assertSame([], self::audit($kernel)->events, 'the marking is not persisted yet');
         self::hostManager($kernel)->flush();
+        $dispatcher->onBoundary();
         self::assertCount(1, self::audit($kernel)->events, 'the host flush committed it');
 
         $other = self::persistLeave($kernel, new LeaveRequest('leave-2', 'org-a', 5));

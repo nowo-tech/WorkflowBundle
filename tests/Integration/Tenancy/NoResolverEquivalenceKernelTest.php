@@ -104,6 +104,17 @@ final class NoResolverEquivalenceKernelTest extends TestCase
         self::assertStringNotContainsString('/publish', $show);
         self::assertStringNotContainsString('/draft', $show);
         self::assertStringNotContainsString('guardExpression', (string) self::send($kernel, '/workflow/definitions/' . $id . '/edit/transitions', 'root')->getContent());
+        $duplicate = self::send($kernel, '/workflow/definitions/new', 'root', 'POST', ['workflow_definition_form' => [
+            'name'            => 'Leave again',
+            'slug'            => 'leave',
+            'type'            => 'state_machine',
+            'initialPlace'    => 'requested',
+            'subjectClass'    => LeaveRequest::class,
+            'markingProperty' => 'status',
+            'priority'        => '0',
+            '_token'          => self::csrf($kernel, 'workflow_definition_form'),
+        ]]);
+        self::assertSame(500, $duplicate->getStatusCode(), 'a duplicate slug fails in the database, as in 1.14');
         foreach (['draft', 'publish', 'clone'] as $action) {
             self::assertSame(404, self::send($kernel, '/workflow/definitions/' . $id . '/' . $action, 'root', 'POST')->getStatusCode(), $action);
         }

@@ -17,6 +17,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\TransitionBlocker;
+use Throwable;
 
 use function is_string;
 
@@ -28,7 +29,7 @@ use function is_string;
  *   ({@see WorkflowSubjectVariablesProviderInterface}).
  *
  * Fail closed: a guard whose port is not configured, a condition that is false or cannot be evaluated, and a port
- * that throws all block the transition. Transitions without guards (every 1.14 transition) are untouched.
+ * that throws all block the transition (the failure is logged without values). Transitions without guards (every 1.14 transition) are untouched.
  *
  * @internal
  */
@@ -80,15 +81,22 @@ final readonly class TransitionGuardSubscriber implements EventSubscriberInterfa
         $subject = $event->getSubject();
         $slug    = $event->getWorkflowName();
 
-        return $this->permissionChecker->isGranted(new WorkflowTransitionPermissionCheck(
-            $permission,
-            $slug,
-            $event->getTransition()->getName(),
-            SubjectClass::real($subject),
-            $this->tenancy->referenceOf($subject, $slug),
-            $this->tenancy->tenantOf($subject, $slug),
-            $this->tenancy->currentActor(),
-        ));
+        try {
+            return $this->permissionChecker->isGranted(new WorkflowTransitionPermissionCheck(
+                $permission,
+                $slug,
+                $event->getTransition()->getName(),
+                SubjectClass::real($subject),
+                $this->tenancy->referenceOf($subject, $slug),
+                $this->tenancy->tenantOf($subject, $slug),
+                $this->tenancy->currentActor(),
+            ));
+        } catch (Throwable $exception) {
+            // A failing host port blocks the transition (fail closed) and is logged without values.
+            $this->logBlocked($event, $exception);
+
+            return false;
+        }
     }
 
     private function conditionMet(GuardEvent $event, string $condition): bool
@@ -99,16 +107,22 @@ final readonly class TransitionGuardSubscriber implements EventSubscriberInterfa
 
         try {
             return GuardExpression::evaluate($condition, $this->variablesProvider->variablesOf(new WorkflowSubject($event->getSubject(), $event->getWorkflowName())));
-        } catch (InvalidArgumentException $exception) {
-            // GuardExpressionException or invalid variables from the host: blocked, logged without values.
-            $this->logger?->warning('Workflow transition condition could not be evaluated; the transition is blocked.', [
-                'bundle'     => 'NowoWorkflowBundle',
-                'workflow'   => $event->getWorkflowName(),
-                'transition' => $event->getTransition()->getName(),
-                'error'      => $exception->getMessage(),
-            ]);
+        } catch (Throwable $exception) {
+            // GuardExpressionException, invalid variables or a failing host port: blocked, logged without values.
+            $this->logBlocked($event, $exception);
 
             return false;
         }
+    }
+
+    private function logBlocked(GuardEvent $event, Throwable $exception): void
+    {
+        $this->logger?->warning('Workflow transition guard could not be evaluated; the transition is blocked.', [
+            'bundle'     => 'NowoWorkflowBundle',
+            'workflow'   => $event->getWorkflowName(),
+            'transition' => $event->getTransition()->getName(),
+            'exception'  => $exception::class,
+            'error'      => $exception instanceof InvalidArgumentException ? $exception->getMessage() : null,
+        ]);
     }
 }

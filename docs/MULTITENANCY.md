@@ -22,12 +22,19 @@ Everything here is **opt-in**: without `nowo_workflow.tenancy.tenant_resolver` t
 - [DDD / hexagonal host](#ddd--hexagonal-host)
 - [Beacon example: leave approval](#beacon-example-leave-approval)
 - [Without tenancy](#without-tenancy)
+- [Owner decisions (2026-11-12)](#owner-decisions-2026-11-12)
 - [Security notes](#security-notes)
 
 ## Tenant model
 
-- A definition belongs to one **tenant** (an opaque key of the host: an organization UUID, a workspace slug; at most
-  128 bytes, compared byte for byte) or to **no tenant**: then it is a **global template**.
+- A definition belongs to one **tenant** (an opaque key of the host: an organization UUID, a workspace slug) or to
+  **no tenant**: then it is a **global template**.
+- **Exact keys (audit NO M1).** A tenant key (and a subject reference) is 1 to 128 printable ASCII characters
+  without spaces, so no accent and no trailing space can make two keys equal under a database collation. Keys are
+  compared exactly: every row the repositories and the pin store read is re-checked in PHP (`acme` is never `Acme`);
+  on MySQL / MariaDB the `tenant_key` and `subject_ref` columns use the binary collation `utf8mb4_bin` (applied by
+  the schema tools; other platforms already compare them exactly). Use the canonical form of your keys (e.g.
+  lower-case UUIDs) everywhere.
 - `Model\WorkflowTenant` is the value object; the database column `tenant_key` stores `''` for a global template.
 - The slug is unique per tenant (and version): a tenant may customize a template under the same slug, so host
   listeners on `workflow.<slug>.*` keep working for every tenant.
@@ -54,7 +61,7 @@ A published version is **never edited**. The lifecycle of each `(tenant, slug)`:
 | New draft | The current published version is copied as the **next version number**, status draft. One open draft at a time. | "New draft" (`edit`) |
 | Edit | Only drafts are edited (general, match rules, places, transitions and their guards). The slug is fixed once created. | Edit (`edit`) |
 | Publish | The draft becomes the version **new subjects** start with. | Publish (`publish`) |
-| Delete | A draft: only the draft. A published definition: every version of the slug in that scope, and their pins. | Delete (`publish`) |
+| Delete | A draft: only the draft. A published definition: every version of the slug in that scope, **refused while any subject is pinned to one of them** (owner decision 2026-11-12: `WorkflowDefinitionInUseException`, the UI shows the count and suggests disabling instead). | Delete (`publish`) |
 
 **In-flight subjects keep the version they started with.** When `WorkflowApplicator` (or the runtime port) applies a
 transition to a subject for the first time, the bundle stores a **pin**: `(subject's tenant, slug, subject reference)
@@ -69,17 +76,23 @@ Pinning rules:
   pinned: the subject follows the current version (**"follow latest"**). Its marking must then exist in the new
   version, otherwise Symfony refuses the marking (`LogicException`): only remove places when every subject has left
   them, or configure the resolver;
-- the first pin wins; pins are written with plain DBAL statements on the definitions' connection, so inside a
-  transaction your application opened the pin commits or rolls back with it;
+- the subject is pinned **before** its first transition is applied (audit NO M3): two concurrent first applies agree
+  on one version (the first pin wins; the loser runs the winner's version). Pins are written with plain DBAL
+  statements on the definitions' connection: inside a transaction your application opened, the insert runs in a
+  savepoint (a duplicate never aborts your transaction, PostgreSQL included) and commits or rolls back with it;
+  outside one (e.g. `runtime.flush_after_apply: false` before you flush) it commits on its own, even if you never
+  persist the subject;
 - a pin is honoured only when it names that slug, a published version, and the subject's tenant or a global
   template. Anything else (a tampered row, a subject moved to another tenant) is **refused**
   (`WorkflowNotFoundException`), never followed;
-- deleting a version removes its pins; those subjects follow the current version again;
+- a published definition subjects are pinned to cannot be deleted (disable it instead); `forgetSubject()` removes a
+  subject's pins, after which the definition can be deleted;
 - no automatic marking migration: a subject moves to a newer version only when you remove its pin
   (`WorkflowVersioning::forgetSubject()`), and then the "follow latest" rule above applies.
 
 The versioning operations are also a service for hosts: `Service\WorkflowVersioning` (`cloneTemplate()`,
-`createDraft()`, `publishDraft()`, `delete()`, `forgetSubject()`), e.g. to give each new organization a published copy
+`createDraft()` / `createDraftOf()`, `publishDraft()` / `publish()`, `delete()`, `forgetSubject()`; the UI acts on the
+already authorised entity, never on a new lookup by slug and tenant), e.g. to give each new organization a published copy
 of a template: `$versioning->cloneTemplate('leave', new WorkflowTenant($uuid), publish: true)`.
 
 ## Runtime
@@ -201,11 +214,16 @@ It is dispatched **after the commit** of the transaction that persisted the subj
 - inside a transaction (yours, or the flush of `runtime.flush_after_apply: true`), it waits for the outermost commit;
   a rollback (or a rolled-back savepoint) drops it;
 - with `runtime.flush_after_apply: false` it waits for the next transaction that begins (your flush) and follows it;
-  if none begins before the end of the request, console command or Messenger message, the marking was never persisted:
-  the event is dropped and a warning is logged.
+- committed events are dispatched right after `WorkflowApplicator` flushed, or at the end of the request, console
+  command or Messenger message (not from a Doctrine `postFlush`, audit NO M4);
+- whatever is not committed by the end of the request, console command or Messenger message (a marking never
+  persisted, or a transaction still open) is dropped with a warning (audit NO L1).
 
-Transactions are observed by a DBAL 4 middleware on every connection (the audit needs doctrine/dbal 4). A listener
-that throws is logged and does not affect the commit that already happened.
+Transactions are observed by a DBAL 4 middleware on the connections of the definitions' manager and of your default
+manager (where `WorkflowApplicator` persists the subject) only; the audit needs doctrine/dbal 4. A subject persisted
+on another connection is not tracked: its events wait for the next tracked transaction or are dropped at the
+boundary. This is best effort around your transactions, not a guarantee: forward the event to an outbox if you need
+exactly-once delivery. A listener that throws is logged and does not affect the commit that already happened.
 
 ## GDPR
 
@@ -240,6 +258,8 @@ nowo_workflow:
     tenancy:
         tenant_resolver: App\Workflow\WorkflowTenancy
         subject_reference_resolver: App\Workflow\WorkflowTenancy
+        subject_classes:
+            App\Leave\LeaveRequest: status
         ui:
             tenant_resolver: App\Workflow\WorkflowTenancy
             action_checker: App\Workflow\WorkflowTenancy
@@ -357,12 +377,34 @@ Without `tenancy.tenant_resolver`:
 - `WorkflowRuntimeInterface` and `forSubject()` resolve as `WorkflowRegistryInterface::get()`.
 
 Tested by `NoResolverEquivalenceKernelTest` (same workflow events in the same order as the 1.14 applicator, same
-markings, no tenancy service in the container).
+markings, and the tenancy-only services (isolation guard, audit dispatcher and middleware) are not registered).
+
+## Owner decisions (2026-11-12)
+
+1. **Versioning model:** one row per version, subjects pinned to the version they started with; no automatic marking
+   migration.
+2. **A disabled tenant version** does not fall back to the global template (the tenant opted out).
+3. **Deleting** a published tenant definition is refused while any subject is pinned to one of its versions (the UI
+   shows the count and suggests disabling it); drafts can always be deleted; `forgetSubject()` removes a subject's
+   pins.
+4. **`WorkflowRegistryInterface`** is deprecated for hosts (removed in 2.0), not made `@internal`.
+5. **The audit event** is on by default with tenancy and needs doctrine/dbal 4.
+6. **GDPR:** no UserKit export / erasure providers: nothing is stored per user.
 
 ## Security notes
 
-- Tenant keys are compared byte for byte; never derive the UI scope from a value the user can choose without your
-  action checker validating it (the route `{uuid}` is user input: `allows()` must check the actor belongs to it).
+- Tenant keys are compared exactly (PHP re-check, binary collation on MySQL); never derive the UI scope from a value
+  the user can choose without your action checker validating it (the route `{uuid}` is user input: `allows()` must
+  check the actor belongs to it).
+- **Tenant-authored workflows reach your listeners.** A tenant admin edits places, transitions and guards of its own
+  definitions; your listeners on `workflow.<slug>.*` and `workflow.guard` receive those workflows too. In a tenant
+  scope the runtime binding is fixed (audit NO M2): type, subject class and marking property come from the cloned
+  template or, for a new definition, from `tenancy.subject_classes` (`{Class: marking_property}`; a class outside it
+  is refused), and place / transition names must match `^[a-z0-9_]{1,64}$`. Do not trust place or transition names
+  for authorization: check the subject and the actor.
+- A guard port that throws blocks the transition (fail closed); the exception class is logged, never its message.
+- The isolation guard resolves the subject's version on every guard event (1–3 indexed queries); it is not memoized
+  (a memo would be per-request state).
 - The action checker sees every action, including `View`: deny unknown actors.
 - A tenant can only clone published templates; it never sees global drafts.
 - Conditions only read the variables your provider returns: never return secrets there, they become comparable by

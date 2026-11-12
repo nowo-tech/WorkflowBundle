@@ -36,6 +36,9 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
  */
 final readonly class WorkflowUiTenancy
 {
+    /**
+     * @param array<string, string> $subjectClasses `tenancy.subject_classes`: subject class => marking property
+     */
     public function __construct(
         private bool $tenancy = false,
         private ?WorkflowUiTenantResolverInterface $tenantResolver = null,
@@ -43,7 +46,29 @@ final readonly class WorkflowUiTenancy
         private ?TokenStorageInterface $tokenStorage = null,
         private ?WorkflowTransitionPermissionCheckerInterface $permissionChecker = null,
         private ?WorkflowSubjectVariablesProviderInterface $variablesProvider = null,
+        private array $subjectClasses = [],
     ) {
+    }
+
+    /**
+     * Audit NO M2: in a tenant scope a new definition may only bind a subject class of `tenancy.subject_classes`, with
+     * the marking property configured there (forced here). The global scope (null) and hosts without tenancy are not
+     * restricted.
+     *
+     * @return bool false when the subject class is not allowed for tenants
+     */
+    public function bindTenantSubject(WorkflowDefinition $definition, ?WorkflowTenant $tenant): bool
+    {
+        if (!$this->tenancy || !$tenant instanceof WorkflowTenant) {
+            return true;
+        }
+        $marking = $this->subjectClasses[$definition->getSubjectClass()] ?? null;
+        if ($marking === null) {
+            return false;
+        }
+        $definition->setMarkingProperty($marking);
+
+        return true;
     }
 
     public function enabled(): bool

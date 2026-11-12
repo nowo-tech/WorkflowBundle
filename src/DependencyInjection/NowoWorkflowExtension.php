@@ -432,7 +432,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
      */
     private function registerTenancy(ContainerBuilder $container, array $config): void
     {
-        /** @var array{tenant_resolver: string|null, subject_reference_resolver: string|null, actor_provider: string|null, ui: array{tenant_resolver: string|null, action_checker: string|null}} $tenancy */
+        /** @var array{tenant_resolver: string|null, subject_reference_resolver: string|null, actor_provider: string|null, subject_classes: array<string, string>, ui: array{tenant_resolver: string|null, action_checker: string|null}} $tenancy */
         $tenancy = $config['tenancy'];
         /** @var array{permission_checker: string|null, variables_provider: string|null, max_automatic_transitions: int} $guards */
         $guards = $config['guards'];
@@ -488,10 +488,12 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
                 new Reference('security.token_storage', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 $ref($guards['permission_checker']),
                 $ref($guards['variables_provider']),
+                $tenancy['subject_classes'],
             ]);
         $container->register(WorkflowUiRouteContextSubscriber::class, WorkflowUiRouteContextSubscriber::class)
             ->setArguments([new Reference('router', ContainerInterface::NULL_ON_INVALID_REFERENCE)])
-            ->addTag('kernel.event_subscriber');
+            ->addTag('kernel.event_subscriber')
+            ->addTag('kernel.reset', ['method' => 'reset']);
         foreach ([WorkflowDefinitionController::class, DashboardController::class] as $controller) {
             $container->getDefinition($controller)->setArgument('$tenancy', new Reference(WorkflowUiTenancy::class));
         }
@@ -508,8 +510,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
                 new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
             ])
             ->addTag('kernel.event_subscriber')
-            ->addTag('kernel.reset', ['method' => 'reset'])
-            ->addTag('doctrine.event_listener', ['event' => 'postFlush', 'method' => 'postFlush']);
+            ->addTag('kernel.reset', ['method' => 'reset']);
         $container->register(AuditMiddleware::class, AuditMiddleware::class)
             ->setArguments([new Reference(AfterCommitDispatcher::class)])
             ->addTag('doctrine.middleware');

@@ -9,8 +9,15 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
+use WeakMap;
 
+use function array_slice;
+use function count;
+use function is_object;
 use function max;
+use function method_exists;
+
+use const PHP_INT_MAX;
 
 /**
  * Binds the bundle's private entity manager ({@see WorkflowEntityManager}, 1.14.0) to one unit of work, also when
@@ -24,34 +31,51 @@ use function max;
  * - Messenger consumers: when a message is received and after it is handled or failed;
  * - console: when the OUTERMOST command starts and when it terminates, and only while no Messenger message is in
  *   flight. A command run in-process from another command or from a message handler must not drop the outer unit's
- *   pending definition changes: the nesting depth is counted on console.command / console.terminate, and the
- *   in-flight flag is set when a message is received and unset when it is handled, failed or the worker stops.
+ *   pending definition changes: each run is a frame (command + input) pushed at console.command and removed, with
+ *   the frames above it, at its console.terminate (first listeners), restoring the message / request state it saved;
+ *   a frame whose console.error listener threw (no terminate) is dropped at the next main request, message, command
+ *   or worker stop, so listeners that throw or stop the propagation cannot leave the tracking behind (audit NM). The
+ *   in-flight flag is set when a message is received and unset when it is handled, failed, skipped or the worker
+ *   stops; main requests are counted.
  *
  * Only the bundle's own manager is ever touched: the application's entity managers are never cleared here (that is
  * the host's job, REQ-RUNTIME-002 rule 7). The Messenger and console events are subscribed by name, so
  * symfony/messenger and symfony/console stay optional. The bundle wires the manager with an
  * IGNORE_ON_UNINITIALIZED_REFERENCE reference, so a boundary never builds it.
  */
-final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface
+final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface, ResetInterface
 {
     /** Messenger event names (class names), subscribed without requiring symfony/messenger. */
     public const MESSENGER_WORKER_MESSAGE_RECEIVED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageReceivedEvent';
     public const MESSENGER_WORKER_MESSAGE_HANDLED  = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent';
     public const MESSENGER_WORKER_MESSAGE_FAILED   = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent';
-    public const MESSENGER_WORKER_STOPPED          = 'Symfony\\Component\\Messenger\\Event\\WorkerStoppedEvent';
+    /** Dispatched only by `messenger:failed:retry` when a message is skipped: the message unit ends too. */
+    public const MESSENGER_WORKER_MESSAGE_SKIPPED = 'Symfony\\Component\\Messenger\\Event\\WorkerMessageSkipEvent';
+    public const MESSENGER_WORKER_STOPPED         = 'Symfony\\Component\\Messenger\\Event\\WorkerStoppedEvent';
 
-    /** Console event names (ConsoleEvents::COMMAND / TERMINATE), subscribed without requiring symfony/console. */
+    /** Console event names (ConsoleEvents::COMMAND / TERMINATE / ERROR), subscribed without requiring symfony/console. */
     public const CONSOLE_COMMAND   = 'console.command';
     public const CONSOLE_TERMINATE = 'console.terminate';
+    public const CONSOLE_ERROR     = 'console.error';
 
     /**
-     * Console commands currently running in this process (nested in-process runs count). Process-lifetime counter,
-     * bounded by the nesting depth; intentionally not reset by kernel.reset.
+     * Running console commands, outermost first (audit NM, revision 2). A frame is one run, keyed by the command AND
+     * its input (a command that runs itself in-process gets another input per run); it saves the message / request
+     * state of the moment it started, restored when it is removed. "Outermost" = no frame, no message and no main
+     * request in flight when it started.
+     *
+     * @var list<array{command: object, input: object|null, outermost: bool, failing: bool, message: bool, requests: int}>
      */
-    private int $consoleDepth = 0;
+    private array $frames = [];
 
-    /** A Messenger message is being handled (between received and handled / failed / worker stopped). */
+    /** A Messenger message is being handled (between received and handled / failed / skipped / worker stopped). */
     private bool $messageInFlight = false;
+
+    /** Main requests in flight (a counter: a main request handled inside another one does not end the outer one). */
+    private int $requestsInFlight = 0;
+
+    /** @var WeakMap<object, bool> outermost verdict of a console terminate event, for its late clear */
+    private WeakMap $verdicts;
 
     /**
      * @param iterable<ResetInterface> $resettables the private entity manager (when wired)
@@ -59,6 +83,7 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface
     public function __construct(
         private readonly iterable $resettables = [],
     ) {
+        $this->verdicts = new WeakMap();
     }
 
     public static function getSubscribedEvents(): array
@@ -66,12 +91,14 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface
         return [
             KernelEvents::REQUEST                   => ['onRequest', 4096],
             KernelEvents::TERMINATE                 => ['onTerminate', -4096],
-            self::MESSENGER_WORKER_MESSAGE_RECEIVED => ['onMessageReceived', 4096],
+            self::MESSENGER_WORKER_MESSAGE_RECEIVED => ['onMessageReceived', PHP_INT_MAX],
             self::MESSENGER_WORKER_MESSAGE_HANDLED  => ['onMessageFinished', -4096],
             self::MESSENGER_WORKER_MESSAGE_FAILED   => ['onMessageFinished', -4096],
+            self::MESSENGER_WORKER_MESSAGE_SKIPPED  => ['onMessageFinished', -4096],
             self::MESSENGER_WORKER_STOPPED          => ['onWorkerStopped', -4096],
-            self::CONSOLE_COMMAND                   => ['onConsoleCommand', 4096],
-            self::CONSOLE_TERMINATE                 => ['onConsoleTerminate', -4096],
+            self::CONSOLE_COMMAND                   => ['onConsoleCommand', PHP_INT_MAX],
+            self::CONSOLE_ERROR                     => ['onConsoleError', PHP_INT_MAX],
+            self::CONSOLE_TERMINATE                 => [['onConsoleTerminateBookkeeping', PHP_INT_MAX], ['onConsoleTerminate', -4096]],
         ];
     }
 
@@ -80,9 +107,13 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface
      */
     public function onRequest(RequestEvent $event): void
     {
-        if ($event->isMainRequest()) {
-            $this->clearState();
+        if (!$event->isMainRequest()) {
+            return;
         }
+        $this->dropFailingFrames();
+        // @igor-ignore - Counter of the main requests in flight, decremented at kernel.terminate.
+        ++$this->requestsInFlight;
+        $this->clearState();
     }
 
     /**
@@ -90,6 +121,10 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface
      */
     public function onTerminate(): void
     {
+        // Revision 3: stale frames first (restoring their saved state), then this handler's own bookkeeping.
+        $this->dropFailingFrames();
+        // @igor-ignore - Counter of the main requests in flight, incremented at the main kernel.request.
+        $this->requestsInFlight = max(0, $this->requestsInFlight - 1);
         $this->clearState();
     }
 
@@ -98,51 +133,116 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface
      */
     public function onMessageReceived(): void
     {
+        $this->dropFailingFrames();
         // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
         $this->messageInFlight = true;
         $this->clearState();
     }
 
     /**
-     * End of a Messenger message (handled or failed).
+     * End of a Messenger message (handled, failed or skipped).
      */
     public function onMessageFinished(): void
     {
+        $this->dropFailingFrames();
         // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
         $this->messageInFlight = false;
         $this->clearState();
     }
 
     /**
-     * The worker stopped (possibly after a skipped message): no message is in flight any more.
+     * The worker stopped: no message is in flight any more.
      */
     public function onWorkerStopped(): void
     {
+        // Stale frames first: dropping one restores the flag it saved, which this handler then overrides (audit NM r3).
+        $this->dropFailingFrames();
         // @igor-ignore - Unit-of-work flag, set and unset at the Messenger boundaries.
         $this->messageInFlight = false;
     }
 
     /**
-     * Start of a command: clears only when the outermost command starts outside a Messenger message.
+     * Start of a command (first listener): pushes its frame and clears when it is the outermost unit. An event
+     * without a command is not counted.
      */
-    public function onConsoleCommand(): void
+    public function onConsoleCommand(?object $event = null): void
     {
-        // @igor-ignore - Nesting counter of the running commands (no request data).
-        if (++$this->consoleDepth === 1 && !$this->messageInFlight) {
+        $command = $this->call($event, 'getCommand');
+        if ($command === null) {
+            return;
+        }
+        $this->dropFailingFrames();
+
+        $outermost = $this->isIdle();
+        // @igor-ignore - Stack of the running commands (no request data), popped by their own terminate.
+        $this->frames[] = [
+            'command'   => $command,
+            'input'     => $this->call($event, 'getInput'),
+            'outermost' => $outermost,
+            'failing'   => false,
+            'message'   => $this->messageInFlight,
+            'requests'  => $this->requestsInFlight,
+        ];
+        if ($outermost) {
             $this->clearState();
         }
     }
 
     /**
-     * End of a command: clears only when the outermost command ends outside a Messenger message.
+     * A command failed (first listener): its frame is marked. Symfony skips its terminate when a later error listener
+     * throws; the still-marked frame is then dropped at the next main request, message, command or worker stop. There
+     * is no "unmark" listener: the frame's own terminate removes it. Without a command (unknown command name) the unit
+     * ends only when nothing runs.
      */
-    public function onConsoleTerminate(): void
+    public function onConsoleError(?object $event = null): void
     {
-        // @igor-ignore - Nesting counter of the running commands (no request data).
-        $this->consoleDepth = max(0, $this->consoleDepth - 1);
-        if ($this->consoleDepth === 0 && !$this->messageInFlight) {
+        $index = $this->indexOf($event);
+        if ($index === null) {
+            if ($this->call($event, 'getCommand') === null && $this->isIdle()) {
+                $this->clearState();
+            }
+
+            return;
+        }
+        // @igor-ignore - Failure marker of a running command, removed with its frame.
+        $this->frames[$index]['failing'] = true;
+    }
+
+    /**
+     * End of a command (first listener): removes its frame and every frame above it (nested runs whose terminate
+     * never came) and restores the state saved when it started. An unknown command changes nothing.
+     */
+    public function onConsoleTerminateBookkeeping(?object $event = null): void
+    {
+        $index = $this->indexOf($event);
+        if ($event === null || $index === null) {
+            return;
+        }
+        // @igor-ignore - Per-event verdict; the WeakMap entry dies with the event.
+        $this->verdicts[$event] = $this->frames[$index]['outermost'];
+        $this->removeFrom($index);
+    }
+
+    /**
+     * End of a command (late listener): clears when that command was the outermost unit.
+     */
+    public function onConsoleTerminate(?object $event = null): void
+    {
+        if ($event !== null && ($this->verdicts[$event] ?? false)) {
+            unset($this->verdicts[$event]);
             $this->clearState();
         }
+    }
+
+    /**
+     * Zeroes the tracking (kernel.reset); worker correctness never depends on it.
+     */
+    public function reset(): void
+    {
+        $this->frames           = [];
+        $this->messageInFlight  = false;
+        $this->requestsInFlight = 0;
+        $this->verdicts         = new WeakMap();
     }
 
     /**
@@ -153,5 +253,67 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface
         foreach ($this->resettables as $service) {
             $service->reset();
         }
+    }
+
+    private function isIdle(): bool
+    {
+        return $this->frames === [] && !$this->messageInFlight && $this->requestsInFlight === 0;
+    }
+
+    /**
+     * The frame of the command and input of a console event (the most recent match).
+     */
+    private function indexOf(?object $event): ?int
+    {
+        $command = $this->call($event, 'getCommand');
+        if ($command === null) {
+            return null;
+        }
+        $input = $this->call($event, 'getInput');
+        for ($i = count($this->frames) - 1; $i >= 0; --$i) {
+            if ($this->frames[$i]['command'] === $command && $this->frames[$i]['input'] === $input) {
+                return $i;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Removes the frame and every frame above it, and restores the state saved by that frame.
+     */
+    private function removeFrom(int $index): void
+    {
+        $frame = $this->frames[$index];
+        // @igor-ignore - Stack of the running commands (no request data), popped by their own terminate.
+        $this->frames = array_slice($this->frames, 0, $index);
+        // @igor-ignore - Restored to the state of the moment the command started.
+        $this->messageInFlight = $frame['message'];
+        // @igor-ignore - Restored to the state of the moment the command started.
+        $this->requestsInFlight = $frame['requests'];
+    }
+
+    /**
+     * Drops the first frame still marked failing (its terminate never came), with the frames above it.
+     */
+    private function dropFailingFrames(): void
+    {
+        foreach ($this->frames as $index => $frame) {
+            if ($frame['failing']) {
+                $this->removeFrom($index);
+
+                return;
+            }
+        }
+    }
+
+    private function call(?object $event, string $method): ?object
+    {
+        if ($event === null || !method_exists($event, $method)) {
+            return null;
+        }
+        $value = $event->{$method}();
+
+        return is_object($value) ? $value : null;
     }
 }

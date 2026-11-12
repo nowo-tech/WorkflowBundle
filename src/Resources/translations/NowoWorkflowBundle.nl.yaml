@@ -195,6 +195,8 @@ error:
   not_found_slug: 'Workflowdefinitie "%slug%" niet gevonden.'
   slug_taken: 'Deze slug wordt in dit bereik al gebruikt.'
   already_customized: 'Deze organisatie heeft al een eigen versie van die workflow.'
+  subject_class_not_allowed: 'Deze organisatie kan geen workflows maken voor deze subjectklasse.'
+  definition_in_use: 'Deze workflow kan niet worden verwijderd: %count% lopende aanvraag/aanvragen gebruiken nog een van de versies. Schakel hem in plaats daarvan uit.'
 
 kpi:
   definitions: 'Definities'

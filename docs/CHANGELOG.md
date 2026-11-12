@@ -90,8 +90,10 @@ the UI behave as 1.14. **A schema update is required.** See [UPGRADING](UPGRADIN
   `guards.max_automatic_transitions`; `WorkflowApplicator::applyAutomaticTransitions()`).
 - **Audit event** `Event\WorkflowTransitionAppliedEvent` (ids only: slug, definition version and tenant, transition,
   from / to, subject class and reference, actor reference, tenant, automatic flag), dispatched after the commit of the
-  transaction that persisted the subject (DBAL 4 middleware on every connection, savepoint aware; dropped on rollback or
-  when the marking is never persisted). `audit.enabled` (default: on with tenancy).
+  transaction that persisted the subject (DBAL 4 middleware on the connections of the definitions' and the default
+  manager, savepoint aware; dispatched after the applicator's flush or at the end of the request / command / message,
+  never from `postFlush`; dropped on rollback, or when not committed by the end of the unit). `audit.enabled`
+  (default: on with tenancy).
 - **Runtime port** `Contract\WorkflowRuntimeInterface` (`can()`, `apply()`, `enabledTransitions()`, `marking()`) with
   the VOs `Model\WorkflowTransitionResult` and `Model\WorkflowMarkingView`; default `Service\WorkflowRuntime`.
   `WorkflowRuntimePass` wires it: the host's own runtime wins; a 1.14 host registry or registry decorator keeps running
@@ -119,8 +121,37 @@ the UI behave as 1.14. **A schema update is required.** See [UPGRADING](UPGRADIN
 - The Workflow UI controller actions take the `Request` (internal); `WorkflowPageFactory` methods take an optional
   `View\WorkflowUiScope`.
 
+### Security
+
+Hardening from the immediate audit NO of this release (before it shipped):
+
+- **Exact tenant keys (M1):** every repository and pin-store result is re-checked in PHP against the exact tenant key,
+  slug and subject reference (a case- or accent-insensitive collation can no longer return or collide another
+  tenant's rows); on MySQL / MariaDB `tenant_key` and `subject_ref` use the binary collation `utf8mb4_bin`
+  (`Doctrine\BinaryKeyCollationSubscriber`); tenant keys and subject references are printable ASCII without spaces.
+  Publish, draft and delete act on the already authorised entity.
+- **Tenant editors cannot rebind a definition (M2):** in a tenant scope the type, subject class and marking property
+  are locked (from the template, or from `tenancy.subject_classes` for a new definition); place and transition names
+  must match `^[a-z0-9_]{1,64}$` with tenancy.
+- **Pin before apply (M3):** concurrent first applies agree on one version; the pin insert runs in a savepoint inside
+  an open transaction (a duplicate never aborts it).
+- **No audit dispatch from `postFlush` (M4)**; the audit middleware observes only the definitions' and the default
+  manager's connections, and anything uncommitted at the end of a unit is dropped (L1).
+- Router context prefix variables are removed at the next main request even if the previous one never finished (L2);
+  concurrent draft / clone / create end with the existing row or a form error (L3); a guard port that throws blocks the
+  transition (fail closed).
+- **A published definition with pinned subjects cannot be deleted** (owner decision 2026-11-12,
+  `Exception\WorkflowDefinitionInUseException`).
+
 ### Fixed
 
+- **Console boundary tracking (audit NM, B6):** `WorkflowUnitOfWorkSubscriber` counted console depth with `++` / `--`
+  at priorities ±4096, so a listener that threw or stopped the propagation could leave the counter behind in a
+  long-running process, and the outermost command then no longer cleared the bundle's private entity manager. Each run
+  is now a frame (command + input) pushed and popped at the extreme priorities, restoring the message / request state
+  it saved; a frame whose `console.error` listener threw is dropped at the next unit boundary; main requests are
+  counted; `WorkerMessageSkipEvent` (from `messenger:failed:retry`) ends the message unit. Precondition of the leak:
+  a long-running process without the services resetter between units.
 - `nowo:workflow:sync-schema` on SQLite dropped a table it had to rebuild to add columns (the rebuild's `CREATE TABLE`
   was filtered as "already exists"), and created the indexes of an existing table before the columns they need. Both
   are needed to upgrade a 1.14 schema; a test migrates a 1.14 `workflow_definition` table.

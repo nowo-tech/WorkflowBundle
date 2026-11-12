@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use LogicException;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
@@ -34,7 +36,8 @@ final readonly class WorkflowVersioning
 
     /**
      * Copies the current published version of a global template into the tenant as a draft (version 1), or as a
-     * published version 1 with $publish. Refused when the tenant already has a definition with that slug.
+     * published version 1 with $publish. Refused when the tenant already has a definition with that slug (also when a
+     * concurrent request created it first: the unique constraint decides, audit NO L3).
      *
      * @throws WorkflowNotFoundException when there is no published global template with that slug
      * @throws LogicException when the tenant already has that slug
@@ -53,7 +56,11 @@ final readonly class WorkflowVersioning
         if ($publish) {
             $copy->publish();
         }
-        $this->repository->save($copy);
+        try {
+            $this->repository->save($copy);
+        } catch (UniqueConstraintViolationException $exception) {
+            throw new LogicException(sprintf('The tenant already has a workflow "%s".', $slug), 0, $exception);
+        }
         $this->registry?->invalidate($slug);
 
         return $copy;
@@ -66,18 +73,38 @@ final readonly class WorkflowVersioning
      */
     public function createDraft(string $slug, ?WorkflowTenant $tenant): WorkflowDefinition
     {
-        $draft = $this->repository->findDraft($slug, $tenant);
-        if ($draft instanceof WorkflowDefinition) {
-            return $draft;
-        }
-
-        $current = $this->repository->findCurrent($slug, $tenant);
+        $current = $this->repository->findDraft($slug, $tenant) ?? $this->repository->findCurrent($slug, $tenant);
         if (!$current instanceof WorkflowDefinition) {
             throw WorkflowNotFoundException::forSlug($slug);
         }
 
-        $draft = $current->copyAsDraft($tenant, $this->repository->nextVersion($slug, $tenant));
-        $this->repository->save($draft);
+        return $this->createDraftOf($current);
+    }
+
+    /**
+     * The open draft of the scope of this (already authorised) definition: the definition itself when it is a draft,
+     * the existing draft of its scope, or a new draft copied from it (audit NO M1: the action works on the checked
+     * entity, never on a re-query by slug and tenant). Two concurrent requests end with the same draft (L3).
+     */
+    public function createDraftOf(WorkflowDefinition $definition): WorkflowDefinition
+    {
+        if ($definition->isDraft()) {
+            return $definition;
+        }
+        $slug   = $definition->getSlug();
+        $tenant = $definition->getTenant();
+        $draft  = $this->repository->findDraft($slug, $tenant);
+        if ($draft instanceof WorkflowDefinition) {
+            return $draft;
+        }
+
+        $draft = $definition->copyAsDraft($tenant, $this->repository->nextVersion($slug, $tenant));
+        try {
+            $this->repository->save($draft);
+        } catch (UniqueConstraintViolationException $exception) {
+            // A concurrent request created the same version first: that draft is the draft.
+            return $this->repository->findDraft($slug, $tenant) ?? throw $exception;
+        }
 
         return $draft;
     }
@@ -95,9 +122,23 @@ final readonly class WorkflowVersioning
             throw WorkflowNotFoundException::forSlug($slug);
         }
 
+        return $this->publish($draft);
+    }
+
+    /**
+     * Publishes this (already authorised) draft.
+     *
+     * @throws LogicException when the definition is not a draft
+     */
+    public function publish(WorkflowDefinition $draft): WorkflowDefinition
+    {
+        if (!$draft->isDraft()) {
+            throw new LogicException(sprintf('Version %d of workflow "%s" is not a draft.', $draft->getVersion(), $draft->getSlug()));
+        }
+
         $draft->publish();
         $this->repository->save($draft);
-        $this->registry?->invalidate($slug);
+        $this->registry?->invalidate($draft->getSlug());
 
         return $draft;
     }
@@ -114,16 +155,27 @@ final readonly class WorkflowVersioning
     }
 
     /**
-     * Deletes a draft, or every version of a published definition of this scope (subjects pinned to one of them lose
-     * their pin and follow the scope's current version, else the global template).
+     * Deletes a draft, or every version of a published definition of this scope. A published definition is refused
+     * while subjects are pinned to any of its versions (owner decision 2026-11-12): disable it instead, or remove the
+     * subjects' pins first. A draft never runs, so it is never pinned.
+     *
+     * @throws WorkflowDefinitionInUseException when subjects are pinned to one of the versions
      */
     public function delete(WorkflowDefinition $definition): void
     {
         $versions = $definition->isDraft() ? [$definition] : $this->repository->findVersions($definition->getSlug(), $definition->getTenant());
+        $ids      = [];
         foreach ($versions as $version) {
             if ($version->getId() !== null) {
-                $this->pins?->forgetDefinition($version->getId());
+                $ids[] = $version->getId();
             }
+        }
+        $pinned = $this->pins?->countForDefinitions($ids) ?? 0;
+        if ($pinned > 0) {
+            throw new WorkflowDefinitionInUseException($definition->getSlug(), $pinned);
+        }
+
+        foreach ($versions as $version) {
             // @igor-ignore - Schedules a delete in the private manager, flushed just below (no state kept).
             $this->repository->remove($version, false);
         }

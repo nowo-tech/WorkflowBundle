@@ -98,19 +98,26 @@ final readonly class WorkflowDefinitionLocator
     }
 
     /**
-     * Pins the subject on the version it just ran, unless it is pinned already (tenancy and a subject reference only).
+     * Pins the subject on the version it is about to run, before the transition is applied (audit NO M3), and returns
+     * the version it is pinned to: a concurrent request may have pinned it on another version first, which then wins.
+     * Tenancy and a subject reference only; the definition is returned unchanged otherwise.
+     *
+     * @throws WorkflowNotFoundException when the winning pin is not valid for the subject
      */
-    public function pin(object $subject, WorkflowDefinition $definition): void
+    public function ensurePinned(object $subject, WorkflowDefinition $definition): WorkflowDefinition
     {
         if (!$this->tenancy->enabled()) {
-            return;
+            return $definition;
         }
-        $reference = $this->tenancy->referenceOf($subject, $definition->getSlug());
+        $slug      = $definition->getSlug();
+        $reference = $this->tenancy->referenceOf($subject, $slug);
         if (!$reference instanceof WorkflowSubjectRef) {
-            return;
+            return $definition;
         }
 
-        $this->pins->pin($this->tenancy->tenantOf($subject, $definition->getSlug()), $definition->getSlug(), $reference, $definition);
+        $pinned = $this->pins->pin($this->tenancy->tenantOf($subject, $slug), $slug, $reference, $definition);
+
+        return $pinned === $definition->getId() ? $definition : $this->forSubject($subject, $slug);
     }
 
     private function pinned(object $subject, string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition

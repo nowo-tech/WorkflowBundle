@@ -8,7 +8,6 @@ use InvalidArgumentException;
 
 use function preg_match;
 use function sprintf;
-use function strlen;
 
 /**
  * Opaque, stable identifier of a workflow subject in the host (since 1.15), e.g. the UUID of a leave request.
@@ -27,8 +26,8 @@ final readonly class WorkflowSubjectRef
      */
     public function __construct(string $id)
     {
-        if ($id === '' || strlen($id) > self::MAX_LENGTH || preg_match('/[\x00-\x1F\x7F]/', $id) === 1) {
-            throw new InvalidArgumentException(sprintf('A workflow subject reference must be 1 to %d bytes without control characters.', self::MAX_LENGTH));
+        if (preg_match('/^[\x21-\x7E]{1,' . self::MAX_LENGTH . '}$/D', $id) !== 1) {
+            throw new InvalidArgumentException(sprintf('A workflow subject reference must be 1 to %d printable ASCII characters without spaces.', self::MAX_LENGTH));
         }
         $this->id = $id;
     }

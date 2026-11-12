@@ -195,6 +195,8 @@ error:
   not_found_slug: 'Definizione di workflow "%slug%" non trovata.'
   slug_taken: 'Questo slug è già usato in questo ambito.'
   already_customized: 'Questa organizzazione ha già la sua versione di quel workflow.'
+  subject_class_not_allowed: 'Questa organizzazione non può creare workflow per questa classe di soggetto.'
+  definition_in_use: 'Questo workflow non può essere eliminato: %count% richiesta/e in corso usano ancora una sua versione. Disattivalo invece.'
 
 kpi:
   definitions: 'Definizioni'

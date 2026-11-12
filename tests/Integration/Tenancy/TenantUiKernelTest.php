@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Integration\Tenancy;
 use LogicException;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
+use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -170,13 +171,13 @@ final class TenantUiKernelTest extends TestCase
     public function aNewDefinitionBelongsToTheScopeAndItsSlugIsUniqueThere(): void
     {
         $kernel = $this->kernel();
-        $form   = static fn (string $slug): array => ['workflow_definition_form' => [
+        $form   = static fn (string $slug, string $class = LeaveRequest::class): array => ['workflow_definition_form' => [
             'name'            => 'Expenses',
             'slug'            => $slug,
             'type'            => 'state_machine',
             'initialPlace'    => 'draft',
-            'subjectClass'    => 'App\\Expense',
-            'markingProperty' => 'status',
+            'subjectClass'    => $class,
+            'markingProperty' => 'stolen_property',
             'enabled'         => '1',
             'priority'        => '0',
             '_token'          => self::csrf($kernel, 'workflow_definition_form'),
@@ -185,10 +186,15 @@ final class TenantUiKernelTest extends TestCase
         $taken = self::send($kernel, self::ui('org-c', '/definitions/new'), 'admin-org-c', 'POST', $form('leave'));
         self::assertSame(422, $taken->getStatusCode());
 
+        $foreign = self::send($kernel, self::ui('org-c', '/definitions/new'), 'admin-org-c', 'POST', $form('expenses', 'App\\Billing\\Invoice'));
+        self::assertSame(422, $foreign->getStatusCode(), 'audit NO M2: a subject class outside tenancy.subject_classes');
+        self::assertStringContainsString('cannot create workflows for this subject class', (string) $foreign->getContent());
+
         $created = self::send($kernel, self::ui('org-c', '/definitions/new'), 'admin-org-c', 'POST', $form('leave_extra'));
         self::assertSame(302, $created->getStatusCode());
         $draft = self::repository($kernel)->findDraft('leave_extra', new WorkflowTenant('org-c'));
         self::assertInstanceOf(WorkflowDefinition::class, $draft);
+        self::assertSame('status', $draft->getMarkingProperty(), 'the marking property comes from tenancy.subject_classes');
         self::assertNull(self::repository($kernel)->findDraft('leave_extra', null));
     }
 

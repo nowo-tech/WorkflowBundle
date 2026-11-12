@@ -76,11 +76,11 @@ final class WorkflowApplicator
     {
         $definition = $workflowSlug !== null ? $this->definitionFor($subject, $workflowSlug) : $this->resolveDefinitionForSubject($subject);
         $this->assertSubjectSupported($subject, $definition);
-        $applied = $this->runAutomatic($definition, $this->workflowFor($definition), $subject);
+        $definition = $this->locator?->ensurePinned($subject, $definition) ?? $definition;
+        $applied    = $this->runAutomatic($definition, $this->workflowFor($definition), $subject);
         if ($applied === []) {
             return [];
         }
-        $this->locator?->pin($subject, $definition);
         $this->flushIfConfigured();
 
         return $applied;
@@ -227,7 +227,9 @@ final class WorkflowApplicator
     private function applyWithDefinition(object $subject, WorkflowDefinition $definition, string $transitionName): array
     {
         $this->assertSubjectSupported($subject, $definition);
-        $workflow = $this->workflowFor($definition);
+        // Pinned before the transition (audit NO M3): concurrent first applies agree on one version.
+        $definition = $this->locator?->ensurePinned($subject, $definition) ?? $definition;
+        $workflow   = $this->workflowFor($definition);
 
         // No can() pre-check: apply() evaluates the guards itself, so each guard listener runs once per apply.
         try {
@@ -239,7 +241,6 @@ final class WorkflowApplicator
         }
 
         $automatic = $this->runAutomatic($definition, $workflow, $subject);
-        $this->locator?->pin($subject, $definition);
         $this->flushIfConfigured();
 
         return $automatic;

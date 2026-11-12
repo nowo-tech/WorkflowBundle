@@ -8,13 +8,14 @@ use InvalidArgumentException;
 
 use function preg_match;
 use function sprintf;
-use function strlen;
 
 /**
  * Opaque tenant key of the host (an organization UUID, a workspace slug…), since 1.15.
  *
- * The bundle only compares keys byte for byte: no trimming, no case folding. A definition without a tenant is a
- * global template; a definition with a tenant is only ever used, listed, shown or edited for that exact key.
+ * Printable ASCII without spaces (a UUID, a slug): no accent, no trailing space, so database collations cannot fold two
+ * keys together (audit NO M1). Keys are compared exactly: the bundle re-checks every row in PHP (`acme` is not
+ * `Acme`), and on MySQL / MariaDB the key columns use the binary collation. A definition without a tenant is a global
+ * template; a definition with a tenant is only ever used, listed, shown or edited for that exact key.
  */
 final readonly class WorkflowTenant
 {
@@ -28,8 +29,8 @@ final readonly class WorkflowTenant
      */
     public function __construct(string $key)
     {
-        if ($key === '' || strlen($key) > self::MAX_LENGTH || preg_match('/[\x00-\x1F\x7F]/', $key) === 1) {
-            throw new InvalidArgumentException(sprintf('A workflow tenant key must be 1 to %d bytes without control characters.', self::MAX_LENGTH));
+        if (preg_match('/^[\x21-\x7E]{1,' . self::MAX_LENGTH . '}$/D', $key) !== 1) {
+            throw new InvalidArgumentException(sprintf('A workflow tenant key must be 1 to %d printable ASCII characters without spaces.', self::MAX_LENGTH));
         }
         $this->key = $key;
     }
