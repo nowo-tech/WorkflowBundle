@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.15.1] - 2026-11-12](#1151---2026-11-12)
 - [[1.15.0] - 2026-11-12](#1150---2026-11-12)
 - [[1.14.1] - 2026-11-12](#1141---2026-11-12)
 - [[1.14.0] - 2026-11-12](#1140---2026-11-12)
@@ -53,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-11-12
+
 ### Fixed
 
 - **Private manager repository factory (audit NX, NZ-M1):** `WorkflowEntityManager` no longer builds its private entity manager on
@@ -65,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kept per manager. Regression test `PrivateManagerRepositoryFactoryTest`.
 - **SQL filter mirroring (audit NZ-L1):** a filter registered on the source configuration after the private manager
   exists, or registered again under the same name with another class, is now registered on the private manager too.
+
+[1.15.1]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.15.1
 
 ## [1.15.0] - 2026-11-12
 
