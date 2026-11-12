@@ -4,6 +4,7 @@
 
 - [Unreleased](#unreleased)
 - [To 1.14.0](#to-1140)
+- [To 1.14.0](#to-1140-1)
   - [Workflow UI access port](#workflow-ui-access-port)
   - [flush_after_apply](#flush_after_apply)
   - [Private entity manager for the definitions](#private-entity-manager-for-the-definitions)
@@ -71,6 +72,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.14.0
+
+From **1.13.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 ## To 1.14.0
 

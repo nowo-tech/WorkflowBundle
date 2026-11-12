@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.14.0] - 2026-11-12](#1140---2026-11-12)
 - [[1.13.0] - 2026-11-10](#1130---2026-11-10)
 - [[1.12.0] - 2026-10-30](#1120---2026-10-30)
 - [[1.11.2] - 2026-10-30](#1112---2026-10-30)
@@ -49,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [[1.0.0] - 2026-06-10](#100---2026-06-10)
 
 ## [Unreleased]
+
+## [1.14.0] - 2026-11-12
 
 Framework-free Workflow UI access port, a private entity manager for the definitions, an explicit `flush_after_apply`
 for new installs and an XML mapping (REQ-ARCH-001 rules 2, 3 and 6). See [UPGRADING](UPGRADING.md#to-1140).
@@ -104,6 +107,8 @@ for new installs and an XML mapping (REQ-ARCH-001 rules 2, 3 and 6). See [UPGRAD
 - Not setting `runtime.flush_after_apply`: the 1.13 default (`true`) stays for upgraded applications, with a
   deprecation; it becomes `false` in 2.0.
 - `doctrine.private_entity_manager` (any value): the private entity manager becomes the only mode in 2.0.
+
+[1.14.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.14.0
 
 ## [1.13.0] - 2026-11-10
 
