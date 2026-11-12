@@ -11,6 +11,7 @@ use Nowo\WorkflowBundle\Tests\Support\ControllerContainerFactory;
 use Nowo\WorkflowBundle\Tests\Support\WorkflowPageFixtures;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Request;
 
 final class DashboardControllerTest extends TestCase
 {
@@ -35,7 +36,7 @@ final class DashboardControllerTest extends TestCase
         $controller = new DashboardController($repository, WorkflowPageFixtures::factory(), 20);
         $controller->setContainer(ControllerContainerFactory::create());
 
-        $response = $controller->index();
+        $response = $controller->index(Request::create('/'));
 
         self::assertSame('dashboard:3:1/1', $response->getContent());
     }

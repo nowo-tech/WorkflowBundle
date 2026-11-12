@@ -28,12 +28,16 @@ action:
   add_match_rule: 'Ajouter une règle'
   create_continue: 'Créer et continuer'
   remove: 'Retirer'
+  new_draft: 'Nouveau brouillon'
+  publish: 'Publier'
+  clone_template: 'Personnaliser pour cette organisation'
 
 status:
   enabled: Activé
   disabled: Désactivé
   default: Par défaut
   initial: État initial
+  draft: 'Brouillon'
 
 workflow_type:
   state_machine: 'Machine à états'
@@ -79,6 +83,12 @@ definition:
   updated_at: 'Mise à jour'
   section:
     general: 'Définition'
+  version_status: 'v%version% (%status%)'
+  version_short: 'v%version%'
+  template_version: 'Cloné depuis la version du modèle'
+  confirm_draft: 'Créer un brouillon de « %name% » ? Les sujets gardent la version publiée jusqu’à la publication du brouillon.'
+  confirm_publish: 'Publier « %name% » ? Les nouveaux sujets démarrent avec cette version ; ceux en cours gardent la leur.'
+  confirm_clone: 'Copier le modèle « %name% » dans cette organisation en brouillon ?'
 
 table:
   name: Nom
@@ -91,6 +101,8 @@ table:
   places: États
   transitions: Transitions du flux
   actions: Actions disponibles
+  version: 'Version'
+  scope: 'Portée'
 
 collection:
   no_places: 'Aucun état pour le moment. Cliquez sur « Ajouter un état ».'
@@ -120,6 +132,9 @@ form:
     places_list: 'Gérez les états du workflow. Les changements sont enregistrés à l''envoi du formulaire.'
     new_definition: 'Commencez par les paramètres généraux ; les règles de correspondance, les états et les transitions viennent ensuite.'
     general: 'Nom, slug, sujet associé et priorité du workflow.'
+    guard_permission: 'Seul un acteur ayant cette permission dans le contexte du sujet peut appliquer la transition (ex. leave.approve).'
+    guard_expression: 'Comparez des variables à des valeurs, ex. days <= 2 and type == ''vacation''. Variables : %variables%.'
+    automatic: 'Appliquée dès qu’elle est possible et que ses gardes passent (ex. approbation automatique).'
   field:
     name: Nom
     slug: Slug
@@ -139,6 +154,9 @@ form:
     label: Libellé
     from_places: 'États source'
     to_places: 'États cible'
+    guard_permission: 'Permission requise'
+    guard_expression: 'Condition'
+    automatic: 'Appliquer automatiquement'
   placeholder:
     select_places: 'Rechercher et sélectionner des états…'
 
@@ -168,10 +186,17 @@ flash:
   created: 'Définition de workflow créée.'
   updated: 'Définition de workflow mise à jour.'
   deleted: 'Définition de workflow supprimée.'
+  published: 'Définition de workflow publiée.'
+  cloned: 'Modèle copié dans cette organisation en brouillon.'
+  published_read_only: 'Une version publiée ne peut pas être modifiée : créez un nouveau brouillon.'
 
 error:
   not_found_id: 'Définition de workflow #%id% introuvable.'
   not_found_slug: 'Définition de workflow "%slug%" introuvable.'
+  slug_taken: 'Ce slug est déjà utilisé dans cette portée.'
+  already_customized: 'Cette organisation a déjà sa propre version de ce workflow.'
+  subject_class_not_allowed: 'Cette organisation ne peut pas créer de workflows pour cette classe de sujet.'
+  definition_in_use: 'Ce workflow ne peut pas être supprimé : %count% demande(s) en cours utilisent encore une de ses versions. Désactivez-le plutôt.'
 
 kpi:
   definitions: 'Définitions'
@@ -235,3 +260,7 @@ workflow_transition:
   label:
     placeholder: 'Soumettre pour approbation'
     help: 'Libellé d''affichage facultatif.'
+
+scope:
+  global: 'Modèle global'
+  tenant: 'Cette organisation'

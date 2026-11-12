@@ -78,10 +78,28 @@ class SchemaSyncService
      */
     public function getSyncSchemaSql(): array
     {
-        return $this->filterExistingSchemaObjects(array_merge(
-            $this->getCreateMissingSchemaSql(),
-            $this->getUpdateSchemaSql(),
-        ));
+        $update  = $this->getUpdateSchemaSql();
+        $rebuilt = [];
+        foreach ($update as $sql) {
+            // SQLite alters a table by rebuilding it (DROP TABLE, then CREATE TABLE and its indexes): those CREATE
+            // statements must run although the table exists now (1.15: the new definition columns).
+            if (preg_match('/^DROP\s+TABLE\s+(?:\w+\.)?["`]?(\w+)["`]?\s*$/i', trim($sql), $matches) === 1) {
+                $rebuilt[strtolower($matches[1])] = true;
+            }
+        }
+
+        $statements = [];
+        foreach (array_merge($this->getCreateMissingSchemaSql(), $update) as $sql) {
+            $table = $this->parseCreateTableName($sql) ?? $this->parseCreateIndexTable($sql);
+            if ($table !== null && isset($rebuilt[$table])) {
+                $statements[] = $sql;
+
+                continue;
+            }
+            $statements = [...$statements, ...$this->filterExistingSchemaObjects([$sql])];
+        }
+
+        return $statements;
     }
 
     /**
@@ -91,9 +109,14 @@ class SchemaSyncService
      */
     public function getCreateMissingSchemaSql(): array
     {
-        return $this->filterExistingSchemaObjects(
-            $this->getCreateSchemaSql(),
-        );
+        $tables = array_flip($this->listExistingTableNames());
+
+        // An index of a table that already exists comes from the update diff, after the columns it needs (1.15: the
+        // new unique index on tenant_key / version of a 1.14 workflow_definition table).
+        return array_values(array_filter(
+            $this->filterExistingSchemaObjects($this->getCreateSchemaSql()),
+            fn (string $sql): bool => !isset($tables[$this->parseCreateIndexTable($sql) ?? '']),
+        ));
     }
 
     /**
@@ -298,6 +321,18 @@ class SchemaSyncService
         }
 
         return strtolower($matches[2]);
+    }
+
+    /**
+     * The lower-case table of a CREATE INDEX statement (null for any other statement).
+     */
+    private function parseCreateIndexTable(string $sql): ?string
+    {
+        if (!preg_match('/^CREATE\s+(?:UNIQUE\s+)?INDEX\s+\S+\s+ON\s+(?:\w+\.)?["`]?(\w+)["`]?/i', trim($sql), $matches)) {
+            return null;
+        }
+
+        return strtolower($matches[1]);
     }
 
     private function parseCreateIndexName(string $sql): ?string

@@ -28,12 +28,16 @@ action:
   add_match_rule: 'Adicionar regra'
   create_continue: 'Criar e continuar'
   remove: 'Remover'
+  new_draft: 'Novo rascunho'
+  publish: 'Publicar'
+  clone_template: 'Personalizar para esta organização'
 
 status:
   enabled: Ativo
   disabled: Inativo
   default: Predefinido
   initial: Inicial
+  draft: 'Rascunho'
 
 workflow_type:
   state_machine: 'Máquina de estados'
@@ -79,6 +83,12 @@ definition:
   updated_at: 'Atualizada'
   section:
     general: 'Definição'
+  version_status: 'v%version% (%status%)'
+  version_short: 'v%version%'
+  template_version: 'Clonado da versão do modelo'
+  confirm_draft: 'Criar um rascunho de "%name%"? Os sujeitos continuam com a versão publicada até publicares o rascunho.'
+  confirm_publish: 'Publicar "%name%"? Os novos sujeitos começam com esta versão; os que já estão em curso mantêm a sua.'
+  confirm_clone: 'Copiar o modelo "%name%" para esta organização como rascunho?'
 
 table:
   name: Nome
@@ -91,6 +101,8 @@ table:
   places: Estados
   transitions: Transições
   actions: Ações
+  version: 'Versão'
+  scope: 'Âmbito'
 
 collection:
   no_places: 'Ainda não há estados. Clique em «Adicionar estado» para criar um.'
@@ -120,6 +132,9 @@ form:
     places_list: 'Gira os estados do workflow. As alterações são guardadas ao submeter o formulário.'
     new_definition: 'Comece pelas definições gerais; as regras de correspondência, os estados e as transições vêm a seguir.'
     general: 'Nome, slug, sujeito associado e prioridade do workflow.'
+    guard_permission: 'Só um ator com esta permissão no contexto do sujeito pode aplicar a transição (ex. leave.approve).'
+    guard_expression: 'Compara variáveis com valores, ex. days <= 2 and type == ''vacation''. Variáveis: %variables%.'
+    automatic: 'Aplicada assim que está disponível e as suas guardas passam (ex. aprovação automática).'
   field:
     name: Nome
     slug: Slug
@@ -139,6 +154,9 @@ form:
     label: Etiqueta
     from_places: 'Estados de origem'
     to_places: 'Estados de destino'
+    guard_permission: 'Permissão necessária'
+    guard_expression: 'Condição'
+    automatic: 'Aplicar automaticamente'
   placeholder:
     select_places: 'Pesquisar e selecionar estados…'
 
@@ -168,10 +186,17 @@ flash:
   created: 'Definição de workflow criada.'
   updated: 'Definição de workflow atualizada.'
   deleted: 'Definição de workflow eliminada.'
+  published: 'Definição de workflow publicada.'
+  cloned: 'Modelo copiado para esta organização como rascunho.'
+  published_read_only: 'Uma versão publicada não pode ser editada: cria um novo rascunho.'
 
 error:
   not_found_id: 'Definição de workflow #%id% não encontrada.'
   not_found_slug: 'Definição de workflow "%slug%" não encontrada.'
+  slug_taken: 'Este slug já é usado neste âmbito.'
+  already_customized: 'Esta organização já tem a sua própria versão desse workflow.'
+  subject_class_not_allowed: 'Esta organização não pode criar workflows para esta classe de sujeito.'
+  definition_in_use: 'Este workflow não pode ser eliminado: %count% pedido(s) em curso ainda usam uma das suas versões. Desativa-o em vez disso.'
 
 kpi:
   definitions: 'Definições'
@@ -235,3 +260,7 @@ workflow_transition:
   label:
     placeholder: 'Submeter para aprovação'
     help: 'Etiqueta de apresentação opcional.'
+
+scope:
+  global: 'Modelo global'
+  tenant: 'Esta organização'

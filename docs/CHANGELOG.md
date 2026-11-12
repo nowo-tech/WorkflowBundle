@@ -52,6 +52,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Multitenant workflows (owner request D-20261112-10, Beacon): tenant-scoped definitions with global templates,
+versions pinned per subject, an embeddable per-organization UI, per-transition guards configured in the editor, an
+after-commit audit event, and a framework-free runtime port. Opt-in: without `tenancy.tenant_resolver` the runtime and
+the UI behave as 1.14. **A schema update is required.** See [UPGRADING](UPGRADING.md#to-1150) and
+[MULTITENANCY.md](MULTITENANCY.md).
+
+### Added
+
+- **Tenant-scoped definitions** (`tenancy.tenant_resolver`, port `Contract\WorkflowTenantResolverInterface`, VO
+  `Model\WorkflowTenant`): a definition belongs to a tenant or is a global template (`tenant_key` column, `''` =
+  global). Resolution for a subject: its pinned version, else its tenant's current published version, else the global
+  template; never another tenant's (a tampered pin is refused). A tenant that disabled its version gets no fallback.
+  `WorkflowResolver::resolveForTenant()`, `WorkflowDefinitionRepository::findCurrent()` / `findForTenant()` /
+  `findEnabledCandidatesForTenant()`, `DatabaseWorkflowRegistry::forSubject()` / `forDefinition()`.
+- **Tenant isolation guard** (`EventListener\TenantIsolationGuardSubscriber`, tenancy only): a workflow built from any
+  other version than the one the subject runs blocks every transition (`nowo_workflow.tenant_mismatch`).
+- **Versions and template clones** (`Service\WorkflowVersioning`, `Enum\WorkflowDefinitionStatus`): drafts (the next
+  version number), publish, clone a published global template into a tenant (`template_version`), delete a draft or
+  every version of a scope. In-flight subjects are **pinned** to the version they started with
+  (`workflow_subject_pin`, `Entity\WorkflowSubjectPin`, written with plain DBAL; subject reference from
+  `Contract\WorkflowSubjectReferenceResolverInterface`); `forgetSubject()` removes a subject's pins.
+- **Embeddable UI per tenant**: `web_ui.path_prefix` may hold route variables (`/organizations/{uuid}/settings/workflows`;
+  `EventListener\WorkflowUiRouteContextSubscriber` keeps them in every bundle link), ports
+  `Contract\WorkflowUiTenantResolverInterface` (scope of a request) and `Contract\WorkflowUiActionCheckerInterface`
+  (`Model\WorkflowUiAction` view / edit / publish, `Model\WorkflowUiActionCheck`), asked on top of the 1.14
+  `WorkflowUiAccessPolicyInterface`. List, dashboard, show / diagram and editor are filtered by scope (another tenant's
+  definition: 404; a template from a tenant: read-only, 403 on change). New routes `nowo_workflow_definition_draft`,
+  `_publish`, `_clone` (POST, CSRF). Badges for template, draft and version.
+- **Per-transition guards** configured in the editor (`workflow_transition.guard_permission`, `guard_expression`,
+  `automatic`): permission in the subject's context (`guards.permission_checker`,
+  `Contract\WorkflowTransitionPermissionCheckerInterface`, `Model\WorkflowTransitionPermissionCheck`, actor from
+  `Contract\WorkflowActorProviderInterface`), conditions in a closed language over the host's whitelist of scalar
+  variables (`guards.variables_provider`, `Contract\WorkflowSubjectVariablesProviderInterface`,
+  `Model\WorkflowSubjectVariables`; no function, method, property, index or arithmetic; 500 bytes, 128 tokens,
+  depth 16; strict types; errors fail closed), automatic transitions (idempotent, stop on a repeated marking or after
+  `guards.max_automatic_transitions`; `WorkflowApplicator::applyAutomaticTransitions()`).
+- **Audit event** `Event\WorkflowTransitionAppliedEvent` (ids only: slug, definition version and tenant, transition,
+  from / to, subject class and reference, actor reference, tenant, automatic flag), dispatched after the commit of the
+  transaction that persisted the subject (DBAL 4 middleware on the connections of the definitions' and the default
+  manager, savepoint aware; dispatched after the applicator's flush or at the end of the request / command / message,
+  never from `postFlush`; dropped on rollback, or when not committed by the end of the unit). `audit.enabled`
+  (default: on with tenancy).
+- **Runtime port** `Contract\WorkflowRuntimeInterface` (`can()`, `apply()`, `enabledTransitions()`, `marking()`) with
+  the VOs `Model\WorkflowTransitionResult` and `Model\WorkflowMarkingView`; default `Service\WorkflowRuntime`.
+  `WorkflowRuntimePass` wires it: the host's own runtime wins; a 1.14 host registry or registry decorator keeps running
+  behind it (with a deprecation; refused with tenancy); a class implementing neither port fails the build.
+- `WorkflowApplicator::can()`, `applyWithAutomatic()`, `markingView()`.
+- Docs: [MULTITENANCY.md](MULTITENANCY.md) (standard and DDD hosts, Beacon leave-approval example).
+- Tests: tenant isolation matrix (runtime, registry, guard, pins; UI list, show / diagram, editor, publish, delete,
+  clone), condition sandbox escapes (method / property / function / index / arithmetic, huge, deep), version pinning,
+  after-commit audit (commit, rollback, no flush), equivalence without the resolver (same workflow events in the same
+  order as 1.14, no tenancy service), runtime port equivalence with the applicator, 1,000-round worker test alternating
+  two organizations without the services resetter, `lint:container` for five container shapes, DDD host using only the
+  runtime port (XML mapping, two connections).
+
+### Changed
+
+- Schema: `workflow_definition` gains `tenant_key` (default `''`), `version` (default 1), `status` (default
+  `published`) and `template_version`; its unique constraint `uniq_workflow_definition_slug` becomes
+  `uniq_workflow_definition_scope (tenant_key, slug, version)`. `workflow_transition` gains `guard_permission`,
+  `guard_expression`, `automatic` (default false). New table `workflow_subject_pin`. XML mapping updated (parity
+  tested).
+- `WorkflowDefinitionRepository::findOneBySlug()`, `findEnabledCandidates()`, `findAllEnabled()`, `countEnabled()` and
+  `paginateByName()` read the global, current published version of each slug (every 1.14 row: same results).
+- Built workflows carry `nowo_definition_id`, `nowo_definition_version` and `nowo_definition_tenant` workflow
+  metadata, and the guard settings as transition metadata (additive).
+- The Workflow UI controller actions take the `Request` (internal); `WorkflowPageFactory` methods take an optional
+  `View\WorkflowUiScope`.
+
+### Security
+
+Hardening from the immediate audit NO of this release (before it shipped):
+
+- **Exact tenant keys (M1):** every repository and pin-store result is re-checked in PHP against the exact tenant key,
+  slug and subject reference (a case- or accent-insensitive collation can no longer return or collide another
+  tenant's rows); on MySQL / MariaDB `tenant_key` and `subject_ref` use the binary collation `utf8mb4_bin`
+  (`Doctrine\BinaryKeyCollationSubscriber`); tenant keys and subject references are printable ASCII without spaces.
+  Publish, draft and delete act on the already authorised entity.
+- **Tenant editors cannot rebind a definition (M2):** in a tenant scope the type, subject class and marking property
+  are locked (from the template, or from `tenancy.subject_classes` for a new definition); place and transition names
+  must match `^[a-z0-9_]{1,64}$` with tenancy.
+- **Pin before apply (M3, NO-v N2):** concurrent first applies agree on one version; the pin insert runs in a savepoint
+  inside an open transaction (a duplicate never aborts it), the winning pin is re-read with a locking read
+  (`LOCK IN SHARE MODE` / `FOR SHARE`, visible under REPEATABLE READ), and when it still cannot be read
+  `Exception\WorkflowPinConflictException` asks to retry: the proposed version is never used instead.
+- **No audit dispatch from `postFlush` (M4)**; the audit middleware observes only the definitions' and the default
+  manager's connections, and anything uncommitted at the end of a unit is dropped (L1).
+- Router context prefix variables are removed at the next main request even if the previous one never finished (L2);
+  concurrent draft / clone / create end with the existing row or a form error (L3); a guard port that throws blocks the
+  transition (fail closed).
+- **A published definition with pinned subjects cannot be deleted** (owner decision 2026-11-12,
+  `Exception\WorkflowDefinitionInUseException`). The pin foreign key is `ON DELETE RESTRICT`, so a pin committed between
+  the count and the delete makes the database refuse it too (NO-v N1).
+- **Verification audit NO-v:** list totals, enabled counts and "latest version" of the UI scope are computed from
+  exactly re-checked rows (N3); the binary collation is applied when the schema is generated (migrations, schema tools,
+  `sync-schema`), whatever the metadata cache holds, and also covers `slug` / `workflow_slug` (N3, N7); the audit
+  boundaries follow the outermost unit (a nested command or request end keeps the outer transaction's events) and a
+  main request drops leftovers of a unit that never ended (N4); main requests are counted at `finish_request` and
+  healed at a top-level `kernel.terminate` (N5); a main request inside a command or message does not clear the
+  private manager (N6); slugs follow the strict name pattern with tenancy (N7).
+
+### Fixed
+
+- **Console boundary tracking (audit NM, B6):** `WorkflowUnitOfWorkSubscriber` counted console depth with `++` / `--`
+  at priorities ±4096, so a listener that threw or stopped the propagation could leave the counter behind in a
+  long-running process, and the outermost command then no longer cleared the bundle's private entity manager. Each run
+  is now a frame (command + input) pushed and popped at the extreme priorities, restoring the message / request state
+  it saved; a frame whose `console.error` listener threw is dropped at the next unit boundary; main requests are
+  counted; `WorkerMessageSkipEvent` (from `messenger:failed:retry`) ends the message unit. Precondition of the leak:
+  a long-running process without the services resetter between units.
+- `nowo:workflow:sync-schema` on SQLite dropped a table it had to rebuild to add columns (the rebuild's `CREATE TABLE`
+  was filtered as "already exists"), and created the indexes of an existing table before the columns they need. Both
+  are needed to upgrade a 1.14 schema; a test migrates a 1.14 `workflow_definition` table.
+
+### Deprecated
+
+- `Contract\WorkflowRegistryInterface` as a port for hosts (it returns a Symfony type, REQ-ARCH-001 rule 3): call
+  `WorkflowRuntimeInterface`. It stays the SPI `WorkflowApplicator` asks until 2.0; a host implementation or decorator
+  triggers a deprecation when the container is built.
+
+
 ## [1.14.1] - 2026-11-12
 
 Fixes for three Low findings of the 1.14.0 audit (NF3). Nothing to change in your application. See

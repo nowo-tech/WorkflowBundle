@@ -10,6 +10,7 @@ use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Exception\WorkflowNameCollisionException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Tenancy\WorkflowDefinitionLocator;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Workflow\MarkingStore\MethodMarkingStore;
@@ -57,7 +58,42 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
         private readonly ?RequestStack $requestStack = null,
         private readonly ?EventDispatcherInterface $eventDispatcher = null,
         private readonly array $frameworkWorkflowNames = [],
+        private readonly ?WorkflowDefinitionLocator $locator = null,
     ) {
+    }
+
+    /**
+     * The workflow a subject runs (since 1.15): with tenancy (`tenancy.tenant_resolver`), its pinned version, else its
+     * tenant's version, else the global template, never another tenant's; without tenancy the same as {@see get()}.
+     */
+    public function forSubject(object $subject, string $workflowSlug): WorkflowInterface
+    {
+        if (!$this->locator instanceof WorkflowDefinitionLocator || !$this->locator->tenancyEnabled()) {
+            return $this->get($workflowSlug);
+        }
+
+        return $this->forDefinition($this->locator->forSubject($subject, $workflowSlug));
+    }
+
+    /**
+     * The workflow of one stored definition version, memoized for the current main request only (since 1.15).
+     */
+    public function forDefinition(WorkflowDefinition $definition): WorkflowInterface
+    {
+        $request = $this->currentCacheOwner();
+        $key     = '#' . $definition->getId();
+
+        if ($request instanceof Request && $definition->getId() !== null && isset($this->cache[$key])) {
+            return $this->cache[$key];
+        }
+
+        $workflow = $this->createWorkflow($definition);
+
+        if ($request instanceof Request && $definition->getId() !== null) {
+            $this->cache[$key] = $workflow;
+        }
+
+        return $workflow;
     }
 
     /**
@@ -110,7 +146,11 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
             return;
         }
 
-        unset($this->cache[$slug]);
+        foreach ($this->cache as $key => $workflow) {
+            if ($key === $slug || $workflow->getName() === $slug) {
+                unset($this->cache[$key]);
+            }
+        }
     }
 
     /**

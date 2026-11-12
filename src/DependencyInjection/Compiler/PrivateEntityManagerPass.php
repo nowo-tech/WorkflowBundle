@@ -6,6 +6,7 @@ namespace Nowo\WorkflowBundle\DependencyInjection\Compiler;
 
 use Closure;
 use Doctrine\DBAL\Driver\Connection;
+use Nowo\WorkflowBundle\Audit\AuditMiddleware;
 use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
@@ -74,6 +75,8 @@ final class PrivateEntityManagerPass implements CompilerPassInterface
     public function process(ContainerBuilder $container): void
     {
         if (!$container->hasDefinition(WorkflowEntityManager::class)) {
+            $this->tagAuditMiddleware($container, []);
+
             return;
         }
 
@@ -106,17 +109,39 @@ final class PrivateEntityManagerPass implements CompilerPassInterface
             }
         }
 
-        if (!$container->hasDefinition(PrivateEntityManagerMiddleware::class)) {
-            return;
-        }
-
         $connections = [];
         foreach ($candidates as $manager) {
             $connection               = $this->connectionOf($container, $manager);
             $connections[$connection] = $connection;
         }
+        $this->tagAuditMiddleware($container, $connections);
+
+        if (!$container->hasDefinition(PrivateEntityManagerMiddleware::class)) {
+            return;
+        }
 
         $definition = $container->getDefinition(PrivateEntityManagerMiddleware::class)->clearTag('doctrine.middleware');
+        foreach ($connections as $connection) {
+            $definition->addTag('doctrine.middleware', ['connection' => $connection]);
+        }
+    }
+
+    /**
+     * Since 1.15 (audit NO L1): the audit middleware observes only the connections of the definitions' manager and of
+     * the application's default manager (where WorkflowApplicator persists the subject), never every connection.
+     *
+     * @param array<string, string> $connections
+     */
+    private function tagAuditMiddleware(ContainerBuilder $container, array $connections): void
+    {
+        if (!$container->hasDefinition(AuditMiddleware::class)) {
+            return;
+        }
+        $default               = $container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null;
+        $default               = $this->connectionOf($container, is_string($default) && $default !== '' ? $default : 'default');
+        $connections[$default] = $default;
+
+        $definition = $container->getDefinition(AuditMiddleware::class)->clearTag('doctrine.middleware');
         foreach ($connections as $connection) {
             $definition->addTag('doctrine.middleware', ['connection' => $connection]);
         }

@@ -11,7 +11,8 @@
 - [Workflow events and guards](#workflow-events-and-guards)
   - [Listeners run before the flush](#listeners-run-before-the-flush)
   - [Slugs and transition names are configuration](#slugs-and-transition-names-are-configuration)
-- [Custom workflow registry](#custom-workflow-registry)
+- [Runtime port (1.15)](#runtime-port-115)
+- [Custom workflow registry (deprecated port)](#custom-workflow-registry-deprecated-port)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
 - [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
@@ -261,9 +262,21 @@ dispatch the same `workflow.<name>.*` events, so the framework workflow's listen
 your database subjects. Since 1.13.0 the registry refuses such a slug while events are dispatched
 (`Nowo\WorkflowBundle\Exception\WorkflowNameCollisionException` when the workflow is built): rename it in the CRUD UI.
 
-## Custom workflow registry
+## Runtime port (1.15)
 
-`WorkflowRegistryInterface` is the extension point for resolving Symfony `WorkflowInterface` instances. The default implementation is `DatabaseWorkflowRegistry`; `WorkflowApplicator` depends on the interface.
+Call `Contract\WorkflowRuntimeInterface` from your code: `can()`, `apply()`, `enabledTransitions()` and `marking()`
+take your subject and a slug and return scalars or bundle VOs (`Model\WorkflowTransitionResult`,
+`Model\WorkflowMarkingView`); a blocked transition is a result (`applied: false`, `blockerCodes`), not an exception.
+It resolves exactly like `WorkflowApplicator` (with tenancy: the subject's pinned or tenant version, see
+[MULTITENANCY.md](MULTITENANCY.md)). Replace it by aliasing the interface to your own service.
+
+## Custom workflow registry (deprecated port)
+
+`WorkflowRegistryInterface` returns Symfony `WorkflowInterface` instances, so since 1.15 it is **deprecated as a port
+for hosts** (REQ-ARCH-001 rule 3; removed in 2.0): call `WorkflowRuntimeInterface` instead. It stays the SPI
+`WorkflowApplicator` asks without tenancy, so a host implementation or decorator keeps running (a deprecation is
+triggered when the container is built). With tenancy a host registry fails the build: the runtime builds the
+subject's pinned tenant version itself.
 
 See demo playgrounds: 0-param orders, 1-param documents, 2-param expenses, 3-param purchase orders, plus `/playground/resolver`.
 
@@ -273,7 +286,7 @@ The bundle has two parts:
 
 - **Definitions** (places, transitions, match rules) are a small bounded context of the bundle: its own Doctrine
   entities and CRUD UI. They never reference your entities except by class name (`subject_class`).
-- **The runtime** (`WorkflowResolver`, `WorkflowApplicator`, `WorkflowRegistryInterface`) builds Symfony
+- **The runtime** (`WorkflowRuntimeInterface`, backed by `WorkflowResolver` and `WorkflowApplicator`) builds Symfony
   workflows from those definitions and applies them to your subjects.
 
 ### Keep the domain in charge
@@ -324,8 +337,9 @@ final readonly class ApproveExpense
   state through intention-revealing methods.
 - With `runtime.flush_after_apply: true` (the value when the key is not set, deprecated since 1.14), `apply*()`
   flushes the default entity manager after each transition (including your other pending changes).
-- `WorkflowApplicator` and `WorkflowResolver` are final classes without interfaces; `WorkflowRegistryInterface` is
-  the replaceable port.
+- `WorkflowApplicator` and `WorkflowResolver` are final classes without interfaces; since 1.15
+  `WorkflowRuntimeInterface` is the framework-free, replaceable port (`WorkflowRegistryInterface` is deprecated for
+  hosts).
 
 ## FrankenPHP / long-running workers
 

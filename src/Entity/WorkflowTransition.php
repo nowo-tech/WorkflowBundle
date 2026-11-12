@@ -7,6 +7,8 @@ namespace Nowo\WorkflowBundle\Entity;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
+use function trim;
+
 /**
  * A transition within a persisted workflow definition.
  */
@@ -37,6 +39,18 @@ class WorkflowTransition
     /** @var list<string> */
     #[ORM\Column(name: 'to_places', type: Types::JSON)]
     private array $toPlaces;
+
+    /** Since 1.15: only an actor with this permission in the subject's context may apply it (host port). */
+    #[ORM\Column(name: 'guard_permission', type: Types::STRING, length: 128, nullable: true)]
+    private ?string $guardPermission = null;
+
+    /** Since 1.15: condition on the whitelisted subject variables, e.g. `days <= 2`. */
+    #[ORM\Column(name: 'guard_expression', type: Types::TEXT, nullable: true)]
+    private ?string $guardExpression = null;
+
+    /** Since 1.15: applied automatically by WorkflowApplicator as soon as it is enabled (and its guards pass). */
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
+    private bool $automatic = false;
 
     /**
      * Creates a transition with its name, source places, target places and optional label.
@@ -169,5 +183,53 @@ class WorkflowTransition
     public function getDisplayLabel(): string
     {
         return $this->label ?? $this->name;
+    }
+
+    /**
+     * The permission an actor needs in the subject's context to apply this transition (null = none), since 1.15.
+     */
+    public function getGuardPermission(): ?string
+    {
+        return $this->guardPermission;
+    }
+
+    public function setGuardPermission(?string $guardPermission): self
+    {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->guardPermission = $guardPermission === '' ? null : $guardPermission;
+
+        return $this;
+    }
+
+    /**
+     * The condition on the subject variables (null = none), since 1.15.
+     */
+    public function getGuardExpression(): ?string
+    {
+        return $this->guardExpression;
+    }
+
+    public function setGuardExpression(?string $guardExpression): self
+    {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->guardExpression = $guardExpression === null || trim($guardExpression) === '' ? null : $guardExpression;
+
+        return $this;
+    }
+
+    /**
+     * Whether WorkflowApplicator applies this transition automatically once enabled, since 1.15.
+     */
+    public function isAutomatic(): bool
+    {
+        return $this->automatic;
+    }
+
+    public function setAutomatic(bool $automatic): self
+    {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->automatic = $automatic;
+
+        return $this;
     }
 }

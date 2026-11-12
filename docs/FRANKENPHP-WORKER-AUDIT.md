@@ -113,8 +113,8 @@ stateless or have their per-request state cleared between requests: under scenar
 
 | Stateful service | State | Cleared at |
 |------------------|-------|------------|
-| `Doctrine\WorkflowEntityManager` (private manager of the definitions) | the private `EntityManager` (identity map), a `stale` flag set after a rollback on its connection | dropped at every outermost boundary by `EventListener\WorkflowUnitOfWorkSubscriber` (since 1.14.1 `WorkflowEntityManager::reset()` also wraps the final `clear()`: a host `onClear` listener that throws is logged as a warning and no longer aborts the boundary, audit NF3-2): `kernel.request` (main request, priority 4096) and `kernel.terminate`; Messenger `WorkerMessageReceivedEvent` / `WorkerMessageHandledEvent` / `WorkerMessageFailedEvent`; `console.command` / `console.terminate` of the outermost command outside a message (nesting depth counter + in-flight message flag); plus `kernel.reset`. Recreated when closed by a failed write or when the source connection changed. |
-| `EventListener\WorkflowUnitOfWorkSubscriber` | console nesting depth, Messenger in-flight flag | process counters by design (bounded by the nesting depth, set / unset at the boundaries) |
+| `Doctrine\WorkflowEntityManager` (private manager of the definitions) | the private `EntityManager` (identity map), a `stale` flag set after a rollback on its connection | dropped at every outermost boundary by `EventListener\WorkflowUnitOfWorkSubscriber` (since 1.14.1 `WorkflowEntityManager::reset()` also wraps the final `clear()`: a host `onClear` listener that throws is logged as a warning and no longer aborts the boundary, audit NF3-2): `kernel.request` (main request, priority 4096) and `kernel.terminate`; Messenger `WorkerMessageReceivedEvent` / `WorkerMessageHandledEvent` / `WorkerMessageFailedEvent`; `console.command` / `console.terminate` of the outermost command outside a message (console frames since 1.15, see the next row); plus `kernel.reset`. Recreated when closed by a failed write or when the source connection changed. |
+| `EventListener\WorkflowUnitOfWorkSubscriber` | stack of console frames (command + input, saved message / request state), Messenger in-flight flag, main request counter | 1.15 (audit NM): frames pushed at `console.command` and popped (with the frames above) at `console.terminate`, both at `PHP_INT_MAX`, restoring the saved state; a frame whose `console.error` listener threw (no terminate) is dropped at the next main request, message, command or worker stop; `WorkerMessageSkipEvent` ends a message; `kernel.reset` zeroes it. Test: `tests/Integration/Worker/ConsoleBoundaryCounterKernelTest.php` (real in-process console runs: throwing terminate / error listeners, unknown nested command, stopped nested start, self-recursive command; HTTP requests in the same kernel) |
 | `Internal\HiddenValues` | static `WeakMap` keyed by the per-request access VOs (`WorkflowUiAccessCheck`, `WorkflowActor`) | each entry disappears with its VO (built per decision, never stored) |
 | `DatabaseWorkflowRegistry` | built workflows memoized for the current main request | unchanged (see W-01) |
 
@@ -129,6 +129,24 @@ Worker test: `tests/Integration/Worker/WorkerKeptAliveKernelTest.php`: one kerne
 response must show the new name), a failed definition write that closes the private manager at iteration 500, and a
 console + two Messenger boundaries. Memory margin: < 2 MB growth after a 100-iteration warm-up. Igor and the PHPStan
 FrankenPHP worker ruleset pass.
+
+### Re-audit 2026-11-12: tenancy, guards, audit event, runtime port (1.15.0)
+
+**Kernel reset false is supported** (REQ-RUNTIME-002), also when the services resetter does not run.
+
+| Service | State | Cleared at |
+|---------|-------|------------|
+| `Tenancy\TenancyContext`, `Tenancy\WorkflowDefinitionLocator`, `Tenancy\SubjectPinStore`, `Http\WorkflowUiTenancy`, `Service\WorkflowRuntime`, `Service\WorkflowVersioning`, guard / isolation / audit subscribers | none (`readonly`): tenant, subject reference, actor and variables are asked to the host ports per call | — |
+| `Audit\AfterCommitDispatcher` | audit events held per open transaction (`WeakMap` keyed by the driver connection), committed events, events of markings not persisted yet | committed events are dispatched after the applicator's flush or at the end of request / console command / Messenger message; everything not committed by then is dropped (warning), also when a transaction is still open (audit NO L1); everything on `kernel.reset` |
+| `EventListener\WorkflowUiRouteContextSubscriber` | router context parameters of a Workflow UI route prefix (`{uuid}`) and their names | removed at `kernel.finish_request` of the main request and, should it never finish, at the next main request (audit NO L2); `kernel.reset` |
+| `Expression\GuardExpression` | parser cursor | a new parser per `parse()` call; never a service |
+| `DatabaseWorkflowRegistry` | built workflows also memoized by definition version | same main-request scope as W-01 |
+
+Worker test: `tests/Integration/Tenancy/TenancyWorkerKernelTest.php`: one kernel, requests sent to `http_kernel`
+(no services resetter), N = 1,000 rounds alternating two organizations: each round lists the definitions of its
+organization (UI, `/organizations/{uuid}/settings/workflow/definitions`) and resolves the workflow of one of its
+subjects; organization A never sees B's view and vice versa. Memory margin: < 2 MB growth after a 100-round warm-up.
+Igor: 110 services, 0 KO.
 
 ## Usage recommendations in worker mode
 

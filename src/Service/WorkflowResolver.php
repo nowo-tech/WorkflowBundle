@@ -9,7 +9,9 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowAmbiguousMatchException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
+use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Tenancy\TenancyContext;
 use Nowo\WorkflowBundle\Util\SubjectClass;
 
 use function count;
@@ -34,16 +36,26 @@ final class WorkflowResolver
      */
     public function __construct(
         private readonly WorkflowDefinitionRepository $repository,
+        private readonly ?TenancyContext $tenancy = null,
     ) {
     }
 
     /**
-     * Returns the best matching enabled definition (class distance, specificity, priority).
+     * Returns the best matching enabled definition (class distance, specificity, priority) among the global ones.
      */
     public function resolve(WorkflowContext $context): WorkflowDefinition
     {
+        return $this->resolveForTenant($context, null);
+    }
+
+    /**
+     * Returns the best matching enabled definition for a tenant (since 1.15): per slug, the tenant's version wins over
+     * the global template; another tenant's definition is never a candidate.
+     */
+    public function resolveForTenant(WorkflowContext $context, ?WorkflowTenant $tenant): WorkflowDefinition
+    {
         $hierarchy = $context->subjectClass !== null ? SubjectClass::hierarchy($context->subjectClass) : [];
-        $matches   = $this->findMatching($context);
+        $matches   = $this->findMatching($context, $tenant);
 
         if ($matches === []) {
             throw WorkflowNotFoundException::forContext($context);
@@ -95,7 +107,7 @@ final class WorkflowResolver
             $context = new WorkflowContext(subjectClass: SubjectClass::real($subject));
         }
 
-        return $this->resolve($context);
+        return $this->resolveForTenant($context, $this->tenancy?->tenantOf($subject));
     }
 
     /**
@@ -111,11 +123,12 @@ final class WorkflowResolver
      *
      * @return list<WorkflowDefinition>
      */
-    public function findMatching(WorkflowContext $context): array
+    public function findMatching(WorkflowContext $context, ?WorkflowTenant $tenant = null): array
     {
-        $candidates = $this->repository->findEnabledCandidates(
-            $context->subjectClass !== null ? SubjectClass::hierarchy($context->subjectClass) : null,
-        );
+        $classes    = $context->subjectClass !== null ? SubjectClass::hierarchy($context->subjectClass) : null;
+        $candidates = $tenant instanceof WorkflowTenant
+            ? $this->repository->findEnabledCandidatesForTenant($classes, $tenant)
+            : $this->repository->findEnabledCandidates($classes);
 
         return array_values(array_filter(
             $candidates,

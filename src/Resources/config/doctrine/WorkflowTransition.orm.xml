@@ -15,6 +15,13 @@
         <field name="label" type="string" length="255" nullable="true"/>
         <field name="fromPlaces" column="from_places" type="json"/>
         <field name="toPlaces" column="to_places" type="json"/>
+        <field name="guardPermission" column="guard_permission" type="string" length="128" nullable="true"/>
+        <field name="guardExpression" column="guard_expression" type="text" nullable="true"/>
+        <field name="automatic" type="boolean">
+            <options>
+                <option name="default">0</option>
+            </options>
+        </field>
         <many-to-one field="workflow" target-entity="Nowo\WorkflowBundle\Entity\WorkflowDefinition" inversed-by="transitions">
             <join-column nullable="false" on-delete="CASCADE"/>
         </many-to-one>

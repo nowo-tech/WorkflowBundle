@@ -111,7 +111,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
         $definition = $this->definitionWithId(7);
         $controller = $this->createController(definitionById: $definition);
 
-        $response = $controller->show(7);
+        $response = $controller->show(Request::create('/'), 7);
 
         self::assertSame('show:Order:1', $response->getContent());
     }
@@ -121,7 +121,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
         $definition = $this->definitionWithId(3);
         $controller = $this->createController(definitionBySlug: $definition);
 
-        $response = $controller->showBySlug('order');
+        $response = $controller->showBySlug(Request::create('/'), 'order');
 
         self::assertSame('show:Order:1', $response->getContent());
     }
@@ -131,7 +131,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
         $controller = $this->createController();
 
         $this->expectException(NotFoundHttpException::class);
-        $controller->show(99);
+        $controller->show(Request::create('/'), 99);
     }
 
     public function testDeleteThrowsWhenCsrfTokenInvalid(): void
@@ -192,7 +192,7 @@ final class WorkflowDefinitionControllerTest extends TestCase
         $controller = $this->createController();
 
         $this->expectException(NotFoundHttpException::class);
-        $controller->showBySlug('missing');
+        $controller->showBySlug(Request::create('/'), 'missing');
     }
 
     public function testEditGeneralGetRendersForm(): void

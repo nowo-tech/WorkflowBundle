@@ -5,10 +5,29 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\ORM\QueryBuilder;
+use Doctrine\DBAL\Connection;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Enum\WorkflowDefinitionStatus;
+use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use SortDirection;
+
+use function array_column;
+use function array_filter;
+use function array_flip;
+use function array_map;
+use function array_slice;
+use function array_values;
+use function ceil;
+use function count;
+use function in_array;
+use function is_array;
+use function is_string;
+use function max;
+use function mb_strtolower;
+use function min;
+use function usort;
 
 /**
  * Doctrine repository of workflow definitions.
@@ -42,6 +61,36 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Flushes the repository's manager (the private manager since 1.14): the definitions only (since 1.15).
+     */
+    public function flush(): void
+    {
+        $this->getEntityManager()->flush();
+    }
+
+    /**
+     * The DBAL connection of the definitions (since 1.15, version pins).
+     */
+    public function connection(): Connection
+    {
+        return $this->getEntityManager()->getConnection();
+    }
+
+    /**
+     * The mapping of a bundle entity on the definitions' manager, table prefix applied (since 1.15).
+     *
+     * @template T of object
+     *
+     * @param class-string<T> $class
+     *
+     * @return ClassMetadata<T>
+     */
+    public function bundleMetadata(string $class): ClassMetadata
+    {
+        return $this->getEntityManager()->getClassMetadata($class);
+    }
+
+    /**
      * Removes a definition (with its places, transitions and match rules) through the manager of this repository, and
      * flushes that manager unless $flush is false (since 1.14).
      */
@@ -58,7 +107,107 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
      */
     public function findOneBySlug(string $slug): ?WorkflowDefinition
     {
-        return $this->findOneBy(['slug' => $slug]);
+        return $this->findCurrent($slug, null);
+    }
+
+    /**
+     * The current published version of a definition of exactly this scope (null tenant = global template), enabled
+     * or not (since 1.15). Never another tenant's definition.
+     */
+    public function findCurrent(string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition
+    {
+        foreach ($this->scopeRows($slug, $tenant) as $row) {
+            if (!$row->isDraft()) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The definition a subject of the tenant runs for a slug (since 1.15): the tenant's current published version
+     * when the tenant has one (even disabled: a tenant that disabled its version opted out, there is no fallback),
+     * else the global template's. Never another tenant's definition.
+     */
+    public function findForTenant(string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition
+    {
+        if ($tenant instanceof WorkflowTenant) {
+            $own = $this->findCurrent($slug, $tenant);
+            if ($own instanceof WorkflowDefinition) {
+                return $own;
+            }
+        }
+
+        return $this->findCurrent($slug, null);
+    }
+
+    /**
+     * The open draft of a definition of exactly this scope, if any (since 1.15; the newest one should several exist).
+     */
+    public function findDraft(string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition
+    {
+        foreach ($this->scopeRows($slug, $tenant) as $row) {
+            if ($row->isDraft()) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether any version of the slug exists in exactly this scope (since 1.15).
+     */
+    public function existsInScope(string $slug, ?WorkflowTenant $tenant): bool
+    {
+        return $this->scopeRows($slug, $tenant) !== [];
+    }
+
+    /**
+     * The next version number of a slug in exactly this scope (since 1.15). Deliberately computed over every row the
+     * SQL comparison returns (under a case-insensitive collation that may include a case variant of the key): the
+     * number is then at least the exact maximum and can never collide in a unique index that folds the keys together;
+     * no row of another tenant is ever returned, only a number (audit NO-v N3).
+     */
+    public function nextVersion(string $slug, ?WorkflowTenant $tenant): int
+    {
+        $max = $this->createQueryBuilder('d')
+            ->select('MAX(d.version)')
+            ->where('d.slug = :slug')
+            ->andWhere('d.tenantKey = :tenant')
+            ->setParameter('slug', $slug)
+            ->setParameter('tenant', WorkflowTenant::storageKey($tenant))
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $max + 1;
+    }
+
+    /**
+     * Every version of a slug in exactly this scope (since 1.15), newest first.
+     *
+     * @return list<WorkflowDefinition>
+     */
+    public function findVersions(string $slug, ?WorkflowTenant $tenant): array
+    {
+        return $this->scopeRows($slug, $tenant);
+    }
+
+    /**
+     * Every version of a slug in exactly this scope, newest first (audit NO M1): the SQL comparison only pre-filters
+     * (a case- or accent-insensitive collation also returns `Acme` for `acme`); slug and tenant key are re-checked
+     * byte for byte in PHP and any other row is dropped.
+     *
+     * @return list<WorkflowDefinition>
+     */
+    private function scopeRows(string $slug, ?WorkflowTenant $tenant): array
+    {
+        $key = WorkflowTenant::storageKey($tenant);
+        /** @var list<WorkflowDefinition> $rows */
+        $rows = $this->findBy(['slug' => $slug, 'tenantKey' => $key], ['version' => 'DESC', 'id' => 'DESC']);
+
+        return array_values(array_filter($rows, static fn (WorkflowDefinition $row): bool => $row->getSlug() === $slug && $row->getTenantKey() === $key));
     }
 
     /**
@@ -68,15 +217,28 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
      */
     public function findAllEnabled(): array
     {
-        return $this->findBy(['enabled' => true], ['name' => 'ASC']);
+        return $this->findEnabledCandidates(null);
     }
 
     /**
-     * Counts the enabled definitions.
+     * Counts the enabled definitions (global, current published versions).
      */
     public function countEnabled(): int
     {
-        return $this->count(['enabled' => true]);
+        return $this->countEnabledInScope(null, false);
+    }
+
+    /**
+     * Counts the enabled definitions the list of a UI scope shows (since 1.15, see {@see paginateByName()}).
+     */
+    public function countEnabledInScope(?WorkflowTenant $tenant, bool $tenancy): int
+    {
+        $count = 0;
+        foreach ($this->scopeListing($tenant, $tenancy) as $row) {
+            $count += $row['enabled'] ? 1 : 0;
+        }
+
+        return $count;
     }
 
     /**
@@ -88,16 +250,95 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
      */
     public function findEnabledCandidates(string|array|null $subjectClass): array
     {
-        $criteria = ['enabled' => true];
+        return $this->findEnabledCandidatesForTenant($subjectClass, null);
+    }
+
+    /**
+     * The enabled definitions a subject of the tenant may run (since 1.15), highest priority first: for each slug,
+     * the tenant's current published version when the tenant has one, else the global template's current published
+     * version. A slug the tenant disabled is left out (no fallback to the template). Never another tenant's.
+     *
+     * @param list<string>|string|null $subjectClass One class, a class hierarchy (IN), or null for all
+     *
+     * @return list<WorkflowDefinition>
+     */
+    public function findEnabledCandidatesForTenant(string|array|null $subjectClass, ?WorkflowTenant $tenant): array
+    {
+        $keys = $tenant instanceof WorkflowTenant ? ['', $tenant->key] : [''];
+        $qb   = $this->createQueryBuilder('d')
+            ->where('d.tenantKey IN (:tenants)')
+            ->andWhere('d.status = :published')
+            ->setParameter('tenants', $keys)
+            ->setParameter('published', WorkflowDefinitionStatus::Published->value)
+            ->orderBy('d.priority', SortDirection::Descending)
+            ->addOrderBy('d.name', SortDirection::Ascending)
+            ->addOrderBy('d.version', SortDirection::Descending);
         if ($subjectClass !== null) {
-            $criteria['subjectClass'] = $subjectClass;
+            $qb->andWhere('d.subjectClass IN (:classes)')->setParameter('classes', (array) $subjectClass);
+        }
+        /** @var list<WorkflowDefinition> $rows */
+        $rows = $qb->getQuery()->getResult();
+        // The SQL IN only pre-filters (collation): another tenant's row is dropped here (audit NO M1).
+        $rows = array_values(array_filter($rows, static fn (WorkflowDefinition $row): bool => in_array($row->getTenantKey(), $keys, true)));
+
+        // Current version per (scope, slug): the first row seen (highest version within the same priority and name;
+        // a lower version may sort elsewhere, so keep the highest explicitly).
+        $current = [];
+        foreach ($rows as $row) {
+            $key = $row->getTenantKey() . "\0" . $row->getSlug();
+            if (!isset($current[$key]) || $current[$key]->getVersion() < $row->getVersion()) {
+                $current[$key] = $row;
+            }
         }
 
-        return $this->findBy($criteria, ['priority' => 'DESC', 'name' => 'ASC']);
+        $shadowed = $tenant instanceof WorkflowTenant ? array_flip($this->publishedSlugs($tenant)) : [];
+        $result   = [];
+        foreach ($rows as $row) {
+            $key = $row->getTenantKey() . "\0" . $row->getSlug();
+            if (($current[$key] ?? null) !== $row || !$row->isEnabled()) {
+                continue;
+            }
+            if ($row->getTenantKey() === '' && isset($shadowed[$row->getSlug()])) {
+                continue;
+            }
+            $result[] = $row;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Slugs the tenant has a published version of (any subject class), since 1.15.
+     *
+     * @return list<string>
+     */
+    private function publishedSlugs(WorkflowTenant $tenant): array
+    {
+        $rows = $this->createQueryBuilder('d')
+            ->select('d.slug', 'd.tenantKey')
+            ->where('d.tenantKey = :tenant')
+            ->andWhere('d.status = :published')
+            ->setParameter('tenant', $tenant->key)
+            ->setParameter('published', WorkflowDefinitionStatus::Published->value)
+            ->getQuery()
+            ->getScalarResult();
+
+        $slugs = [];
+        foreach ($rows as $row) {
+            if (is_array($row) && ($row['tenantKey'] ?? null) === $tenant->key && is_string($row['slug'] ?? null)) {
+                $slugs[$row['slug']] = $row['slug'];
+            }
+        }
+
+        return array_values($slugs);
     }
 
     /**
      * Paginated list ordered by name, with associations hydrated to avoid N+1 on list pages.
+     *
+     * Since 1.15 the scope (tenant, latest version per slug, templates the tenant has not customized) is computed in PHP
+     * from a light scalar query, with every tenant key and slug compared exactly (audit NO-v N3: no SQL comparison,
+     * count or MAX can mix keys that a database collation folds together); only the page's entities are hydrated.
      *
      * @return array{
      *     items: list<WorkflowDefinition>,
@@ -107,41 +348,29 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
      *     page_size: int
      * }
      */
-    public function paginateByName(int $page, int $pageSize): array
+    public function paginateByName(int $page, int $pageSize, ?WorkflowTenant $tenant = null, bool $tenancy = false): array
     {
-        $page = max(1, $page);
+        $page  = max(1, $page);
+        $ids   = array_column($this->scopeListing($tenant, $tenancy), 'id');
+        $total = count($ids);
+        $pages = $pageSize > 0 ? max(1, (int) ceil($total / $pageSize)) : 1;
+        $page  = $pageSize > 0 ? min($page, $pages) : 1;
+        $slice = $pageSize > 0 ? array_slice($ids, ($page - 1) * $pageSize, $pageSize) : $ids;
 
-        $total = (int) $this->createQueryBuilder('d')
-            ->select('COUNT(d.id)')
-            ->getQuery()
-            ->getSingleScalarResult();
-
-        if ($pageSize <= 0) {
-            /** @var list<WorkflowDefinition> $items */
-            $items = $this->createListQueryBuilder()
-                ->getQuery()
-                ->getResult();
-            $this->loadListCollections($items);
-
-            return [
-                'items'     => $items,
-                'total'     => $total,
-                'page'      => 1,
-                'pages'     => 1,
-                'page_size' => 0,
-            ];
+        $byId = [];
+        if ($slice !== []) {
+            /** @var list<WorkflowDefinition> $rows */
+            $rows = $this->createQueryBuilder('d')->where('d.id IN (:ids)')->setParameter('ids', $slice)->getQuery()->getResult();
+            foreach ($rows as $row) {
+                $byId[$row->getId()] = $row;
+            }
         }
-
-        $pages = max(1, (int) ceil($total / $pageSize));
-        $page  = min($page, $pages);
-
-        // No collection join in the page query: a plain LIMIT pages definitions, not joined rows.
-        /** @var list<WorkflowDefinition> $items */
-        $items = $this->createListQueryBuilder()
-            ->setFirstResult(($page - 1) * $pageSize)
-            ->setMaxResults($pageSize)
-            ->getQuery()
-            ->getResult();
+        $items = [];
+        foreach ($slice as $id) {
+            if (isset($byId[$id])) {
+                $items[] = $byId[$id];
+            }
+        }
         $this->loadListCollections($items);
 
         return [
@@ -149,14 +378,66 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
             'total'     => $total,
             'page'      => $page,
             'pages'     => $pages,
-            'page_size' => $pageSize,
+            'page_size' => max(0, $pageSize),
         ];
     }
 
-    private function createListQueryBuilder(): QueryBuilder
+    /**
+     * The definitions a UI scope lists (since 1.15), one row per slug, ordered by name:
+     *
+     * - without tenancy: the current published version of each global definition (every 1.14 definition);
+     * - with tenancy: the latest version (draft or published) of each definition of the scope (null = the global
+     *   templates) and, for a tenant, the current published version of each global template the tenant has not
+     *   customized yet. Never another tenant's definition.
+     *
+     * @return list<array{id: int, enabled: bool}>
+     */
+    private function scopeListing(?WorkflowTenant $tenant, bool $tenancy): array
     {
-        return $this->createQueryBuilder('d')
-            ->orderBy('d.name', SortDirection::Ascending);
+        $own  = $tenancy ? WorkflowTenant::storageKey($tenant) : '';
+        $keys = $own === '' ? [''] : ['', $own];
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $this->createQueryBuilder('d')
+            ->select('d.id', 'd.tenantKey', 'd.slug', 'd.version', 'd.status', 'd.name', 'd.enabled')
+            ->where('d.tenantKey IN (:keys)')
+            ->setParameter('keys', $keys)
+            ->getQuery()
+            ->getArrayResult();
+
+        // Latest version per exact (tenant key, slug): drafts count only in the scope's own rows with tenancy.
+        $latest     = [];
+        $customized = [];
+        foreach ($rows as $row) {
+            $key  = $row['tenantKey'] ?? null;
+            $slug = $row['slug'] ?? null;
+            if (!is_string($key) || !is_string($slug) || !in_array($key, $keys, true)) {
+                continue;
+            }
+            $status    = $row['status'] ?? null;
+            $published = ($status instanceof WorkflowDefinitionStatus ? $status->value : $status) === WorkflowDefinitionStatus::Published->value;
+            if ($key === $own && $own !== '') {
+                $customized[$slug] = true;
+            }
+            $draftsListed = $tenancy && $key === $own;
+            if (!$published && !$draftsListed) {
+                continue;
+            }
+            $index = $key . "\0" . $slug;
+            if (!isset($latest[$index]) || (int) $row['version'] > (int) $latest[$index]['version']) {
+                $latest[$index] = $row;
+            }
+        }
+
+        $listing = [];
+        foreach ($latest as $row) {
+            if ($row['tenantKey'] === '' && $own !== '' && isset($customized[$row['slug']])) {
+                continue;
+            }
+            $listing[] = $row;
+        }
+        usort($listing, static fn (array $a, array $b): int => [mb_strtolower((string) $a['name']), (string) $a['name'], (string) $b['tenantKey'], (int) $a['id']] <=> [mb_strtolower((string) $b['name']), (string) $b['name'], (string) $a['tenantKey'], (int) $b['id']]);
+
+        return array_map(static fn (array $row): array => ['id' => (int) $row['id'], 'enabled' => (bool) $row['enabled']], $listing);
     }
 
     /**

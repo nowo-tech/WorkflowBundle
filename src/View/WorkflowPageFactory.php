@@ -91,7 +91,7 @@ final class WorkflowPageFactory
      * @param array{items: list<WorkflowDefinition>, total: int, page: int, pages: int, page_size: int} $result
      *                                                                                                          {@see WorkflowDefinitionRepository::paginateByName()}
      */
-    public function index(array $result): ListPage
+    public function index(array $result, WorkflowUiScope $scope = new WorkflowUiScope()): ListPage
     {
         return new ListPage(
             new PageHeader(
@@ -109,7 +109,7 @@ final class WorkflowPageFactory
                 new Column('transitions', self::label('table.transitions'), align: 'end', priority: 2),
             ],
             $result['items'],
-            rowActions: fn (WorkflowDefinition $definition): array => $this->rowActions($definition),
+            rowActions: fn (WorkflowDefinition $definition): array => $this->rowActions($definition, $scope),
             pagination: $result['page_size'] > 0
                 ? new Pagination($result['page'], $result['page_size'], $result['total'], $result['pages'], 'nowo_workflow_definition_index')
                 : null,
@@ -125,12 +125,20 @@ final class WorkflowPageFactory
      *
      * @return list<Action>
      */
-    public function rowActions(WorkflowDefinition $definition): array
+    public function rowActions(WorkflowDefinition $definition, WorkflowUiScope $scope = new WorkflowUiScope()): array
     {
-        $id = (int) $definition->getId();
+        $id   = (int) $definition->getId();
+        $view = Action::view($this->url('nowo_workflow_definition_show', ['id' => $id]), self::label('action.view'));
+
+        if ($scope->isTemplate($definition)) {
+            return [$view, $this->cloneAction($definition)];
+        }
+        if (!$scope->isEditable($definition)) {
+            return [$view, $this->draftAction($definition), $this->deleteAction($definition)];
+        }
 
         return [
-            Action::view($this->url('nowo_workflow_definition_show', ['id' => $id]), self::label('action.view')),
+            $view,
             Action::edit($this->url('nowo_workflow_definition_edit_general', ['id' => $id]), self::label('action.edit')),
             $this->deleteAction($definition),
         ];
@@ -139,23 +147,46 @@ final class WorkflowPageFactory
     /**
      * Builds the show page view model of a definition.
      */
-    public function show(WorkflowDefinition $definition): ShowPage
+    public function show(WorkflowDefinition $definition, WorkflowUiScope $scope = new WorkflowUiScope()): ShowPage
     {
         $id = (int) $definition->getId();
+
+        if ($scope->isTemplate($definition)) {
+            $actions = [$this->cloneAction($definition, 'primary')];
+        } elseif (!$scope->isEditable($definition)) {
+            $actions = [$this->draftAction($definition, 'primary'), $this->deleteAction($definition)];
+        } elseif ($scope->tenancy) {
+            $actions = [
+                new Action('edit', self::label('action.edit'), $this->url('nowo_workflow_definition_edit_general', ['id' => $id])),
+                $this->publishAction($definition),
+                $this->deleteAction($definition),
+            ];
+        } else {
+            $actions = [
+                new Action('edit', self::label('action.edit'), $this->url('nowo_workflow_definition_edit_general', ['id' => $id]), variant: 'primary'),
+                $this->deleteAction($definition),
+            ];
+        }
+
+        $general = [new DetailItem(self::label('table.slug'), $definition->getSlug())];
+        if ($scope->tenancy) {
+            $general[] = new DetailItem(self::label('table.version'), self::label('definition.version_status', ['%version%' => $definition->getVersion(), '%status%' => $definition->getStatus()->value]));
+            $general[] = new DetailItem(self::label('table.scope'), $definition->getTenantKey() === '' ? self::label('scope.global') : self::label('scope.tenant'));
+            if ($definition->getTemplateVersion() !== null) {
+                $general[] = new DetailItem(self::label('definition.template_version'), $definition->getTemplateVersion());
+            }
+        }
 
         return new ShowPage(
             new PageHeader(
                 $definition->getName(),
                 $definition->getDescription(),
-                [
-                    new Action('edit', self::label('action.edit'), $this->url('nowo_workflow_definition_edit_general', ['id' => $id]), variant: 'primary'),
-                    $this->deleteAction($definition),
-                ],
+                $actions,
                 $this->definitionCrumbs($definition, false),
             ),
             [
                 new DetailSection(self::label('definition.section.general'), [
-                    new DetailItem(self::label('table.slug'), $definition->getSlug()),
+                    ...$general,
                     new DetailItem(self::label('table.type'), self::label('workflow_type.' . $definition->getType()->value)),
                     new DetailItem(self::label('table.status'), self::label($definition->isEnabled() ? 'status.enabled' : 'status.disabled')),
                     new DetailItem(self::label('table.priority'), $definition->getPriority()),
@@ -205,7 +236,7 @@ final class WorkflowPageFactory
      * Edit page: one settings section (tab) per {@see WorkflowDefinitionFormSection}; only the current one carries
      * the form.
      */
-    public function edit(WorkflowDefinition $definition, WorkflowDefinitionFormSection $current, FormView $form): SettingsPage
+    public function edit(WorkflowDefinition $definition, WorkflowDefinitionFormSection $current, FormView $form, WorkflowUiScope $scope = new WorkflowUiScope()): SettingsPage
     {
         $id       = (int) $definition->getId();
         $sections = [];
@@ -228,6 +259,7 @@ final class WorkflowPageFactory
                 $definition->getName() . ' · ' . $definition->getSlug(),
                 [
                     Action::view($this->url('nowo_workflow_definition_show', ['id' => $id]), self::label('action.view')),
+                    ...($scope->tenancy ? [$this->publishAction($definition)] : []),
                     $this->deleteAction($definition),
                 ],
                 $this->definitionCrumbs($definition, true),
@@ -268,6 +300,45 @@ final class WorkflowPageFactory
                 cancelLabel: self::label('action.cancel'),
             ),
             self::label('action.delete'),
+        );
+    }
+
+    /**
+     * POST "new draft" of a published version (CSRF token "draft<id>"), since 1.15.
+     */
+    public function draftAction(WorkflowDefinition $definition, ?string $variant = null): Action
+    {
+        return $this->postAction('edit', 'nowo_workflow_definition_draft', 'draft', $definition, 'action.new_draft', 'definition.confirm_draft', $variant);
+    }
+
+    /**
+     * POST "publish" of a draft (CSRF token "publish<id>"), since 1.15.
+     */
+    public function publishAction(WorkflowDefinition $definition): Action
+    {
+        return $this->postAction('send', 'nowo_workflow_definition_publish', 'publish', $definition, 'action.publish', 'definition.confirm_publish', 'primary');
+    }
+
+    /**
+     * POST "customize for this organization" of a global template (CSRF token "clone<id>"), since 1.15.
+     */
+    public function cloneAction(WorkflowDefinition $definition, ?string $variant = null): Action
+    {
+        return $this->postAction('copy', 'nowo_workflow_definition_clone', 'clone', $definition, 'action.clone_template', 'definition.confirm_clone', $variant);
+    }
+
+    private function postAction(string $kind, string $route, string $intention, WorkflowDefinition $definition, string $label, string $confirm, ?string $variant): Action
+    {
+        $id = (int) $definition->getId();
+
+        return new Action(
+            $kind,
+            self::label($label),
+            $this->url($route, ['id' => $id]),
+            method: 'POST',
+            csrfToken: $this->csrfTokenManager->getToken($intention . $id)->getValue(),
+            confirm: new Confirm(self::label($label), self::label($confirm, ['%name%' => $definition->getName()]), self::label($label), cancelLabel: self::label('action.cancel')),
+            variant: $variant,
         );
     }
 
