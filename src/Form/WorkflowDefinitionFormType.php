@@ -120,7 +120,7 @@ final class WorkflowDefinitionFormType extends AbstractType
             $definition = $event->getData();
             $placeNames = $definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : [];
 
-            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames);
+            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, self::isStateMachine($definition));
         });
 
         $builder->addEventListener(FormEvents::PRE_SUBMIT, static function (FormEvent $event) use ($guards, $strictNames): void {
@@ -131,8 +131,13 @@ final class WorkflowDefinitionFormType extends AbstractType
                 ? PlaceChoiceHelper::extractNamesFromSubmittedPlaces($submitted['places'])
                 : ($definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : []);
 
-            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames);
+            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, self::isStateMachine($definition));
         });
+    }
+
+    private static function isStateMachine(mixed $definition): bool
+    {
+        return $definition instanceof WorkflowDefinition && $definition->getType() === WorkflowType::StateMachine;
     }
 
     /**
@@ -140,7 +145,7 @@ final class WorkflowDefinitionFormType extends AbstractType
      * @param list<string> $placeNames
      * @param array{permission: bool, variables: list<string>|null, automatic: bool} $guards
      */
-    private static function configureTransitionsField(FormInterface $form, array $placeNames, array $guards, bool $strictNames = false): void
+    private static function configureTransitionsField(FormInterface $form, array $placeNames, array $guards, bool $strictNames = false, bool $singleTarget = false): void
     {
         if ($form->has('transitions')) {
             $form->remove('transitions');
@@ -148,7 +153,7 @@ final class WorkflowDefinitionFormType extends AbstractType
 
         $form->add('transitions', CollectionType::class, [
             'entry_type'     => WorkflowTransitionType::class,
-            'entry_options'  => ['place_choices' => $placeNames, 'guards' => $guards, 'strict_names' => $strictNames],
+            'entry_options'  => ['place_choices' => $placeNames, 'guards' => $guards, 'strict_names' => $strictNames, 'single_target' => $singleTarget],
             'allow_add'      => true,
             'allow_delete'   => true,
             'by_reference'   => false,

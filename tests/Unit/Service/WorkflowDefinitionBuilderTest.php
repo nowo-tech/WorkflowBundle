@@ -13,6 +13,7 @@ use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use Nowo\WorkflowBundle\Tests\Support\GuardProbeSubject;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Workflow\Transition;
 
@@ -43,14 +44,11 @@ final class WorkflowDefinitionBuilderTest extends TestCase
     }
 
     /**
-     * 1.15.2: like FrameworkBundle, a state machine transition becomes one Transition per (from, to) pair.
+     * 1.15.2: like FrameworkBundle, a state machine transition becomes one Transition per `from` place (same name).
      */
-    public function testStateMachineTransitionIsSplitPerFromAndToPlaceLikeFrameworkBundle(): void
+    public function testStateMachineTransitionIsSplitPerFromPlaceLikeFrameworkBundle(): void
     {
-        $entity = $this->cancellable(WorkflowType::StateMachine);
-        $entity->addTransition(new WorkflowTransition('fork', ['review'], ['done', 'cancelled']));
-
-        $transitions = (new WorkflowDefinitionBuilder())->build($entity)->getTransitions();
+        $transitions = (new WorkflowDefinitionBuilder())->build($this->cancellable(WorkflowType::StateMachine))->getTransitions();
 
         $pairs = array_map(static fn (Transition $transition): array => [
             $transition->getName(),
@@ -62,9 +60,44 @@ final class WorkflowDefinitionBuilderTest extends TestCase
             ['finish', ['review'], ['done']],
             ['cancel', ['draft'], ['cancelled']],
             ['cancel', ['review'], ['cancelled']],
-            ['fork', ['review'], ['done']],
-            ['fork', ['review'], ['cancelled']],
         ], $pairs);
+    }
+
+    /**
+     * 1.15.2: a state machine transition needs exactly one target and at least one source (FrameworkBundle's
+     * StateMachineValidator refuses the same name from the same place twice); refused when the workflow is built.
+     *
+     * @return iterable<string, array{list<string>, list<string>}>
+     */
+    public static function invalidStateMachineTransitions(): iterable
+    {
+        yield 'two targets' => [['review'], ['done', 'cancelled']];
+        yield 'no target' => [['review'], []];
+        yield 'no source' => [[], ['done']];
+    }
+
+    /**
+     * @param list<string> $from
+     * @param list<string> $to
+     */
+    #[DataProvider('invalidStateMachineTransitions')]
+    public function testStateMachineTransitionWithoutExactlyOneTargetIsRefused(array $from, array $to): void
+    {
+        $entity = $this->cancellable(WorkflowType::StateMachine);
+        $entity->addTransition(new WorkflowTransition('fork', $from, $to));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Transition "fork" of state machine "order" must have at least one source place and exactly one target place.');
+        (new WorkflowDefinitionBuilder())->build($entity);
+    }
+
+    public function testWorkflowTransitionMayHaveSeveralTargets(): void
+    {
+        $entity = $this->cancellable(WorkflowType::Workflow);
+        $entity->addTransition(new WorkflowTransition('fork', ['review'], ['done', 'cancelled']));
+
+        $transitions = (new WorkflowDefinitionBuilder())->build($entity)->getTransitions();
+        self::assertSame(['done', 'cancelled'], $transitions[3]->getTos());
     }
 
     /**

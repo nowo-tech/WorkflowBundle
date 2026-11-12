@@ -18,6 +18,8 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 
 use function is_array;
+use function is_callable;
+use function is_object;
 use function is_string;
 use function method_exists;
 use function preg_match;
@@ -139,15 +141,36 @@ final readonly class BinaryKeyCollationSubscriber
 
     /**
      * The configured server version (`doctrine.dbal.server_version` / `?serverVersion=`, also on a primary / replica
-     * connection), else the one the server reports.
+     * connection), else the one the server reports (null when it cannot be read: unknown).
      */
-    private static function serverVersion(Connection $connection): string
+    private static function serverVersion(Connection $connection): ?string
     {
         $params  = $connection->getParams();
         $primary = $params['primary'] ?? null;
         $version = $params['serverVersion'] ?? (is_array($primary) ? ($primary['serverVersion'] ?? null) : null);
+        if (is_string($version) && $version !== '') {
+            return $version;
+        }
+        // doctrine/dbal 4: public Connection::getServerVersion(); doctrine/dbal 3 keeps it private (the wrapped driver
+        // connection reports it).
+        if (is_callable([$connection, 'getServerVersion'])) {
+            return $connection->getServerVersion();
+        }
 
-        return is_string($version) && $version !== '' ? $version : $connection->getServerVersion();
+        return self::wrappedServerVersion($connection); // @codeCoverageIgnore
+    }
+
+    /**
+     * doctrine/dbal 3 only.
+     *
+     * @codeCoverageIgnore
+     */
+    private static function wrappedServerVersion(Connection $connection): ?string
+    {
+        $driver  = method_exists($connection, 'getWrappedConnection') ? $connection->getWrappedConnection() : null;
+        $version = is_object($driver) && is_callable([$driver, 'getServerVersion']) ? $driver->getServerVersion() : null;
+
+        return is_string($version) && $version !== '' ? $version : null;
     }
 
     private static function supportsMysqlNoPad(?string $serverVersion): bool

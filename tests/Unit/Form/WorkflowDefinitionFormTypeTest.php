@@ -105,6 +105,30 @@ final class WorkflowDefinitionFormTypeTest extends TypeTestCase
         self::assertTrue($form->has('transitions'));
     }
 
+    /**
+     * 1.15.2: a state machine transition has exactly one target place; a workflow transition may have several.
+     */
+    public function testStateMachineTransitionWithSeveralTargetsIsInvalid(): void
+    {
+        foreach ([WorkflowType::StateMachine->value => false, WorkflowType::Workflow->value => true] as $type => $valid) {
+            $definition = new WorkflowDefinition('Order', 'order', 'draft', 'App\\Entity\\Order', WorkflowType::from($type));
+            foreach (['draft', 'done', 'cancelled'] as $place) {
+                $definition->addPlace(new WorkflowPlace($place));
+            }
+            $definition->addTransition(new WorkflowTransition('close', ['draft'], ['done']));
+
+            $form = $this->factory->create(WorkflowDefinitionFormType::class, $definition, [
+                'section' => WorkflowDefinitionFormSection::Transitions,
+            ]);
+            $form->submit(['transitions' => [['name' => 'close', 'label' => '', 'fromPlaces' => ['draft'], 'toPlaces' => ['done', 'cancelled']]]]);
+
+            self::assertSame($valid, $form->isValid(), $type);
+            if (!$valid) {
+                self::assertStringContainsString('exactly one target place', (string) $form->getErrors(true));
+            }
+        }
+    }
+
     public function testPlacesSectionSubmit(): void
     {
         $definition = new WorkflowDefinition('Order', 'order', 'draft', 'App\\Entity\\Order');

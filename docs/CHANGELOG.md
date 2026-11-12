@@ -71,9 +71,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   MariaDB 11.4): after the schema is created the migrations diff is empty, a 1.15.1 column is altered once, and
   `acme`, `acme ` and `Acme` are three keys.
 - **State machine transitions with several `from` places (Beacon):** the definition builder now mirrors
-  FrameworkBundle: a `state_machine` transition becomes one Symfony `Transition` per (`from`, `to`) pair with the same
-  name, so it fires from any of its `from` places (before, a single `Transition` needed all of them marked and never
-  fired on a state machine). A `workflow` transition is unchanged (all `from` places must be marked).
+  FrameworkBundle: a `state_machine` transition becomes one Symfony `Transition` per `from` place with the same name,
+  so it fires from any of its `from` places (before, a single `Transition` needed all of them marked and never fired
+  on a state machine). As with FrameworkBundle's `StateMachineValidator`, a state machine transition needs at least one
+  `from` and exactly one `to` place: the builder refuses another shape with an explicit `InvalidArgumentException`
+  (before, several `to` places silently moved the subject to the first one) and the transition editor refuses to save
+  it. A `workflow` transition is unchanged (all `from` places must be marked, any number of `to` places).
+- **DoctrineBundle 3 with a custom `table_prefix`:** see UPGRADING before generating the migration (rename the tables
+  by hand; the generated diff drops and recreates them).
 - **SQL filter mirroring (audit NZ-I6):** the private manager registers the class of each enabled source filter
   *instance* (not the class named in the source configuration), so the mirror is exact, also when a filter is
   registered again under the same name with another class.

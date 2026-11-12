@@ -90,14 +90,23 @@ php bin/console doctrine:migrations:diff   # MySQL / MariaDB only, see below
   `9.7`, `11.4.4-MariaDB`); `8.0` without a patch number is read as `8.0.0` and keeps `utf8mb4_bin`. PostgreSQL and
   SQLite: nothing changes.
 - **DoctrineBundle 3 hosts:** the collation and `table_prefix` now apply (1.15.0 / 1.15.1 ignored them there). If you
-  set `table_prefix` on DoctrineBundle 3, the generated migration also renames the bundle tables to the prefixed names;
-  if you added the collation by hand in a migration, the diff no longer proposes to drop it.
+  added the collation by hand in a migration, the diff no longer proposes to drop it.
+- **DoctrineBundle 3 hosts with a custom `table_prefix` — back up first.** Your tables were created **without** the
+  prefix (`workflow_definition`, `workflow_place`, …). `doctrine:migrations:diff` does not rename tables: it proposes
+  `CREATE TABLE` for the prefixed names and `DROP TABLE` for the existing ones, which **deletes your workflow data**.
+  Do not apply those statements. Write the migration by hand with data-preserving renames (MySQL / MariaDB
+  `RENAME TABLE workflow_definition TO <prefix>definition, …`; PostgreSQL `ALTER TABLE … RENAME TO …`) for the five
+  tables (`definition`, `place`, `transition`, `match_rule`, `subject_pin`), then run the diff again and check that it
+  only contains the collation changes. Or remove `table_prefix` to keep the unprefixed names. Hosts on DoctrineBundle 2,
+  and hosts without `table_prefix`, are not affected.
 - `TablePrefixSubscriber` and `BinaryKeyCollationSubscriber` no longer implement `Doctrine\Common\EventSubscriber`
   (no `getSubscribedEvents()`); they are tagged `doctrine.event_listener`. If you registered them on an event manager
   yourself, use `addEventListener(Events::loadClassMetadata, …)` / `addEventListener(ToolEvents::postGenerateSchemaTable, …)`.
-- **State machines:** a transition with several `from` places now fires from any of them (FrameworkBundle semantics),
-  and one with several `to` places becomes one transition per target. Review state machine definitions that relied on
-  such a transition never being enabled. `workflow`-type definitions are unchanged.
+- **State machines:** a transition with several `from` places now fires from any of them (FrameworkBundle semantics).
+  A state machine transition must have at least one `from` place and **exactly one** `to` place, as FrameworkBundle's
+  validation requires: building such a workflow now fails with an `InvalidArgumentException` naming the transition
+  (before, a transition with several `to` places silently moved the subject to the first one), and the editor refuses
+  to save it. Split it into one transition per target. `workflow`-type definitions are unchanged.
 
 ## To 1.15.1
 
