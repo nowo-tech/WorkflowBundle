@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Exception;
 
 use LogicException;
+use Throwable;
 
 use function sprintf;
 
@@ -17,7 +18,8 @@ final class WorkflowDefinitionInUseException extends LogicException
     public function __construct(
         public readonly string $workflowSlug,
         public readonly int $pinnedSubjects,
+        ?Throwable $previous = null,
     ) {
-        parent::__construct(sprintf('Workflow "%s" cannot be deleted: %d running subject(s) are pinned to its versions. Disable it instead.', $workflowSlug, $pinnedSubjects));
+        parent::__construct(sprintf('Workflow "%s" cannot be deleted: %d running subject(s) are pinned to its versions. Disable it instead.', $workflowSlug, $pinnedSubjects), 0, $previous);
     }
 }

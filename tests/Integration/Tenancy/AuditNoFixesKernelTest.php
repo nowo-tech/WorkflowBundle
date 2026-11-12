@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Integration\Tenancy;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\WorkflowBundle\Exception\WorkflowPinConflictException;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Service\DatabaseMetadataStore;
@@ -57,21 +58,31 @@ final class AuditNoFixesKernelTest extends TestCase
         self::assertFalse(self::repository($kernel)->existsInScope('leave', new WorkflowTenant('Acme')));
         self::assertSame([], self::repository($kernel)->findVersions('LEAVE', new WorkflowTenant('acme')));
 
+        $globalDraft = self::versioning($kernel)->createDraft('leave', null);
+        $globalDraft->setName('Global draft only');
+        self::repository($kernel)->save($globalDraft);
+
         $list = (string) self::send($kernel, self::ui('Acme', '/definitions'), 'admin-Acme')->getContent();
         self::assertStringNotContainsString('Leave acme only', $list);
+        self::assertStringNotContainsString('Global draft only', $list, 'a tenant never lists a global draft');
         self::assertSame(404, self::send($kernel, self::ui('Acme', '/definitions/' . $own->getId()), 'admin-Acme')->getStatusCode());
 
-        // Pins: leave-1 of acme is not LEAVE-1 of acme; the colliding insert runs in a savepoint and the host
-        // transaction goes on.
+        // Pins: leave-1 of acme is not LEAVE-1 of acme. The insert of LEAVE-1 collides with leave-1 in the folded
+        // unique index: it runs in a savepoint, the winning pin cannot be read for LEAVE-1, so the transition is not
+        // applied with a guessed version (audit NO-v N2) and the host transaction goes on.
         $connection = self::hostManager($kernel)->getConnection();
         $lower      = self::persistLeave($kernel, new LeaveRequest('leave-1', 'acme', 3));
         self::applicator($kernel)->apply($lower, 'leave', 'submit');
         $upper = self::persistLeave($kernel, new LeaveRequest('LEAVE-1', 'acme', 3));
         $connection->beginTransaction();
-        self::applicator($kernel)->apply($upper, 'leave', 'submit');
+        try {
+            self::applicator($kernel)->apply($upper, 'leave', 'submit');
+            self::fail('The concurrent pin cannot be read: retry.');
+        } catch (WorkflowPinConflictException) {
+        }
         $connection->executeStatement("UPDATE host_leave_request SET type = 'sick' WHERE uuid = 'LEAVE-1'");
         $connection->commit();
-        self::assertSame('submitted', $upper->getStatus());
+        self::assertSame('requested', $upper->getStatus());
         self::assertSame(0, self::versioning($kernel)->forgetSubject(new WorkflowSubjectRef('LEAVE-1'), new WorkflowTenant('acme')));
         self::assertSame(1, self::versioning($kernel)->forgetSubject(new WorkflowSubjectRef('leave-1'), new WorkflowTenant('acme')));
 

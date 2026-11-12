@@ -508,6 +508,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArguments([
                 new Reference('event_dispatcher', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                new Reference(WorkflowUnitOfWorkSubscriber::class),
             ])
             ->addTag('kernel.event_subscriber')
             ->addTag('kernel.reset', ['method' => 'reset']);

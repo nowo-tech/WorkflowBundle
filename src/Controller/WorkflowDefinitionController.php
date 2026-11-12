@@ -98,6 +98,8 @@ final class WorkflowDefinitionController extends AbstractController
         }
         $form = $this->createForm(WorkflowDefinitionFormType::class, $definition, [
             'section' => WorkflowDefinitionFormSection::General,
+            // Audit NO-v N7: with tenancy the slug is an identifier too.
+            'strict_names' => $this->tenancy->enabled(),
         ]);
         $form->handleRequest($request);
 

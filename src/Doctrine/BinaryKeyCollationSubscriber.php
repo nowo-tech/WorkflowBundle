@@ -6,59 +6,79 @@ namespace Nowo\WorkflowBundle\Doctrine;
 
 use Doctrine\Common\EventSubscriber;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
-use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
-use Doctrine\ORM\Events;
+use Doctrine\DBAL\Schema\ColumnEditor;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
+use Doctrine\ORM\Tools\ToolEvents;
+use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
-use Throwable;
+
+use function method_exists;
 
 /**
- * Tenant keys and subject references are compared exactly (since 1.15, audit NO M1): on MySQL / MariaDB their columns
- * get the binary collation `utf8mb4_bin`, so `acme` and `Acme` (or `acme` and `acmé` under an accent-insensitive
- * collation) are different keys in queries and unique indexes. Other platforms already compare these strings exactly
- * (PostgreSQL, SQLite) and get no collation option (a `collation` option is not portable).
+ * Keys are compared exactly (since 1.15, audit NO M1 / NO-v N3 / N7): on MySQL / MariaDB the key columns of the bundle
+ * tables (`tenant_key`, `slug`, `workflow_slug`, `subject_ref`) get the binary collation `utf8mb4_bin`, so `acme` and
+ * `Acme` (or `acme` and `acmé` under an accent-insensitive collation) are different keys in queries and unique indexes.
  *
- * The repositories re-check every key in PHP anyway; this only keeps the database from returning or colliding rows of
- * another key. When the platform cannot be determined (no database at cache warm-up), nothing is changed.
+ * Applied when the schema is generated from the mapping (`doctrine:migrations:diff`, `doctrine:schema:update`,
+ * `nowo:workflow:sync-schema`), whatever metadata the cache holds: the platform is the one of the manager that maps
+ * the entities and is read then (it needs the database, or `doctrine.dbal.server_version`, as schema generation does
+ * anyway; a failure is not swallowed). Other platforms (PostgreSQL, SQLite) already compare these strings exactly and
+ * get no collation (a `collation` option is not portable). The repositories re-check every key in PHP anyway.
  *
  * @internal
  */
-final class BinaryKeyCollationSubscriber implements EventSubscriber
+final readonly class BinaryKeyCollationSubscriber implements EventSubscriber
 {
     public const COLLATION = 'utf8mb4_bin';
 
-    /** @var array<class-string, list<string>> */
-    private const FIELDS = [
-        WorkflowDefinition::class => ['tenantKey'],
-        WorkflowSubjectPin::class => ['tenantKey', 'subjectRef'],
+    /** @var array<class-string, list<string>> column names */
+    private const COLUMNS = [
+        WorkflowDefinition::class => ['tenant_key', 'slug'],
+        WorkflowSubjectPin::class => ['tenant_key', 'workflow_slug', 'subject_ref'],
     ];
+
+    public function __construct(
+        private ManagerRegistry $doctrine,
+    ) {
+    }
 
     public function getSubscribedEvents(): array
     {
-        return [Events::loadClassMetadata];
+        return [ToolEvents::postGenerateSchemaTable];
     }
 
-    public function loadClassMetadata(LoadClassMetadataEventArgs $args): void
+    public function postGenerateSchemaTable(GenerateSchemaTableEventArgs $args): void
     {
-        $metadata = $args->getClassMetadata();
-        $fields   = self::FIELDS[$metadata->getName()] ?? [];
-        if ($fields === []) {
+        $class   = $args->getClassMetadata()->getName();
+        $columns = self::COLUMNS[$class] ?? [];
+        $manager = $columns === [] ? null : $this->doctrine->getManagerForClass($class);
+        if (!$manager instanceof EntityManagerInterface || !$manager->getConnection()->getDatabasePlatform() instanceof AbstractMySQLPlatform) {
             return;
         }
 
-        try {
-            $platform = $args->getObjectManager()->getConnection()->getDatabasePlatform();
-        } catch (Throwable) {
-            return;
-        }
-        if (!$platform instanceof AbstractMySQLPlatform) {
-            return;
+        $table = $args->getClassTable();
+        // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType (older doctrine/dbal / doctrine/orm)
+        if (!method_exists($table, 'edit') || !method_exists($args, 'setClassTable')) {
+            // doctrine/dbal < 4.5 or doctrine/orm without schema editors: the mutable column API.
+            foreach ($columns as $column) { // @codeCoverageIgnoreStart
+                if ($table->hasColumn($column)) {
+                    $table->getColumn($column)->setPlatformOption('collation', self::COLLATION);
+                }
+            }
+
+            return; // @codeCoverageIgnoreEnd
         }
 
-        foreach ($fields as $field) {
-            if (isset($metadata->fieldMappings[$field])) {
-                $metadata->fieldMappings[$field]->options = ['collation' => self::COLLATION] + ($metadata->fieldMappings[$field]->options ?? []);
+        $editor = $table->edit();
+        foreach ($columns as $column) {
+            if ($table->hasColumn($column)) {
+                $editor->modifyColumnByUnquotedName($column, static function (ColumnEditor $editor): void {
+                    $editor->setCollation(self::COLLATION);
+                });
             }
         }
+        $args->setClassTable($editor->create());
     }
 }

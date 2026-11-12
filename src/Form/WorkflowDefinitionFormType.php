@@ -16,6 +16,7 @@ use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Regex;
 
 use function is_array;
 
@@ -37,7 +38,7 @@ final class WorkflowDefinitionFormType extends AbstractType
         $section = $options['section'];
 
         if ($section === WorkflowDefinitionFormSection::General) {
-            $this->addGeneralFields($builder, $options['slug_locked'], $options['binding_locked']);
+            $this->addGeneralFields($builder, $options['slug_locked'], $options['binding_locked'], $options['strict_names']);
         }
 
         if ($section === WorkflowDefinitionFormSection::MatchRules) {
@@ -56,11 +57,11 @@ final class WorkflowDefinitionFormType extends AbstractType
     /**
      * @param FormBuilderInterface<WorkflowDefinition|null> $builder
      */
-    private function addGeneralFields(FormBuilderInterface $builder, bool $slugLocked, bool $bindingLocked = false): void
+    private function addGeneralFields(FormBuilderInterface $builder, bool $slugLocked, bool $bindingLocked = false, bool $strictNames = false): void
     {
         $this->addText($builder, 'name', ['label' => 'form.field.name']);
         // With tenancy the slug ties the versions of a definition together: set once, when it is created.
-        $this->addText($builder, 'slug', ['label' => 'form.field.slug', 'disabled' => $slugLocked]);
+        $this->addText($builder, 'slug', ['label' => 'form.field.slug', 'disabled' => $slugLocked] + ($strictNames ? ['constraints' => [new Regex(WorkflowTransitionType::STRICT_NAME_PATTERN, 'Use 1 to 64 lower-case letters, digits or underscores.')]] : []));
         $this->addWithDefaults($builder, 'type', EnumType::class, [
             'class'        => WorkflowType::class,
             'label'        => 'form.field.type',

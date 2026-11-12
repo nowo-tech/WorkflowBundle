@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Audit;
 
+use Nowo\WorkflowBundle\EventListener\WorkflowUnitOfWorkSubscriber;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Symfony\Contracts\Service\ResetInterface;
@@ -15,6 +17,8 @@ use WeakMap;
 use function array_slice;
 use function count;
 use function strcasecmp;
+
+use const PHP_INT_MAX;
 
 /**
  * Dispatches the audit events of applied transitions after the commit that persisted them (since 1.15,
@@ -56,6 +60,7 @@ final class AfterCommitDispatcher implements TransactionObserverInterface, Event
     public function __construct(
         private readonly ?EventDispatcherInterface $dispatcher = null,
         private readonly ?LoggerInterface $logger = null,
+        private readonly ?WorkflowUnitOfWorkSubscriber $boundaries = null,
     ) {
         $this->transactions = new WeakMap();
     }
@@ -63,8 +68,9 @@ final class AfterCommitDispatcher implements TransactionObserverInterface, Event
     public static function getSubscribedEvents(): array
     {
         return [
-            KernelEvents::TERMINATE                                           => ['onBoundary', -1024],
-            'console.terminate'                                               => ['onBoundary', -1024],
+            KernelEvents::REQUEST                                             => ['onMainRequest', PHP_INT_MAX],
+            KernelEvents::TERMINATE                                           => ['onRequestBoundary', -1024],
+            'console.terminate'                                               => ['onConsoleBoundary', -1024],
             'Symfony\\Component\\Messenger\\Event\\WorkerMessageHandledEvent' => ['onBoundary', -1024],
             'Symfony\\Component\\Messenger\\Event\\WorkerMessageFailedEvent'  => ['onBoundary', -1024],
         ];
@@ -119,8 +125,45 @@ final class AfterCommitDispatcher implements TransactionObserverInterface, Event
     }
 
     /**
-     * End of the request, console command or Messenger message: committed events are dispatched; events whose
-     * marking change was never persisted are dropped.
+     * Start of a main request outside any command or message: whatever an earlier unit left (its end was never
+     * dispatched) is dropped with a warning, never dispatched into this request (audit NO-v N4).
+     */
+    public function onMainRequest(RequestEvent $event): void
+    {
+        if (!$event->isMainRequest() || $this->boundaries?->insideCommandOrMessage() === true || $this->countPending() === 0) {
+            return;
+        }
+        $this->logger?->warning('Workflow audit: {count} applied transition(s) of an earlier unit of work that never ended were dropped.', [
+            'bundle' => 'NowoWorkflowBundle',
+            'count'  => $this->countPending(),
+        ]);
+        $this->reset();
+    }
+
+    /**
+     * End of a main request: a unit boundary only outside any command or message (a request handled inside a command
+     * keeps the command's transaction, audit NO-v N4).
+     */
+    public function onRequestBoundary(): void
+    {
+        if ($this->boundaries?->insideCommandOrMessage() !== true) {
+            $this->onBoundary();
+        }
+    }
+
+    /**
+     * End of a command: a unit boundary only for the outermost command (a nested command's terminate inside the outer
+     * command's transaction keeps its events, audit NO-v N4).
+     */
+    public function onConsoleBoundary(object $event): void
+    {
+        if (!$this->boundaries instanceof WorkflowUnitOfWorkSubscriber || $this->boundaries->endsOutermostCommand($event)) {
+            $this->onBoundary();
+        }
+    }
+
+    /**
+     * End of the unit of work: committed events are dispatched; whatever is not committed is dropped.
      */
     public function onBoundary(): void
     {

@@ -32,8 +32,10 @@ Everything here is **opt-in**: without `nowo_workflow.tenancy.tenant_resolver` t
 - **Exact keys (audit NO M1).** A tenant key (and a subject reference) is 1 to 128 printable ASCII characters
   without spaces, so no accent and no trailing space can make two keys equal under a database collation. Keys are
   compared exactly: every row the repositories and the pin store read is re-checked in PHP (`acme` is never `Acme`);
-  on MySQL / MariaDB the `tenant_key` and `subject_ref` columns use the binary collation `utf8mb4_bin` (applied by
-  the schema tools; other platforms already compare them exactly). Use the canonical form of your keys (e.g.
+  on MySQL / MariaDB the `tenant_key`, `slug`, `workflow_slug` and `subject_ref` columns use the binary collation
+  `utf8mb4_bin`, added whenever the schema is generated (migrations diff, schema tools, `sync-schema`; set
+  `doctrine.dbal.server_version` or keep the database reachable then); other platforms already compare them exactly.
+  List totals, counts and "latest version" are computed from the re-checked rows too. Use the canonical form of your keys (e.g.
   lower-case UUIDs) everywhere.
 - `Model\WorkflowTenant` is the value object; the database column `tenant_key` stores `''` for a global template.
 - The slug is unique per tenant (and version): a tenant may customize a template under the same slug, so host
@@ -77,7 +79,8 @@ Pinning rules:
   version, otherwise Symfony refuses the marking (`LogicException`): only remove places when every subject has left
   them, or configure the resolver;
 - the subject is pinned **before** its first transition is applied (audit NO M3): two concurrent first applies agree
-  on one version (the first pin wins; the loser runs the winner's version). Pins are written with plain DBAL
+  on one version (the first pin wins; the loser re-reads it with a locking read and runs the winner's version, or gets
+  a retryable `WorkflowPinConflictException` when it cannot read it yet; it never runs its own proposal). Pins are written with plain DBAL
   statements on the definitions' connection: inside a transaction your application opened, the insert runs in a
   savepoint (a duplicate never aborts your transaction, PostgreSQL included) and commits or rolls back with it;
   outside one (e.g. `runtime.flush_after_apply: false` before you flush) it commits on its own, even if you never
@@ -214,8 +217,10 @@ It is dispatched **after the commit** of the transaction that persisted the subj
 - inside a transaction (yours, or the flush of `runtime.flush_after_apply: true`), it waits for the outermost commit;
   a rollback (or a rolled-back savepoint) drops it;
 - with `runtime.flush_after_apply: false` it waits for the next transaction that begins (your flush) and follows it;
-- committed events are dispatched right after `WorkflowApplicator` flushed, or at the end of the request, console
-  command or Messenger message (not from a Doctrine `postFlush`, audit NO M4);
+- committed events are dispatched right after `WorkflowApplicator` flushed, or at the end of the outermost request,
+  console command or Messenger message (not from a Doctrine `postFlush`, audit NO M4; the end of a command or request
+  nested in another unit is not a boundary, NO-v N4);
+- a main request that starts while an earlier unit left events behind (its end was lost) drops them with a warning;
 - whatever is not committed by the end of the request, console command or Messenger message (a marking never
   persisted, or a transaction still open) is dropped with a warning (audit NO L1).
 
@@ -385,8 +390,8 @@ markings, and the tenancy-only services (isolation guard, audit dispatcher and m
    migration.
 2. **A disabled tenant version** does not fall back to the global template (the tenant opted out).
 3. **Deleting** a published tenant definition is refused while any subject is pinned to one of its versions (the UI
-   shows the count and suggests disabling it); drafts can always be deleted; `forgetSubject()` removes a subject's
-   pins.
+   shows the count and suggests disabling it; the pin foreign key is `ON DELETE RESTRICT`, so a pin created at the same
+   moment also blocks it); drafts can always be deleted; `forgetSubject()` removes a subject's pins.
 4. **`WorkflowRegistryInterface`** is deprecated for hosts (removed in 2.0), not made `@internal`.
 5. **The audit event** is on by default with tenancy and needs doctrine/dbal 4.
 6. **GDPR:** no UserKit export / erasure providers: nothing is stored per user.

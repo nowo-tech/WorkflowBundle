@@ -6,9 +6,12 @@ namespace Nowo\WorkflowBundle\Tenancy;
 
 use DateTimeImmutable;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Types\Types;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
+use Nowo\WorkflowBundle\Exception\WorkflowPinConflictException;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
@@ -55,7 +58,11 @@ final readonly class SubjectPinStore
      * (the first pin wins: a concurrent request may have pinned it on another version, audit NO M3).
      *
      * Inside an open transaction the insert runs in a savepoint, so a unique-constraint violation never aborts the
-     * application's transaction (PostgreSQL); outside one it commits on its own (autocommit).
+     * application's transaction (PostgreSQL); outside one it commits on its own (autocommit). After a violation the
+     * winning pin is read with a locking read; when it still cannot be read, {@see WorkflowPinConflictException} is
+     * thrown: the caller never proceeds with its own proposed version.
+     *
+     * @throws WorkflowPinConflictException
      */
     public function pin(?WorkflowTenant $tenant, string $workflowSlug, WorkflowSubjectRef $subject, WorkflowDefinition $definition): ?int
     {
@@ -89,13 +96,36 @@ final readonly class SubjectPinStore
                 $connection->releaseSavepoint(self::SAVEPOINT);
             }
         } catch (UniqueConstraintViolationException) {
-            // Another request pinned it first: its pin wins.
+            // Another request pinned it first: its pin wins. Under REPEATABLE READ a plain read may not see it yet (the
+            // snapshot is older): read it with a locking read, which sees the latest committed row (audit NO-v N2).
             if ($savepoint) {
                 $connection->rollbackSavepoint(self::SAVEPOINT);
             }
+
+            return $this->lockedPin($tenant, $workflowSlug, $subject) ?? throw WorkflowPinConflictException::forSlug($workflowSlug);
         }
 
-        return $this->pinnedDefinitionId($tenant, $workflowSlug, $subject) ?? $definition->getId();
+        return $definition->getId();
+    }
+
+    /**
+     * The pin read with a locking read (MySQL / MariaDB `LOCK IN SHARE MODE`, PostgreSQL `FOR SHARE`; a plain read on
+     * other platforms, which have no older snapshot here).
+     */
+    private function lockedPin(?WorkflowTenant $tenant, string $workflowSlug, WorkflowSubjectRef $subject): ?int
+    {
+        $platform = $this->repository->connection()->getDatabasePlatform();
+        $lock     = match (true) {
+            $platform instanceof AbstractMySQLPlatform => ' LOCK IN SHARE MODE',
+            $platform instanceof PostgreSQLPlatform    => ' FOR SHARE',
+            default                                    => '',
+        };
+
+        foreach ($this->rows($tenant, $subject, $workflowSlug, $lock) as $row) {
+            return $row['definition'];
+        }
+
+        return null;
     }
 
     /**
@@ -120,12 +150,12 @@ final readonly class SubjectPinStore
      *
      * @return list<array{id: int, definition: int}>
      */
-    private function rows(?WorkflowTenant $tenant, WorkflowSubjectRef $subject, ?string $workflowSlug): array
+    private function rows(?WorkflowTenant $tenant, WorkflowSubjectRef $subject, ?string $workflowSlug, string $lock = ''): array
     {
         $m   = $this->metadata();
         $key = WorkflowTenant::storageKey($tenant);
         $sql = 'SELECT ' . $m['id'] . ' AS pin_id, ' . $m['definition'] . ' AS pin_definition, ' . $m['tenant'] . ' AS pin_tenant, ' . $m['slug'] . ' AS pin_slug, ' . $m['ref'] . ' AS pin_ref FROM ' . $m['table']
-            . ' WHERE ' . $m['tenant'] . ' = ? AND ' . $m['ref'] . ' = ?' . ($workflowSlug !== null ? ' AND ' . $m['slug'] . ' = ?' : '') . ' ORDER BY ' . $m['id'];
+            . ' WHERE ' . $m['tenant'] . ' = ? AND ' . $m['ref'] . ' = ?' . ($workflowSlug !== null ? ' AND ' . $m['slug'] . ' = ?' : '') . ' ORDER BY ' . $m['id'] . $lock;
         $params = $workflowSlug !== null ? [$key, $subject->id, $workflowSlug] : [$key, $subject->id];
 
         $rows = [];

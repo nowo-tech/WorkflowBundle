@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Event\FinishRequestEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -31,8 +32,38 @@ final class WorkflowUnitOfWorkSubscriberTest extends TestCase
         $subscriber->onRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::SUB_REQUEST));
         self::assertSame(0, $this->resets, 'a sub-request shares its main request unit of work');
         $subscriber->onRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
+        $subscriber->onFinishRequest(new FinishRequestEvent($kernel, new Request(), HttpKernelInterface::SUB_REQUEST));
+        $subscriber->onFinishRequest(new FinishRequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
+        $subscriber->onTerminateBookkeeping();
         $subscriber->onTerminate();
         self::assertSame(2, $this->resets);
+    }
+
+    #[Test]
+    public function aMainRequestInsideACommandOrAMessageDoesNotEndTheirUnit(): void
+    {
+        $subscriber = $this->subscriber();
+        $kernel     = $this->createStub(HttpKernelInterface::class);
+        $command    = $this->event();
+
+        $this->start($subscriber, $command);
+        self::assertSame(1, $this->resets);
+        $subscriber->onRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
+        $subscriber->onFinishRequest(new FinishRequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
+        $subscriber->onTerminateBookkeeping();
+        $subscriber->onTerminate();
+        self::assertSame(1, $this->resets, 'audit NO-v N6: the nested main request kept the command unit');
+        self::assertTrue($subscriber->insideCommandOrMessage());
+        $this->end($subscriber, $command);
+        self::assertSame(2, $this->resets);
+
+        // A lost finish_request is healed by the next top-level terminate (N5).
+        $subscriber->onRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
+        $subscriber->onTerminateBookkeeping();
+        $subscriber->onTerminate();
+        $before = $this->resets;
+        $this->start($subscriber, $this->event());
+        self::assertSame($before + 1, $this->resets, 'no main request in flight any more: outermost');
     }
 
     #[Test]
@@ -126,12 +157,10 @@ final class WorkflowUnitOfWorkSubscriberTest extends TestCase
         $subscriber->reset();
         $subscriber->onRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
         $subscriber->onRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
-        $subscriber->onTerminate();
+        $subscriber->onFinishRequest(new FinishRequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
         $before = $this->resets;
         $this->start($subscriber, $this->event());
         self::assertSame($before, $this->resets, 'the outer main request is still in flight');
-        $subscriber->onTerminate();
-        $subscriber->onTerminate();
     }
 
     #[Test]

@@ -133,15 +133,25 @@ Hardening from the immediate audit NO of this release (before it shipped):
 - **Tenant editors cannot rebind a definition (M2):** in a tenant scope the type, subject class and marking property
   are locked (from the template, or from `tenancy.subject_classes` for a new definition); place and transition names
   must match `^[a-z0-9_]{1,64}$` with tenancy.
-- **Pin before apply (M3):** concurrent first applies agree on one version; the pin insert runs in a savepoint inside
-  an open transaction (a duplicate never aborts it).
+- **Pin before apply (M3, NO-v N2):** concurrent first applies agree on one version; the pin insert runs in a savepoint
+  inside an open transaction (a duplicate never aborts it), the winning pin is re-read with a locking read
+  (`LOCK IN SHARE MODE` / `FOR SHARE`, visible under REPEATABLE READ), and when it still cannot be read
+  `Exception\WorkflowPinConflictException` asks to retry: the proposed version is never used instead.
 - **No audit dispatch from `postFlush` (M4)**; the audit middleware observes only the definitions' and the default
   manager's connections, and anything uncommitted at the end of a unit is dropped (L1).
 - Router context prefix variables are removed at the next main request even if the previous one never finished (L2);
   concurrent draft / clone / create end with the existing row or a form error (L3); a guard port that throws blocks the
   transition (fail closed).
 - **A published definition with pinned subjects cannot be deleted** (owner decision 2026-11-12,
-  `Exception\WorkflowDefinitionInUseException`).
+  `Exception\WorkflowDefinitionInUseException`). The pin foreign key is `ON DELETE RESTRICT`, so a pin committed between
+  the count and the delete makes the database refuse it too (NO-v N1).
+- **Verification audit NO-v:** list totals, enabled counts and "latest version" of the UI scope are computed from
+  exactly re-checked rows (N3); the binary collation is applied when the schema is generated (migrations, schema tools,
+  `sync-schema`), whatever the metadata cache holds, and also covers `slug` / `workflow_slug` (N3, N7); the audit
+  boundaries follow the outermost unit (a nested command or request end keeps the outer transaction's events) and a
+  main request drops leftovers of a unit that never ended (N4); main requests are counted at `finish_request` and
+  healed at a top-level `kernel.terminate` (N5); a main request inside a command or message does not clear the
+  private manager (N6); slugs follow the strict name pattern with tenancy (N7).
 
 ### Fixed
 

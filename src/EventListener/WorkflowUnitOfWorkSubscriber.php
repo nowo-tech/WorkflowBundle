@@ -6,6 +6,7 @@ namespace Nowo\WorkflowBundle\EventListener;
 
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpKernel\Event\FinishRequestEvent;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Contracts\Service\ResetInterface;
@@ -74,8 +75,11 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface, Re
     /** Main requests in flight (a counter: a main request handled inside another one does not end the outer one). */
     private int $requestsInFlight = 0;
 
-    /** @var WeakMap<object, bool> outermost verdict of a console terminate event, for its late clear */
+    /** @var WeakMap<object, bool> outermost verdict of a console terminate event (read by the audit dispatcher) */
     private WeakMap $verdicts;
+
+    /** @var WeakMap<object, true> console terminate events whose late listener still has to clear */
+    private WeakMap $pendingClear;
 
     /**
      * @param iterable<ResetInterface> $resettables the private entity manager (when wired)
@@ -83,14 +87,16 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface, Re
     public function __construct(
         private readonly iterable $resettables = [],
     ) {
-        $this->verdicts = new WeakMap();
+        $this->verdicts     = new WeakMap();
+        $this->pendingClear = new WeakMap();
     }
 
     public static function getSubscribedEvents(): array
     {
         return [
             KernelEvents::REQUEST                   => ['onRequest', 4096],
-            KernelEvents::TERMINATE                 => ['onTerminate', -4096],
+            KernelEvents::FINISH_REQUEST            => ['onFinishRequest', PHP_INT_MAX],
+            KernelEvents::TERMINATE                 => [['onTerminateBookkeeping', PHP_INT_MAX], ['onTerminate', -4096]],
             self::MESSENGER_WORKER_MESSAGE_RECEIVED => ['onMessageReceived', PHP_INT_MAX],
             self::MESSENGER_WORKER_MESSAGE_HANDLED  => ['onMessageFinished', -4096],
             self::MESSENGER_WORKER_MESSAGE_FAILED   => ['onMessageFinished', -4096],
@@ -111,21 +117,64 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface, Re
             return;
         }
         $this->dropFailingFrames();
-        // @igor-ignore - Counter of the main requests in flight, decremented at kernel.terminate.
+        // @igor-ignore - Counter of the main requests in flight, decremented at the main kernel.finish_request.
         ++$this->requestsInFlight;
-        $this->clearState();
+        // A main request handled inside a command or a message belongs to that unit: it does not end it (audit NO-v N6).
+        if (!$this->insideCommandOrMessage()) {
+            $this->clearState();
+        }
     }
 
     /**
-     * End of the main request (after the response was sent).
+     * End of a main request's handling (also after an exception): one main request less in flight (audit NO-v N5).
+     */
+    public function onFinishRequest(FinishRequestEvent $event): void
+    {
+        if ($event->isMainRequest()) {
+            // @igor-ignore - Counter of the main requests in flight, incremented at the main kernel.request.
+            $this->requestsInFlight = max(0, $this->requestsInFlight - 1);
+        }
+    }
+
+    /**
+     * kernel.terminate (first listener): stale frames first, then, at a top-level terminate (no command, no message),
+     * no main request is in flight any more, whatever was lost before (audit NO-v N5).
+     */
+    public function onTerminateBookkeeping(): void
+    {
+        $this->dropFailingFrames();
+        if (!$this->insideCommandOrMessage()) {
+            // @igor-ignore - Counter of the main requests in flight, healed at a top-level terminate.
+            $this->requestsInFlight = 0;
+        }
+    }
+
+    /**
+     * End of the main request (after the response was sent): clears unless a command or a message is still running
+     * around it (audit NO-v N6).
      */
     public function onTerminate(): void
     {
-        // Revision 3: stale frames first (restoring their saved state), then this handler's own bookkeeping.
-        $this->dropFailingFrames();
-        // @igor-ignore - Counter of the main requests in flight, incremented at the main kernel.request.
-        $this->requestsInFlight = max(0, $this->requestsInFlight - 1);
-        $this->clearState();
+        if (!$this->insideCommandOrMessage()) {
+            $this->clearState();
+        }
+    }
+
+    /**
+     * A console command or a Messenger message is running (the current unit of work is theirs).
+     */
+    public function insideCommandOrMessage(): bool
+    {
+        return $this->frames !== [] || $this->messageInFlight;
+    }
+
+    /**
+     * Whether this console terminate (or error) event ended the outermost command (since 1.15; for the audit
+     * dispatcher's boundary). Read-only: the verdict lives as long as the event.
+     */
+    public function endsOutermostCommand(object $event): bool
+    {
+        return $this->verdicts[$event] ?? false;
     }
 
     /**
@@ -220,6 +269,10 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface, Re
         }
         // @igor-ignore - Per-event verdict; the WeakMap entry dies with the event.
         $this->verdicts[$event] = $this->frames[$index]['outermost'];
+        if ($this->frames[$index]['outermost']) {
+            // @igor-ignore - Consumed by the late terminate listener of the same event.
+            $this->pendingClear[$event] = true;
+        }
         $this->removeFrom($index);
     }
 
@@ -228,8 +281,8 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface, Re
      */
     public function onConsoleTerminate(?object $event = null): void
     {
-        if ($event !== null && ($this->verdicts[$event] ?? false)) {
-            unset($this->verdicts[$event]);
+        if ($event !== null && isset($this->pendingClear[$event])) {
+            unset($this->pendingClear[$event]);
             $this->clearState();
         }
     }
@@ -243,6 +296,7 @@ final class WorkflowUnitOfWorkSubscriber implements EventSubscriberInterface, Re
         $this->messageInFlight  = false;
         $this->requestsInFlight = 0;
         $this->verdicts         = new WeakMap();
+        $this->pendingClear     = new WeakMap();
     }
 
     /**

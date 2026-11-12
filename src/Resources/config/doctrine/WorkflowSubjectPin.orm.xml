@@ -15,7 +15,7 @@
         <field name="subjectRef" column="subject_ref" type="string" length="128"/>
         <field name="createdAt" column="created_at" type="datetime_immutable"/>
         <many-to-one field="definition" target-entity="Nowo\WorkflowBundle\Entity\WorkflowDefinition">
-            <join-column name="definition_id" nullable="false" on-delete="CASCADE"/>
+            <join-column name="definition_id" nullable="false" on-delete="RESTRICT"/>
         </many-to-one>
     </entity>
 </doctrine-mapping>

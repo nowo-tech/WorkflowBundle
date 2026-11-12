@@ -6,15 +6,20 @@ namespace Nowo\WorkflowBundle\Tests\Unit\Tenancy;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver\Exception as DriverException;
+use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Platforms\MySQLPlatform;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\DBAL\Schema\Table;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Mapping\FieldMapping;
+use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
+use Doctrine\Persistence\ManagerRegistry;
 use Exception;
 use LogicException;
+use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
 use Nowo\WorkflowBundle\Contract\WorkflowTransitionPermissionCheckerInterface;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
@@ -26,6 +31,9 @@ use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use Nowo\WorkflowBundle\EventListener\TransitionGuardSubscriber;
 use Nowo\WorkflowBundle\EventListener\WorkflowUiRouteContextSubscriber;
+use Nowo\WorkflowBundle\EventListener\WorkflowUnitOfWorkSubscriber;
+use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
+use Nowo\WorkflowBundle\Exception\WorkflowPinConflictException;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
@@ -43,6 +51,7 @@ use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
@@ -143,28 +152,111 @@ final class AuditNoUnitTest extends TestCase
     #[Test]
     public function keyColumnsGetTheBinaryCollationOnMysqlOnly(): void
     {
-        foreach ([[WorkflowDefinition::class, ['tenantKey']], [WorkflowSubjectPin::class, ['tenantKey', 'subjectRef']]] as [$class, $fields]) {
-            $metadata = $this->metadata($class, $fields);
-            (new BinaryKeyCollationSubscriber())->loadClassMetadata(new LoadClassMetadataEventArgs($metadata, $this->manager(new MySQLPlatform())));
-            foreach ($fields as $field) {
-                self::assertSame(BinaryKeyCollationSubscriber::COLLATION, $metadata->fieldMappings[$field]->options['collation'] ?? null);
+        foreach ([[WorkflowDefinition::class, ['tenant_key', 'slug']], [WorkflowSubjectPin::class, ['tenant_key', 'workflow_slug', 'subject_ref']]] as [$class, $columns]) {
+            $args = $this->schemaArgs($class, [...$columns, 'other']);
+            (new BinaryKeyCollationSubscriber($this->registry(new MySQLPlatform())))->postGenerateSchemaTable($args);
+            foreach ($columns as $column) {
+                self::assertSame(BinaryKeyCollationSubscriber::COLLATION, $args->getClassTable()->getColumn($column)->getCollation(), $class . '::' . $column);
             }
+            self::assertNull($args->getClassTable()->getColumn('other')->getCollation());
         }
 
-        $sqlite = $this->metadata(WorkflowDefinition::class, ['tenantKey']);
-        (new BinaryKeyCollationSubscriber())->loadClassMetadata(new LoadClassMetadataEventArgs($sqlite, $this->manager(new SQLitePlatform())));
-        self::assertNull($sqlite->fieldMappings['tenantKey']->options);
+        $sqlite = $this->schemaArgs(WorkflowDefinition::class, ['tenant_key']);
+        (new BinaryKeyCollationSubscriber($this->registry(new SQLitePlatform())))->postGenerateSchemaTable($sqlite);
+        self::assertFalse($sqlite->classTableWasMutated());
 
-        $unknown = $this->metadata(WorkflowDefinition::class, ['tenantKey']);
-        (new BinaryKeyCollationSubscriber())->loadClassMetadata(new LoadClassMetadataEventArgs($unknown, $this->manager(null)));
-        self::assertNull($unknown->fieldMappings['tenantKey']->options, 'no database: nothing changes');
+        $other = $this->schemaArgs(WorkflowPlace::class, ['name']);
+        (new BinaryKeyCollationSubscriber($this->registry(new MySQLPlatform())))->postGenerateSchemaTable($other);
+        self::assertFalse($other->classTableWasMutated());
 
-        $other = $this->metadata(WorkflowPlace::class, []);
-        (new BinaryKeyCollationSubscriber())->loadClassMetadata(new LoadClassMetadataEventArgs($other, $this->manager(new MySQLPlatform())));
-        $partial = $this->metadata(WorkflowSubjectPin::class, ['tenantKey']);
-        (new BinaryKeyCollationSubscriber())->loadClassMetadata(new LoadClassMetadataEventArgs($partial, $this->manager(new MySQLPlatform())));
-        self::assertArrayNotHasKey('subjectRef', $partial->fieldMappings);
-        self::assertSame(['loadClassMetadata'], (new BinaryKeyCollationSubscriber())->getSubscribedEvents());
+        $partial = $this->schemaArgs(WorkflowSubjectPin::class, ['tenant_key']);
+        (new BinaryKeyCollationSubscriber($this->registry(new MySQLPlatform())))->postGenerateSchemaTable($partial);
+        self::assertSame(BinaryKeyCollationSubscriber::COLLATION, $partial->getClassTable()->getColumn('tenant_key')->getCollation());
+        self::assertSame(['postGenerateSchemaTable'], (new BinaryKeyCollationSubscriber($this->registry(null)))->getSubscribedEvents());
+
+        $this->expectException(RuntimeException::class);
+        (new BinaryKeyCollationSubscriber($this->registry(null)))->postGenerateSchemaTable($this->schemaArgs(WorkflowDefinition::class, ['tenant_key']));
+    }
+
+    #[Test]
+    public function anUnreadableConcurrentPinIsNeverReplacedByTheProposedVersion(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('getDatabasePlatform')->willReturn(new MySQLPlatform());
+        $connection->method('isTransactionActive')->willReturn(false);
+        $sql = [];
+        $connection->method('fetchAllAssociative')->willReturnCallback(static function (string $query) use (&$sql): array {
+            $sql[] = $query;
+
+            return [];
+        });
+        $connection->method('insert')->willThrowException($this->uniqueViolation());
+
+        try {
+            (new SubjectPinStore($this->repository($connection)))->pin(new WorkflowTenant('org-a'), 'leave', new WorkflowSubjectRef('leave-1'), $this->definitionWithId(9));
+            self::fail('A snapshot read cannot see the winner: retry.');
+        } catch (WorkflowPinConflictException) {
+        }
+        self::assertStringEndsWith('LOCK IN SHARE MODE', $sql[1] ?? '', 'the winner is read with a locking read');
+    }
+
+    #[Test]
+    public function aPinCommittedBetweenTheCountAndTheDeleteBlocksTheDelete(): void
+    {
+        $definition = $this->definitionWithId(5);
+        $definition->publish();
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findVersions')->willReturn([$definition]);
+        $repository->method('flush')->willThrowException(new ForeignKeyConstraintViolationException($this->driverException(), null));
+
+        try {
+            (new WorkflowVersioning($repository))->delete($definition);
+            self::fail('The RESTRICT foreign key refuses the delete.');
+        } catch (WorkflowDefinitionInUseException $exception) {
+            self::assertSame(1, $exception->pinnedSubjects);
+            self::assertInstanceOf(ForeignKeyConstraintViolationException::class, $exception->getPrevious());
+        }
+    }
+
+    #[Test]
+    public function auditBoundariesFollowTheOutermostUnit(): void
+    {
+        $seen   = [];
+        $events = new EventDispatcher();
+        $events->addListener(stdClass::class, static function (object $event) use (&$seen): void {
+            $seen[] = $event;
+        });
+        $logger     = new RecordingLogger();
+        $boundaries = new WorkflowUnitOfWorkSubscriber();
+        $dispatcher = new AfterCommitDispatcher($events, $logger, $boundaries);
+        $outer      = $this->consoleEvent();
+        $nested     = $this->consoleEvent();
+        $connection = new stdClass();
+
+        $boundaries->onConsoleCommand($outer);
+        $dispatcher->transactionStarted($connection);
+        $boundaries->onConsoleCommand($nested);
+        $dispatcher->record($event = new stdClass());
+        $boundaries->onConsoleTerminateBookkeeping($nested);
+        $dispatcher->onConsoleBoundary($nested);
+        $dispatcher->onRequestBoundary();
+        self::assertSame(1, $dispatcher->countPending(), 'a nested command or request end keeps the outer transaction\'s event');
+        $dispatcher->transactionEnded($connection, true);
+        $boundaries->onConsoleTerminateBookkeeping($outer);
+        $dispatcher->onConsoleBoundary($outer);
+        self::assertSame([$event], $seen);
+
+        // A unit whose end was lost: its leftovers never reach the next main request.
+        $dispatcher->record(new stdClass());
+        $kernel = $this->createMock(HttpKernelInterface::class);
+        $dispatcher->onMainRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::SUB_REQUEST));
+        self::assertSame(1, $dispatcher->countPending());
+        $dispatcher->onMainRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
+        self::assertSame(0, $dispatcher->countPending());
+        self::assertStringContainsString('never ended', $logger->records[0]['message'] ?? '');
+        $dispatcher->onMainRequest(new RequestEvent($kernel, new Request(), HttpKernelInterface::MAIN_REQUEST));
+        $dispatcher->onRequestBoundary();
+        (new AfterCommitDispatcher($events))->onConsoleBoundary($outer);
     }
 
     #[Test]
@@ -249,6 +341,57 @@ final class AuditNoUnitTest extends TestCase
         };
 
         return new UniqueConstraintViolationException($driver, null);
+    }
+
+    private function driverException(): DriverException
+    {
+        return new class('constraint') extends Exception implements DriverException {
+            public function getSQLState(): string
+            {
+                return '23000';
+            }
+        };
+    }
+
+    private function consoleEvent(): object
+    {
+        return new class(new stdClass(), new stdClass()) {
+            public function __construct(private readonly object $command, private readonly object $input)
+            {
+            }
+
+            public function getCommand(): object
+            {
+                return $this->command;
+            }
+
+            public function getInput(): object
+            {
+                return $this->input;
+            }
+        };
+    }
+
+    /**
+     * @param class-string $class
+     * @param list<string> $columns
+     */
+    private function schemaArgs(string $class, array $columns): GenerateSchemaTableEventArgs
+    {
+        $table = new Table('t');
+        foreach ($columns as $column) {
+            $table->addColumn($column, 'string', ['length' => 128]);
+        }
+
+        return new GenerateSchemaTableEventArgs(new ClassMetadata($class), new Schema(), $table);
+    }
+
+    private function registry(?object $platform): ManagerRegistry
+    {
+        $registry = $this->createMock(ManagerRegistry::class);
+        $registry->method('getManagerForClass')->willReturn($this->manager($platform));
+
+        return $registry;
     }
 
     private function repository(Connection $connection): WorkflowDefinitionRepository

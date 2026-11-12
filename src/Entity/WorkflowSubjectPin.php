@@ -37,7 +37,7 @@ class WorkflowSubjectPin
         #[ORM\Column(name: 'subject_ref', type: Types::STRING, length: 128)]
         private string $subjectRef,
         #[ORM\ManyToOne(targetEntity: WorkflowDefinition::class)]
-        #[ORM\JoinColumn(name: 'definition_id', nullable: false, onDelete: 'CASCADE')]
+        #[ORM\JoinColumn(name: 'definition_id', nullable: false, onDelete: 'RESTRICT')]
         private WorkflowDefinition $definition,
         #[ORM\Column(name: 'created_at', type: Types::DATETIME_IMMUTABLE)]
         private DateTimeImmutable $createdAt = new DateTimeImmutable(),

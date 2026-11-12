@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
+use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use LogicException;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -14,6 +15,7 @@ use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
 
+use function max;
 use function sprintf;
 
 /**
@@ -179,7 +181,13 @@ final readonly class WorkflowVersioning
             // @igor-ignore - Schedules a delete in the private manager, flushed just below (no state kept).
             $this->repository->remove($version, false);
         }
-        $this->repository->flush();
+        try {
+            $this->repository->flush();
+        } catch (ForeignKeyConstraintViolationException $exception) {
+            // A subject was pinned between the count and the delete (audit NO-v N1): the pin foreign key is
+            // ON DELETE RESTRICT, so the database refuses and nothing is deleted.
+            throw new WorkflowDefinitionInUseException($definition->getSlug(), max(1, $this->pins?->countForDefinitions($ids) ?? 1), $exception);
+        }
         $this->registry?->invalidate($definition->getSlug());
     }
 }

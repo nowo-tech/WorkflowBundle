@@ -118,8 +118,10 @@ nowo_workflow:
         variables_provider: App\Workflow\WorkflowTenancy
 ```
 
-On **MySQL / MariaDB** the migration also switches `tenant_key` and `subject_ref` to the binary collation
-`utf8mb4_bin` (exact tenant keys, audit NO M1). Tenant keys and subject references must be printable ASCII without
+On **MySQL / MariaDB** the migration also switches `tenant_key`, `slug`, `workflow_slug` and `subject_ref` to the
+binary collation `utf8mb4_bin` (exact keys, audit NO M1 / NO-v), and the version-pin foreign key is
+`ON DELETE RESTRICT`. The collation is added when the schema is generated, so the database (or
+`doctrine.dbal.server_version`, recommended) must be reachable when you generate the migration. Tenant keys and subject references must be printable ASCII without
 spaces (UUIDs, slugs): other values are refused by the value objects.
 
 A long-running process that runs console commands in-process (or consumes messages) no longer loses the console
