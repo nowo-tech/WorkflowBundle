@@ -121,22 +121,35 @@ php bin/console doctrine:migrations:diff   # MySQL / MariaDB only, see below
   SQLite: nothing changes.
 - **DoctrineBundle 3 hosts:** the collation and `table_prefix` now apply (1.15.0 / 1.15.1 ignored them there). If you
   added the collation by hand in a migration, the diff no longer proposes to drop it.
-- **DoctrineBundle 3 hosts with a custom `table_prefix` — back up first.** Your tables were created **without** the
-  prefix (`workflow_definition`, `workflow_place`, …). `doctrine:migrations:diff` does not rename tables: it proposes
-  `CREATE TABLE` for the prefixed names and `DROP TABLE` for the existing ones, which **deletes your workflow data**.
-  Do not apply those statements. Write the migration by hand with data-preserving renames (MySQL / MariaDB
-  `RENAME TABLE workflow_definition TO <prefix>definition, …`; PostgreSQL `ALTER TABLE … RENAME TO …`) for the five
-  tables (`definition`, `place`, `transition`, `match_rule`, `subject_pin`), then run the diff again and check that it
-  only contains the collation changes. Or remove `table_prefix` to keep the unprefixed names. Hosts on DoctrineBundle 2,
-  and hosts without `table_prefix`, are not affected.
+- **⚠ DoctrineBundle 3 hosts with a custom `table_prefix` — back up first.** Your tables were created **without** the
+  prefix (`workflow_definition`, `workflow_place`, …). Since 1.15.2 schema generation stops with an error that lists
+  the statements to run, for example (MySQL / MariaDB; PostgreSQL / SQLite get `ALTER TABLE … RENAME TO …`):
+
+  ```text
+  nowo_workflow.table_prefix is "acme_", but the Workflow tables still have their default names (created while
+  DoctrineBundle 3 ignored the prefix, WorkflowBundle 1.15.0 / 1.15.1). A generated migration would DROP them and
+  create empty ones. Back up the database, rename them first, then generate the migration again:
+  RENAME TABLE workflow_definition TO acme_definition;
+  RENAME TABLE workflow_place TO acme_place;
+  RENAME TABLE workflow_transition TO acme_transition;
+  RENAME TABLE workflow_match_rule TO acme_match_rule;
+  RENAME TABLE workflow_subject_pin TO acme_subject_pin;
+  ```
+
+  Put those statements in a hand-written migration, run it, then run `doctrine:migrations:diff` again: it should only
+  contain index renames and the collation changes. **Never apply a generated `DROP TABLE` of the bundle tables.** Or
+  remove `table_prefix` to keep the unprefixed names. Hosts on DoctrineBundle 2, and hosts without `table_prefix`, are
+  not affected.
 - `TablePrefixSubscriber` and `BinaryKeyCollationSubscriber` no longer implement `Doctrine\Common\EventSubscriber`
   (no `getSubscribedEvents()`); they are tagged `doctrine.event_listener`. If you registered them on an event manager
   yourself, use `addEventListener(Events::loadClassMetadata, …)` / `addEventListener(ToolEvents::postGenerateSchemaTable, …)`.
 - **State machines:** a transition with several `from` places now fires from any of them (FrameworkBundle semantics).
-  A state machine transition must have at least one `from` place and **exactly one** `to` place, as FrameworkBundle's
-  validation requires: building such a workflow now fails with an `InvalidArgumentException` naming the transition
-  (before, a transition with several `to` places silently moved the subject to the first one), and the editor refuses
-  to save it. Split it into one transition per target. `workflow`-type definitions are unchanged.
+- **Invalid transition shapes:** run `php bin/console nowo:workflow:lint`. It lists every stored transition without
+  `from` or `to` places and every `state_machine` transition with several `to` places. In 1.15.2 they still run as in
+  1.15.1 (deprecation + warning), the editor and `publish()` refuse them, and **1.16.0 refuses to build them**: split
+  them into one transition per target before upgrading to 1.16.0.
+- **MySQL:** a `server_version` of `8` or `8.0` (no patch number) keeps the PAD SPACE `utf8mb4_bin` and logs a
+  warning; configure the full version (`8.0.40`). `8.4`, `9.7` and full versions are fine.
 
 ## To 1.15.1
 

@@ -210,6 +210,7 @@ error:
   definition_in_use: 'Deze workflow kan niet worden verwijderd: %count% lopende aanvraag/aanvragen gebruiken nog een van de versies. Schakel hem in plaats daarvan uit.'
   cannot_retire: 'Deze workflow kan niet buiten gebruik worden gesteld: nieuwe aanvragen hebben een ingeschakeld platformsjabloon nodig.'
   structure_locked: 'Plaatsen en overgangen volgen het platformsjabloon en kunnen hier niet worden gewijzigd.'
+  invalid_shape: 'Deze workflow kan niet worden gepubliceerd: %violations%'
 
 kpi:
   definitions: 'Definities'

@@ -210,6 +210,7 @@ error:
   definition_in_use: 'Dieser Workflow kann nicht gelöscht werden: %count% laufende Vorgänge nutzen noch eine seiner Versionen. Deaktiviere ihn stattdessen.'
   cannot_retire: 'Dieser Workflow kann nicht außer Betrieb genommen werden: neue Anträge brauchen eine aktivierte Plattformvorlage.'
   structure_locked: 'Stellen und Übergänge folgen der Plattformvorlage und können hier nicht geändert werden.'
+  invalid_shape: 'Dieser Workflow kann nicht veröffentlicht werden: %violations%'
 
 kpi:
   definitions: 'Definitionen'

@@ -12,6 +12,7 @@ use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
+use Nowo\WorkflowBundle\Exception\WorkflowInvalidShapeException;
 use Nowo\WorkflowBundle\Exception\WorkflowStructureLockedException;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormType;
@@ -35,6 +36,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Throwable;
+
+use function implode;
 
 /**
  * Workflow definitions CRUD (UiKit page scaffolds, REQ-UI-003): index → page/list, show → page/show,
@@ -239,6 +242,11 @@ final class WorkflowDefinitionController extends AbstractController
         } catch (WorkflowStructureLockedException) {
             // Since 1.16 (tenancy.lock_clone_structure): the clone's places and transitions must match its template.
             $this->addFlash('error', $this->translator->trans('error.structure_locked', [], WorkflowPageFactory::DOMAIN));
+
+            return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
+        } catch (WorkflowInvalidShapeException $exception) {
+            // Since 1.15.2: transitions FrameworkBundle would refuse (no source / target, several targets on a state machine).
+            $this->addFlash('error', $this->translator->trans('error.invalid_shape', ['%violations%' => implode(' ', $exception->violations)], WorkflowPageFactory::DOMAIN));
 
             return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
         }

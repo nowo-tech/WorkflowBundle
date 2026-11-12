@@ -210,6 +210,7 @@ error:
   definition_in_use: 'Ce workflow ne peut pas être supprimé : %count% demande(s) en cours utilisent encore une de ses versions. Désactivez-le plutôt.'
   cannot_retire: 'Ce workflow ne peut pas être retiré : les nouvelles demandes ont besoin d''un modèle de plateforme activé.'
   structure_locked: 'Les états et les transitions suivent le modèle de la plateforme et ne peuvent pas être modifiés ici.'
+  invalid_shape: 'Ce workflow ne peut pas être publié : %violations%'
 
 kpi:
   definitions: 'Définitions'

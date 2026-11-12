@@ -11,7 +11,9 @@ use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
+use Nowo\WorkflowBundle\Service\WorkflowShapeValidator;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\Form\FormInterface;
@@ -53,6 +55,22 @@ final class WorkflowDefinitionFormType extends AbstractType
 
         if ($section === WorkflowDefinitionFormSection::Transitions) {
             $this->addTransitionsFields($builder, $options['guards'], $options['strict_names'], $structureLocked);
+        }
+
+        if ($section === WorkflowDefinitionFormSection::General || $section === WorkflowDefinitionFormSection::Transitions) {
+            // Since 1.15.2: the shape of every transition, checked on the submitted type and transitions (switching the
+            // type to state_machine in General cannot leave a transition with several targets behind).
+            $builder->addEventListener(FormEvents::POST_SUBMIT, static function (FormEvent $event) use ($section): void {
+                $definition = $event->getData();
+                if (!$definition instanceof WorkflowDefinition) {
+                    return;
+                }
+                $form   = $event->getForm();
+                $target = $section === WorkflowDefinitionFormSection::General && $form->has('type') ? $form->get('type') : $form;
+                foreach (WorkflowShapeValidator::violations($definition) as $violation) {
+                    $target->addError(new FormError($violation));
+                }
+            });
         }
     }
 
@@ -125,7 +143,7 @@ final class WorkflowDefinitionFormType extends AbstractType
             $definition = $event->getData();
             $placeNames = $definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : [];
 
-            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, self::isStateMachine($definition), $structureLocked);
+            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, $structureLocked);
         });
 
         $builder->addEventListener(FormEvents::PRE_SUBMIT, static function (FormEvent $event) use ($guards, $strictNames, $structureLocked): void {
@@ -136,13 +154,8 @@ final class WorkflowDefinitionFormType extends AbstractType
                 ? PlaceChoiceHelper::extractNamesFromSubmittedPlaces($submitted['places'])
                 : ($definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : []);
 
-            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, self::isStateMachine($definition), $structureLocked);
+            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, $structureLocked);
         });
-    }
-
-    private static function isStateMachine(mixed $definition): bool
-    {
-        return $definition instanceof WorkflowDefinition && $definition->getType() === WorkflowType::StateMachine;
     }
 
     /**
@@ -150,15 +163,15 @@ final class WorkflowDefinitionFormType extends AbstractType
      * @param list<string> $placeNames
      * @param array{permission: bool, variables: list<string>|null, automatic: bool} $guards
      */
-    private static function configureTransitionsField(FormInterface $form, array $placeNames, array $guards, bool $strictNames = false, bool $singleTarget = false, bool $structureLocked = false): void
+    private static function configureTransitionsField(FormInterface $form, array $placeNames, array $guards, bool $strictNames = false, bool $structureLocked = false): void
     {
         if ($form->has('transitions')) {
             $form->remove('transitions');
         }
 
         $form->add('transitions', CollectionType::class, [
-            'entry_type'    => WorkflowTransitionType::class,
-            'entry_options' => ['place_choices' => $placeNames, 'guards' => $guards, 'strict_names' => $strictNames, 'single_target' => $singleTarget, 'structure_locked' => $structureLocked],
+            'entry_type'     => WorkflowTransitionType::class,
+            'entry_options'  => ['place_choices' => $placeNames, 'guards' => $guards, 'strict_names' => $strictNames, 'structure_locked' => $structureLocked],
             // Since 1.16: a locked clone keeps its transitions (only their guards and conditions are edited).
             'allow_add'      => !$structureLocked,
             'allow_delete'   => !$structureLocked,

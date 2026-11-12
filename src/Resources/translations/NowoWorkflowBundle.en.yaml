@@ -210,6 +210,7 @@ error:
   definition_in_use: 'This workflow cannot be deleted: %count% running request(s) still use one of its versions. Disable it instead.'
   cannot_retire: 'This workflow cannot be retired: new requests need an enabled platform template to fall back to.'
   structure_locked: 'Places and transitions follow the platform template and cannot be changed here.'
+  invalid_shape: 'This workflow cannot be published: %violations%'
 
 kpi:
   definitions: 'Definitions'

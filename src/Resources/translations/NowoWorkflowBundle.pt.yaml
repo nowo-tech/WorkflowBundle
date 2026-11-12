@@ -210,6 +210,7 @@ error:
   definition_in_use: 'Este workflow não pode ser eliminado: %count% pedido(s) em curso ainda usam uma das suas versões. Desativa-o em vez disso.'
   cannot_retire: 'Este workflow não pode ser retirado: os novos pedidos precisam de um modelo da plataforma ativo.'
   structure_locked: 'Os estados e as transições seguem o modelo da plataforma e não podem ser alterados aqui.'
+  invalid_shape: 'Este workflow não pode ser publicado: %violations%'
 
 kpi:
   definitions: 'Definições'

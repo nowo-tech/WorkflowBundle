@@ -19,9 +19,7 @@ use Symfony\Component\Validator\Constraints\Callback;
 use Symfony\Component\Validator\Constraints\Regex;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
-use function count;
 use function implode;
-use function is_array;
 use function is_string;
 use function trim;
 
@@ -84,13 +82,8 @@ final class WorkflowTransitionType extends AbstractType
             $transition = $event->getData();
             $form       = $event->getForm();
 
-            $this->configurePlaceField($form, 'fromPlaces', 'form.field.from_places', $options['place_choices'], $transition?->getFromPlaces() ?? [], [], $options['structure_locked']);
-            $this->configurePlaceField($form, 'toPlaces', 'form.field.to_places', $options['place_choices'], $transition?->getToPlaces() ?? [], $options['single_target'] ? [new Callback(static function (mixed $value, ExecutionContextInterface $context): void {
-                // Since 1.15.2: a state machine transition has exactly one target place (as in framework.workflows).
-                if (is_array($value) && count($value) > 1) {
-                    $context->addViolation('A state machine transition has exactly one target place.');
-                }
-            })] : [], $options['structure_locked']);
+            $this->configurePlaceField($form, 'fromPlaces', 'form.field.from_places', $options['place_choices'], $transition?->getFromPlaces() ?? [], $options['structure_locked']);
+            $this->configurePlaceField($form, 'toPlaces', 'form.field.to_places', $options['place_choices'], $transition?->getToPlaces() ?? [], $options['structure_locked']);
         });
     }
 
@@ -106,14 +99,11 @@ final class WorkflowTransitionType extends AbstractType
             'place_choices'      => [],
             'guards'             => ['permission' => false, 'variables' => null, 'automatic' => false],
             'strict_names'       => false,
-            // Since 1.15.2: state machines (one target place per transition).
-            'single_target' => false,
             // Since 1.16: structure of a locked clone (only guards stay editable).
             'structure_locked' => false,
         ]);
         $resolver->setAllowedTypes('structure_locked', 'bool');
         $resolver->setAllowedTypes('strict_names', 'bool');
-        $resolver->setAllowedTypes('single_target', 'bool');
         $resolver->setAllowedTypes('place_choices', 'array');
         $resolver->setAllowedTypes('guards', 'array');
     }
@@ -122,7 +112,6 @@ final class WorkflowTransitionType extends AbstractType
      * @param FormInterface<WorkflowTransition|null> $form
      * @param list<string> $placeChoices
      * @param list<string> $selected
-     * @param list<Callback> $constraints
      */
     private function configurePlaceField(
         FormInterface $form,
@@ -130,7 +119,6 @@ final class WorkflowTransitionType extends AbstractType
         string $label,
         array $placeChoices,
         array $selected,
-        array $constraints = [],
         bool $disabled = false,
     ): void {
         if ($form->has($field)) {
@@ -146,6 +134,6 @@ final class WorkflowTransitionType extends AbstractType
             'translation_domain' => 'NowoWorkflowBundle',
             'attr'               => ['class' => PlaceMultiSelectType::widgetClass()],
             'choices'            => PlaceChoiceHelper::buildChoices($placeChoices, $selected),
-        ] + ($constraints === [] ? [] : ['constraints' => $constraints]) + ($disabled ? ['disabled' => true] : [])));
+        ] + ($disabled ? ['disabled' => true] : [])));
     }
 }
