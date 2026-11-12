@@ -26,6 +26,34 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Persists a definition (new or changed) through the manager of this repository, and flushes that manager unless
+     * $flush is false (since 1.14).
+     *
+     * Since 1.14 the definitions are managed by the bundle's private entity manager: a definition loaded through this
+     * repository is not managed by the application's entity manager, so change it and save it here. The flush writes
+     * only definition rows (the application's pending changes are not in that unit of work).
+     */
+    public function save(WorkflowDefinition $definition, bool $flush = true): void
+    {
+        $this->getEntityManager()->persist($definition);
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
+
+    /**
+     * Removes a definition (with its places, transitions and match rules) through the manager of this repository, and
+     * flushes that manager unless $flush is false (since 1.14).
+     */
+    public function remove(WorkflowDefinition $definition, bool $flush = true): void
+    {
+        $this->getEntityManager()->remove($definition);
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
+
+    /**
      * Finds a definition by slug, enabled or not.
      */
     public function findOneBySlug(string $slug): ?WorkflowDefinition

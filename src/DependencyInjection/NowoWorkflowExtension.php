@@ -5,17 +5,30 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
 use Nowo\UiKitBundle\Theme\ThemeSlots;
+use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
+use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
+use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
+use Nowo\WorkflowBundle\Doctrine\WorkflowManagerRegistry;
+use Nowo\WorkflowBundle\EventListener\WorkflowUnitOfWorkSubscriber;
+use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Service\DemoSeedService;
 use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\Config\FileLocator;
+use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
 
 use function array_key_exists;
 use function in_array;
 use function is_array;
+use function is_bool;
 use function is_string;
+use function trigger_deprecation;
 
 /**
  * Loads bundle services and exposes configuration as container parameters.
@@ -33,18 +46,24 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     public const ASSETS_BASE_PATH = '/bundles/nowoworkflow';
 
     /**
+     * Directory of the XML mapping of the bundle entities (1.14, same tables and columns as the attributes).
+     */
+    public const XML_MAPPING_DIR = __DIR__ . '/../Resources/config/doctrine';
+
+    /**
      * Prepends Doctrine mappings, translator paths, the asset package and FormKit / UiKit defaults.
      */
     public function prepend(ContainerBuilder $container): void
     {
         $this->prependFormKitDefaults($container);
-        if ($container->hasExtension('doctrine')) {
+        [$registerMapping, $mappingType] = $this->rawMappingOptions($container);
+        if ($registerMapping && $container->hasExtension('doctrine')) {
             $container->prependExtensionConfig('doctrine', [
                 'orm' => [
                     'mappings' => [
                         'NowoWorkflowBundle' => [
-                            'type'      => 'attribute',
-                            'dir'       => __DIR__ . '/../Entity',
+                            'type'      => $mappingType,
+                            'dir'       => $mappingType === 'xml' ? self::XML_MAPPING_DIR : __DIR__ . '/../Entity',
                             'prefix'    => 'Nowo\\WorkflowBundle\\Entity',
                             'is_bundle' => false,
                         ],
@@ -75,6 +94,29 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         }
 
         $this->prependUiKitDefaults($container);
+    }
+
+    /**
+     * `doctrine.register_mapping` and `doctrine.mapping_type` from the raw configuration (prepend() runs before the
+     * configuration is processed; the last file that sets a key wins, invalid values are rejected later by load()).
+     *
+     * @return array{0: bool, 1: string}
+     */
+    private function rawMappingOptions(ContainerBuilder $container): array
+    {
+        $register = true;
+        $type     = 'attribute';
+        foreach ($container->getExtensionConfig(Configuration::ALIAS) as $config) {
+            $doctrine = is_array($config['doctrine'] ?? null) ? $config['doctrine'] : [];
+            if (is_bool($doctrine['register_mapping'] ?? null)) {
+                $register = $doctrine['register_mapping'];
+            }
+            if (in_array($doctrine['mapping_type'] ?? null, ['attribute', 'xml'], true)) {
+                $type = $doctrine['mapping_type'];
+            }
+        }
+
+        return [$register, $type];
     }
 
     /**
@@ -273,6 +315,13 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.connection', $config['connection']);
         $container->setParameter(Configuration::ALIAS . '.table_prefix', $config['table_prefix']);
         $container->setParameter(Configuration::ALIAS . '.runtime.flush_after_apply', $config['runtime']['flush_after_apply']);
+        if (!$this->setsFlushAfterApply($configs)) {
+            trigger_deprecation(Configuration::PACKAGE, '1.14', 'Not setting "nowo_workflow.runtime.flush_after_apply" is deprecated: it keeps the 1.13 default (true, WorkflowApplicator flushes the application\'s default entity manager after each transition) and becomes false in 2.0. Set it explicitly: false to persist the subject yourself (what the 1.14 recipe installs), true to keep the current behaviour.');
+        }
+        $container->setParameter(PrivateEntityManagerPass::ENTITY_MANAGER_PARAMETER, $config['doctrine']['entity_manager']);
+        if ($config['doctrine']['private_entity_manager']) {
+            $this->registerPrivateEntityManager($container);
+        }
         // Filled by FrameworkWorkflowNamesPass with the framework.workflows names.
         $container->setParameter(Configuration::ALIAS . '.framework_workflow_names', []);
 
@@ -301,6 +350,58 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.security.access_roles', $config['security']['access_roles']);
         $container->setParameter(Configuration::ALIAS . '.security.access_checker', $config['security']['access_checker']);
         $container->setParameter(Configuration::ALIAS . '.security.allow_unauthenticated', $config['security']['allow_unauthenticated']);
+    }
+
+    /**
+     * Whether one of the raw configuration files sets `runtime.flush_after_apply` (true or false).
+     *
+     * @param array<mixed> $configs
+     */
+    private function setsFlushAfterApply(array $configs): bool
+    {
+        foreach ($configs as $config) {
+            if (is_array($config) && is_array($config['runtime'] ?? null) && array_key_exists('flush_after_apply', $config['runtime'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 1.14.0 (REQ-ARCH-001 rule 6): the repository, the admin controller and the demo seeder read and write the
+     * definitions through the bundle's private entity manager ({@see WorkflowEntityManager}), so a definition save
+     * never flushes, and a failed one never resets, an application manager. The manager is dropped at every outermost
+     * unit-of-work boundary ({@see WorkflowUnitOfWorkSubscriber}) and at `kernel.reset`; the rollback middleware is
+     * attached to its connection by {@see PrivateEntityManagerPass} (doctrine/dbal 4 only).
+     */
+    private function registerPrivateEntityManager(ContainerBuilder $container): void
+    {
+        $container->register(WorkflowEntityManager::class, WorkflowEntityManager::class)
+            ->setArguments([new Reference('doctrine'), '%' . PrivateEntityManagerPass::ENTITY_MANAGER_PARAMETER . '%', new Reference('logger', ContainerInterface::IGNORE_ON_INVALID_REFERENCE)])
+            ->addTag('kernel.reset', ['method' => 'reset']);
+        $container->register(WorkflowManagerRegistry::class, WorkflowManagerRegistry::class)
+            ->setArguments([new Reference('doctrine'), new Reference(WorkflowEntityManager::class)]);
+
+        $container->getDefinition(WorkflowDefinitionRepository::class)
+            ->setArgument('$registry', new Reference(WorkflowManagerRegistry::class));
+        $container->getDefinition(WorkflowDefinitionController::class)
+            ->setArgument('$entityManager', new Reference(WorkflowEntityManager::class))
+            // The private manager recreates itself when closed: the application's managers are never reset.
+            ->setArgument('$managerRegistry', null);
+        $container->getDefinition(DemoSeedService::class)
+            ->setArgument('$entityManager', new Reference(WorkflowEntityManager::class));
+
+        if (PrivateEntityManagerPass::supportsRollbackMiddleware()) {
+            $container->register(PrivateEntityManagerMiddleware::class, PrivateEntityManagerMiddleware::class)
+                ->setArguments([new Reference(WorkflowEntityManager::class)])
+                ->addTag('doctrine.middleware');
+        }
+
+        $container->getDefinition(WorkflowUnitOfWorkSubscriber::class)
+            ->setArgument('$resettables', new IteratorArgument([
+                new Reference(WorkflowEntityManager::class, ContainerInterface::IGNORE_ON_UNINITIALIZED_REFERENCE),
+            ]));
     }
 
     /**

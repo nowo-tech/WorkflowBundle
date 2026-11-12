@@ -3,11 +3,11 @@
 | Field | Value |
 |-------|-------|
 | Package | `nowo-tech/workflow-bundle` (`symfony-bundle`) |
-| Audited revision | `v1.6.8` |
+| Audited revision | `v1.6.8`; re-audited for 1.13.0 and 1.14.0 (see the re-audit sections) |
 | Audit date | 2026-09-25 |
 | Method | Manual review of every file under `src/` (services, controllers, subscribers, Twig extension, form types, commands, Doctrine subscriber, DI extension, compiler passes, `Resources/config/services.yaml`); entities and value objects skimmed |
 | Remediation (2026-09-23 / release 1.6.8) | W-01 to W-03 resolved: request-scoped workflow memo + `ResetInterface` on `DatabaseWorkflowRegistry`, entity-free `DatabaseMetadataStore`, closed-EntityManager recovery after failed flushes (`Doctrine\ClosedEntityManagerResetter`) in `WorkflowApplicator` and `WorkflowDefinitionController`; regression tests simulate consecutive requests without `reset()` |
-| **Verdict** | ✅ **Viable under scenario B** — no bundle-owned state outlives the main request; definitions edited in one worker are seen by every worker on the next request. Clearing Doctrine's identity map between requests remains the application's responsibility (see usage recommendations) |
+| **Verdict** | ✅ **Viable under scenario B** — no bundle-owned state outlives the main request; definitions edited in one worker are seen by every worker on the next request. Since 1.14 the bundle's private entity manager is dropped at every boundary (kernel reset false supported, 1,000-request worker test); clearing the application's own entity managers remains the application's responsibility (see usage recommendations) |
 
 ## Table of contents
 
@@ -19,6 +19,7 @@
   - [W-02 — Cached workflows hold an entity from an earlier request (Low)](#w-02--cached-workflows-hold-an-entity-from-an-earlier-request-low)
   - [W-03 — `WorkflowApplicator` depends on Doctrine's resetter after a failed flush (Medium, scenario B only)](#w-03--workflowapplicator-depends-on-doctrines-resetter-after-a-failed-flush-medium-scenario-b-only)
   - [Re-audit 2026-11-10: workflow event dispatcher (1.13.0)](#re-audit-2026-11-10-workflow-event-dispatcher-1130)
+  - [Re-audit 2026-11-12: private entity manager and access VOs (1.14.0)](#re-audit-2026-11-12-private-entity-manager-and-access-vos-1140)
 - [Usage recommendations in worker mode](#usage-recommendations-in-worker-mode)
 - [Re-audit triggers](#re-audit-triggers)
 
@@ -106,13 +107,36 @@ requests. `WorkflowApplicator` gained no property. Result: still worker-safe. Ho
 stateless or have their per-request state cleared between requests: under scenario A they can implement
 `ResetInterface` (`services_resetter` calls it); under scenario B the application must reset them itself.
 
+### Re-audit 2026-11-12: private entity manager and access VOs (1.14.0)
+
+**Kernel reset false is supported** (REQ-RUNTIME-002), also when the services resetter does not run.
+
+| Stateful service | State | Cleared at |
+|------------------|-------|------------|
+| `Doctrine\WorkflowEntityManager` (private manager of the definitions) | the private `EntityManager` (identity map), a `stale` flag set after a rollback on its connection | dropped at every outermost boundary by `EventListener\WorkflowUnitOfWorkSubscriber`: `kernel.request` (main request, priority 4096) and `kernel.terminate`; Messenger `WorkerMessageReceivedEvent` / `WorkerMessageHandledEvent` / `WorkerMessageFailedEvent`; `console.command` / `console.terminate` of the outermost command outside a message (nesting depth counter + in-flight message flag); plus `kernel.reset`. Recreated when closed by a failed write or when the source connection changed. |
+| `EventListener\WorkflowUnitOfWorkSubscriber` | console nesting depth, Messenger in-flight flag | process counters by design (bounded by the nesting depth, set / unset at the boundaries) |
+| `Internal\HiddenValues` | static `WeakMap` keyed by the per-request access VOs (`WorkflowUiAccessCheck`, `WorkflowActor`) | each entry disappears with its VO (built per decision, never stored) |
+| `DatabaseWorkflowRegistry` | built workflows memoized for the current main request | unchanged (see W-01) |
+
+The bundle never clears, flushes or resets an application entity manager. A host that disables or bypasses the
+services resetter must clear its own managers at every boundary (REQ-RUNTIME-002 rule 7); with
+`runtime.flush_after_apply: true` (deprecated default) `WorkflowApplicator` still flushes the application's default
+manager and resets it when that flush closed it (1.13 behaviour, W-03).
+
+Worker test: `tests/Integration/Worker/WorkerKeptAliveKernelTest.php`: one kernel, requests sent to `http_kernel`
+(never `Kernel::handle()`, so the services resetter never runs), N = 1,000 iterations alternating an administrator
+(200) and a user (403) on `/workflow/definitions`, definitions renamed in the database every 100 iterations (the next
+response must show the new name), a failed definition write that closes the private manager at iteration 500, and a
+console + two Messenger boundaries. Memory margin: < 2 MB growth after a 100-iteration warm-up. Igor and the PHPStan
+FrankenPHP worker ruleset pass.
+
 ## Usage recommendations in worker mode
 
 - Workers no longer need a restart after editing definitions: every request rebuilds workflows from the database.
-- Under scenario B, clearing Doctrine's identity map between requests remains the application's responsibility (the bundle never calls `EntityManager::clear()`): an entity already loaded by an earlier request in the same worker is returned as-is by `findOneBy()` and would carry stale fields. Keeping `services_resetter` active (scenario A) handles this.
-- Custom `WorkflowUiAccessCheckerInterface` or `WorkflowRegistryInterface` implementations must stay stateless (or implement `ResetInterface`); never cache the current user or request in them.
+- Under scenario B, clearing **your** Doctrine identity maps between requests remains the application's responsibility (REQ-RUNTIME-002 rule 7; the bundle clears only its own private manager since 1.14): an entity of yours already loaded by an earlier request in the same worker is returned as-is by `findOneBy()` and would carry stale fields. Keeping `services_resetter` active (scenario A) handles this.
+- Custom `WorkflowUiAccessPolicyInterface` (or deprecated `WorkflowUiAccessCheckerInterface`) or `WorkflowRegistryInterface` implementations must stay stateless (or implement `ResetInterface`); never cache the current user or request in them.
 - The demo (`demo/symfony8`) runs in worker mode by default (`FRANKENPHP_MODE=worker`, `docker/Caddyfile` has a `worker` block); use it to check that an edit is visible from all workers.
 
 ## Re-audit triggers
 
-Re-run this audit when a change adds: new properties or caches to `DatabaseWorkflowRegistry`, `WorkflowResolver` or `WorkflowApplicator`, an event dispatcher or listeners attached to built workflows, a custom marking store with state, per-request data stored in `LocaleManager` or the access checkers, or any use of `$_SERVER` / `$_ENV` at runtime.
+Re-run this audit when a change adds: state to `WorkflowEntityManager` or `WorkflowUnitOfWorkSubscriber`, a new boundary, new properties or caches to `DatabaseWorkflowRegistry`, `WorkflowResolver` or `WorkflowApplicator`, an event dispatcher or listeners attached to built workflows, a custom marking store with state, per-request data stored in `LocaleManager` or the access checkers, or any use of `$_SERVER` / `$_ENV` at runtime.

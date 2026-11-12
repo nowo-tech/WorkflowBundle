@@ -1,0 +1,19 @@
+nowo_workflow:
+    # New installs (recipe 1.14): WorkflowApplicator::apply*() only changes the marking; persist the subject yourself
+    # (your repository / transaction). Without this key the 1.13 default (true: flush the default entity manager after
+    # each transition) applies, with a deprecation; it becomes false in 2.0.
+    runtime:
+        flush_after_apply: false
+    web_ui:
+        path_prefix: '/workflow'
+        # layout_template: null   # default: nowo_ui_kit.layouts.admin (configure your layout once in UiKit)
+        default_locale: 'en'
+        locales: ['en', 'es', 'fr', 'it']
+    security:
+        access_roles: [ROLE_ADMIN]
+        # allow_unauthenticated: false   # default; never true in production
+
+# Host security.yaml example (do not paste under nowo_workflow — add to security.access_control):
+# security:
+#     access_control:
+#         - { path: ^/workflow, roles: ROLE_ADMIN }

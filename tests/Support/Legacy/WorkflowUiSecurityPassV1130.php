@@ -1,0 +1,83 @@
+<?php
+
+declare(strict_types=1);
+
+// Verbatim copy of the v1.13.0 WorkflowUiSecurityPass (git show v1.13.0:src/DependencyInjection/Compiler/WorkflowUiSecurityPass.php): reference of the 1.14
+// access-decision equivalence matrix. Only the namespace and class / interface names were renamed. Do not edit.
+
+namespace Nowo\WorkflowBundle\Tests\Support\Legacy;
+
+use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
+use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
+use Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker;
+use Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker;
+use Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Reference;
+
+use function is_string;
+
+/**
+ * Wires Workflow UI access checking after all extensions are merged.
+ *
+ * Cannot run in {@see NowoWorkflowExtension::load()} —
+ * Symfony loads each extension against an isolated container where {@code has('security.authorization_checker')} is unreliable.
+ */
+final class WorkflowUiSecurityPassV1130 implements CompilerPassInterface
+{
+    /**
+     * Aliases the Workflow UI access checker (role based, custom, allow-all or deny-all) and fails when no safe option is configured.
+     */
+    public function process(ContainerBuilder $container): void
+    {
+        if (!$container->hasParameter('nowo_workflow.security.allow_unauthenticated')) {
+            // Extension not loaded: keep the fail-closed default alias from services.yaml.
+            return;
+        }
+
+        // Security wiring is never skipped: with enabled: false the UI routes answer 404
+        // (WorkflowUiAccessSubscriber) and the checker still fails closed.
+        $enabled              = !$container->hasParameter('nowo_workflow.enabled') || (bool) $container->getParameter('nowo_workflow.enabled');
+        $allowUnauthenticated = (bool) $container->getParameter('nowo_workflow.security.allow_unauthenticated');
+        $hasSecurity          = $container->has('security.authorization_checker');
+        $accessCheckerId      = $container->getParameter('nowo_workflow.security.access_checker');
+
+        if (!$hasSecurity && !$allowUnauthenticated && (!is_string($accessCheckerId) || $accessCheckerId === '')) {
+            if (!$enabled) {
+                $container->setAlias(WorkflowUiAccessCheckerInterface::class, DenyAllWorkflowUiAccessChecker::class)
+                    ->setPublic(false);
+
+                return;
+            }
+
+            throw new InvalidConfigurationException('nowo_workflow requires symfony/security-bundle (security.authorization_checker), or set nowo_workflow.security.allow_unauthenticated: true (dev/demo only — never in production), or set nowo_workflow.security.access_checker to a custom service id.');
+        }
+
+        if (is_string($accessCheckerId) && $accessCheckerId !== '') {
+            $container->setAlias(WorkflowUiAccessCheckerInterface::class, $accessCheckerId)
+                ->setPublic(false);
+
+            return;
+        }
+
+        if ($allowUnauthenticated || !$hasSecurity) {
+            $container->setAlias(WorkflowUiAccessCheckerInterface::class, AllowAllWorkflowUiAccessChecker::class)
+                ->setPublic(false);
+
+            return;
+        }
+
+        /** @var list<string> $accessRoles */
+        $accessRoles = $container->getParameter('nowo_workflow.security.access_roles');
+
+        $container->register(RoleBasedWorkflowUiAccessChecker::class, RoleBasedWorkflowUiAccessChecker::class)
+            ->setArgument('$requiredRoles', $accessRoles)
+            ->setArgument('$authorizationChecker', new Reference('security.authorization_checker'))
+            ->setPublic(false);
+
+        $container->setAlias(WorkflowUiAccessCheckerInterface::class, RoleBasedWorkflowUiAccessChecker::class)
+            ->setPublic(false);
+    }
+}

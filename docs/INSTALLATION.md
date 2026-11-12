@@ -73,10 +73,12 @@ See [demo/README.md](../demo/README.md) for the FrankenPHP playground.
 
 ## Symfony Flex recipe
 
-When using Symfony Flex, the recipe at `.symfony/recipe/nowo-tech/workflow-bundle/0.1/` copies:
+When using Symfony Flex, the recipe at `.symfony/recipe/nowo-tech/workflow-bundle/1.14/` (1.14.0 and later; `0.1/`
+for older versions) copies:
 
-- `config/packages/nowo_workflow.yaml` — default bundle configuration
-- `config/services/nowo_workflow_security.yaml` — optional access-checker wiring notes
+- `config/packages/nowo_workflow.yaml` — default bundle configuration, including `runtime.flush_after_apply: false`
+  for new installs (see [CONFIGURATION.md](CONFIGURATION.md#flushing-after-apply-new-installs-and-upgrades))
+- `config/services/nowo_workflow_security.yaml` — optional access-policy wiring notes
 - `post-install.txt` — reminds you to set `access_roles` and host `security.access_control` for `^/workflow`
 
 After install, run `nowo:workflow:sync-schema` and import routes as shown above. Never enable `security.allow_unauthenticated` in production; see [SECURITY.md](SECURITY.md).

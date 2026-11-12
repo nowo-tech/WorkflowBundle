@@ -140,6 +140,8 @@ class DemoController extends AbstractController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $this->workflowApplicator->applyForSubject($changeRequest, $transition);
+            // runtime.flush_after_apply: false (the 1.14 recipe default): the application persists its own subject.
+            $this->entityManager->flush();
         }
 
         return $this->redirectToRoute('demo_change_requests');
@@ -167,6 +169,8 @@ class DemoController extends AbstractController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $this->workflowApplicator->applyForSubject($order, $transition);
+            // runtime.flush_after_apply: false (the 1.14 recipe default): the application persists its own subject.
+            $this->entityManager->flush();
         }
 
         return $this->redirectToRoute('demo_orders');
@@ -209,6 +213,8 @@ class DemoController extends AbstractController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $this->workflowApplicator->applyForSubject($document, $transition);
+            // runtime.flush_after_apply: false (the 1.14 recipe default): the application persists its own subject.
+            $this->entityManager->flush();
         }
 
         return $this->redirectToRoute('demo_documents');
@@ -252,6 +258,8 @@ class DemoController extends AbstractController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $this->workflowApplicator->applyForSubject($expense, $transition);
+            // runtime.flush_after_apply: false (the 1.14 recipe default): the application persists its own subject.
+            $this->entityManager->flush();
         }
 
         return $this->redirectToRoute('demo_expenses');
@@ -296,6 +304,8 @@ class DemoController extends AbstractController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $this->workflowApplicator->applyForSubject($po, $transition);
+            // runtime.flush_after_apply: false (the 1.14 recipe default): the application persists its own subject.
+            $this->entityManager->flush();
         }
 
         return $this->redirectToRoute('demo_purchase_orders');

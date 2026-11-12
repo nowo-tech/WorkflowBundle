@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\EventListener;
 
 use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
+use Nowo\WorkflowBundle\Http\WorkflowUiAccessCheckFactory;
+use Nowo\WorkflowBundle\Model\WorkflowActor;
+use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
@@ -12,12 +17,20 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
 use function is_string;
 use function ltrim;
 
 /**
- * Enforces {@see WorkflowUiAccessCheckerInterface} before Workflow UI controllers run.
+ * Enforces the Workflow UI access policy before Workflow UI controllers run.
+ *
+ * Since 1.14 the subscriber asks the framework-free {@see WorkflowUiAccessPolicyInterface} (with a
+ * {@see WorkflowUiAccessCheck} built from the main request and the security token) and/or
+ * the deprecated {@see WorkflowUiAccessCheckerInterface} (with the Symfony request, exactly as in 1.13).
+ * {@see WorkflowUiSecurityPass} decides which: the policy, the deprecated checker (a host service on the deprecated
+ * port only, or a host decorator of the deprecated port), or both. When both are wired, both must grant. When neither
+ * is wired, every request is denied (fail closed).
  *
  * When the bundle is disabled ({@code nowo_workflow.enabled: false}) every Workflow UI route answers 404.
  */
@@ -28,11 +41,17 @@ final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
     public const CONTROLLER_NAMESPACE = 'Nowo\\WorkflowBundle\\Controller\\';
 
     /**
-     * Creates the subscriber with the UI access checker and the web_ui.enabled flag.
+     * Creates the subscriber with the access ports, the web_ui.enabled flag and the token storage (for the
+     * {@see WorkflowActor} of the policy).
+     *
+     * @param WorkflowUiAccessCheckerInterface|null $accessChecker deprecated port, asked with the Symfony request
+     * @param WorkflowUiAccessPolicyInterface|null $accessPolicy framework-free port (1.14)
      */
     public function __construct(
-        private readonly WorkflowUiAccessCheckerInterface $accessChecker,
+        private readonly ?WorkflowUiAccessCheckerInterface $accessChecker = null,
         private readonly bool $enabled = true,
+        private readonly ?WorkflowUiAccessPolicyInterface $accessPolicy = null,
+        private readonly ?TokenStorageInterface $tokenStorage = null,
     ) {
     }
 
@@ -63,9 +82,26 @@ final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
             return;
         }
 
-        if (!$this->accessChecker->isGranted($event->getRequest())) {
+        if (!$this->isGranted($event->getRequest())) {
             throw new AccessDeniedHttpException('Access to the Workflow UI is denied.');
         }
+    }
+
+    /**
+     * Every wired port must grant; no port wired = deny.
+     */
+    private function isGranted(Request $request): bool
+    {
+        if (!$this->accessPolicy instanceof WorkflowUiAccessPolicyInterface && !$this->accessChecker instanceof WorkflowUiAccessCheckerInterface) {
+            return false;
+        }
+
+        if ($this->accessPolicy instanceof WorkflowUiAccessPolicyInterface
+            && !$this->accessPolicy->allows(WorkflowUiAccessCheckFactory::fromRequest($request, $this->tokenStorage?->getToken()))) {
+            return false;
+        }
+
+        return !$this->accessChecker instanceof WorkflowUiAccessCheckerInterface || $this->accessChecker->isGranted($request);
     }
 
     /**
