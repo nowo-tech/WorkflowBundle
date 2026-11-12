@@ -7,12 +7,21 @@ namespace Nowo\WorkflowBundle\Form;
 use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
+use Nowo\WorkflowBundle\Expression\GuardExpression;
+use Nowo\WorkflowBundle\Expression\GuardExpressionException;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Callback;
+use Symfony\Component\Validator\Constraints\Length;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
+
+use function implode;
+use function is_string;
+use function trim;
 
 /**
  * Form type for a workflow transition row.
@@ -31,6 +40,35 @@ final class WorkflowTransitionType extends AbstractType
     {
         $this->addText($builder, 'name', ['label' => 'form.field.name']);
         $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false]);
+
+        // Since 1.15: guards an editor configures per transition, shown only when the host configured their port.
+        /** @var array{permission: bool, variables: list<string>|null, automatic: bool} $guards */
+        $guards = $options['guards'];
+        if ($guards['permission']) {
+            $this->addText($builder, 'guardPermission', ['label' => 'form.field.guard_permission', 'required' => false, 'help' => 'form.help.guard_permission', 'constraints' => [new Length(max: 128)]]);
+        }
+        if ($guards['variables'] !== null) {
+            $variables = $guards['variables'];
+            $this->addTextarea($builder, 'guardExpression', [
+                'label'                       => 'form.field.guard_expression',
+                'required'                    => false,
+                'help'                        => 'form.help.guard_expression',
+                'help_translation_parameters' => ['%variables%' => $variables === [] ? '—' : implode(', ', $variables)],
+                'constraints'                 => [new Callback(static function (mixed $value, ExecutionContextInterface $context) use ($variables): void {
+                    if (!is_string($value) || trim($value) === '') {
+                        return;
+                    }
+                    try {
+                        GuardExpression::validate($value, $variables);
+                    } catch (GuardExpressionException $exception) {
+                        $context->addViolation($exception->getMessage());
+                    }
+                })],
+            ]);
+        }
+        if ($guards['automatic']) {
+            $this->addCheckbox($builder, 'automatic', ['label' => 'form.field.automatic', 'required' => false, 'help' => 'form.help.automatic']);
+        }
 
         $builder->addEventListener(FormEvents::PRE_SET_DATA, function (FormEvent $event) use ($options): void {
             /** @var WorkflowTransition|null $transition */
@@ -52,8 +90,10 @@ final class WorkflowTransitionType extends AbstractType
             'empty_data'         => static fn (): WorkflowTransition => new WorkflowTransition('', [], []),
             'translation_domain' => 'NowoWorkflowBundle',
             'place_choices'      => [],
+            'guards'             => ['permission' => false, 'variables' => null, 'automatic' => false],
         ]);
         $resolver->setAllowedTypes('place_choices', 'array');
+        $resolver->setAllowedTypes('guards', 'array');
     }
 
     /**

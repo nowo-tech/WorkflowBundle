@@ -5,14 +5,31 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
 use Nowo\UiKitBundle\Theme\ThemeSlots;
+use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
+use Nowo\WorkflowBundle\Audit\AuditMiddleware;
+use Nowo\WorkflowBundle\Controller\DashboardController;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
 use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Doctrine\WorkflowManagerRegistry;
+use Nowo\WorkflowBundle\EventListener\TenantIsolationGuardSubscriber;
+use Nowo\WorkflowBundle\EventListener\TransitionAuditSubscriber;
+use Nowo\WorkflowBundle\EventListener\TransitionGuardSubscriber;
+use Nowo\WorkflowBundle\EventListener\WorkflowUiRouteContextSubscriber;
 use Nowo\WorkflowBundle\EventListener\WorkflowUnitOfWorkSubscriber;
+use Nowo\WorkflowBundle\Http\WorkflowUiTenancy;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\DemoSeedService;
+use Nowo\WorkflowBundle\Service\WorkflowApplicator;
+use Nowo\WorkflowBundle\Service\WorkflowResolver;
+use Nowo\WorkflowBundle\Service\WorkflowVersioning;
+use Nowo\WorkflowBundle\Tenancy\SecurityTokenActorProvider;
+use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
+use Nowo\WorkflowBundle\Tenancy\TenancyContext;
+use Nowo\WorkflowBundle\Tenancy\WorkflowDefinitionLocator;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
@@ -347,6 +364,8 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.ui.locales', $webUi['locales']);
         $container->setParameter(Configuration::ALIAS . '.ui.required_roles', $config['security']['access_roles']);
 
+        $this->registerTenancy($container, $config);
+
         $container->setParameter(Configuration::ALIAS . '.security.access_roles', $config['security']['access_roles']);
         $container->setParameter(Configuration::ALIAS . '.security.access_checker', $config['security']['access_checker']);
         $container->setParameter(Configuration::ALIAS . '.security.allow_unauthenticated', $config['security']['allow_unauthenticated']);
@@ -402,6 +421,102 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArgument('$resettables', new IteratorArgument([
                 new Reference(WorkflowEntityManager::class, ContainerInterface::IGNORE_ON_UNINITIALIZED_REFERENCE),
             ]));
+    }
+
+    /**
+     * Since 1.15: tenancy, transition guards, versioning and the audit event (docs/MULTITENANCY.md). Without
+     * `tenancy.tenant_resolver`, the guard ports or `audit.enabled`, nothing here changes a 1.14 behaviour: the
+     * services are wired with no port and answer as 1.14 did.
+     *
+     * @param array<string, mixed> $config
+     */
+    private function registerTenancy(ContainerBuilder $container, array $config): void
+    {
+        /** @var array{tenant_resolver: string|null, subject_reference_resolver: string|null, actor_provider: string|null, ui: array{tenant_resolver: string|null, action_checker: string|null}} $tenancy */
+        $tenancy = $config['tenancy'];
+        /** @var array{permission_checker: string|null, variables_provider: string|null, max_automatic_transitions: int} $guards */
+        $guards = $config['guards'];
+        /** @var array{enabled: bool|null} $audit */
+        $audit   = $config['audit'];
+        $enabled = $tenancy['tenant_resolver'] !== null;
+        $auditOn = $audit['enabled'] ?? $enabled;
+        $ref     = static fn (?string $id): ?Reference => $id === null ? null : new Reference($id);
+
+        $container->setParameter(Configuration::ALIAS . '.tenancy.enabled', $enabled);
+        $container->setParameter(Configuration::ALIAS . '.audit.enabled', $auditOn);
+
+        $container->register(SecurityTokenActorProvider::class, SecurityTokenActorProvider::class)
+            ->setArguments([new Reference('security.token_storage', ContainerInterface::NULL_ON_INVALID_REFERENCE)]);
+        $container->register(TenancyContext::class, TenancyContext::class)
+            ->setArguments([
+                $ref($tenancy['tenant_resolver']),
+                $ref($tenancy['subject_reference_resolver']),
+                $ref($tenancy['actor_provider']) ?? new Reference(SecurityTokenActorProvider::class),
+            ]);
+        $container->register(SubjectPinStore::class, SubjectPinStore::class)->setAutowired(true);
+        $container->register(WorkflowDefinitionLocator::class, WorkflowDefinitionLocator::class)->setAutowired(true);
+        $container->register(WorkflowVersioning::class, WorkflowVersioning::class)->setAutowired(true)->setPublic(false);
+
+        $container->getDefinition(WorkflowResolver::class)->setArgument('$tenancy', new Reference(TenancyContext::class));
+        $container->getDefinition(DatabaseWorkflowRegistry::class)->setArgument('$locator', new Reference(WorkflowDefinitionLocator::class));
+        $container->getDefinition(WorkflowApplicator::class)
+            ->setArgument('$locator', new Reference(WorkflowDefinitionLocator::class))
+            ->setArgument('$databaseRegistry', new Reference(DatabaseWorkflowRegistry::class))
+            ->setArgument('$maxAutomaticTransitions', $guards['max_automatic_transitions'])
+            ->setArgument('$logger', new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE));
+
+        $container->register(TransitionGuardSubscriber::class, TransitionGuardSubscriber::class)
+            ->setArguments([
+                new Reference(TenancyContext::class),
+                $ref($guards['permission_checker']),
+                $ref($guards['variables_provider']),
+                new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            ])
+            ->addTag('kernel.event_subscriber');
+
+        if ($enabled) {
+            $container->register(TenantIsolationGuardSubscriber::class, TenantIsolationGuardSubscriber::class)
+                ->setArguments([new Reference(WorkflowDefinitionLocator::class)])
+                ->addTag('kernel.event_subscriber');
+        }
+
+        $container->register(WorkflowUiTenancy::class, WorkflowUiTenancy::class)
+            ->setArguments([
+                $enabled,
+                $ref($tenancy['ui']['tenant_resolver']),
+                $ref($tenancy['ui']['action_checker']),
+                new Reference('security.token_storage', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                $ref($guards['permission_checker']),
+                $ref($guards['variables_provider']),
+            ]);
+        $container->register(WorkflowUiRouteContextSubscriber::class, WorkflowUiRouteContextSubscriber::class)
+            ->setArguments([new Reference('router', ContainerInterface::NULL_ON_INVALID_REFERENCE)])
+            ->addTag('kernel.event_subscriber');
+        foreach ([WorkflowDefinitionController::class, DashboardController::class] as $controller) {
+            $container->getDefinition($controller)->setArgument('$tenancy', new Reference(WorkflowUiTenancy::class));
+        }
+
+        if (!$auditOn) {
+            return;
+        }
+        if (!PrivateEntityManagerPass::supportsRollbackMiddleware()) {
+            throw new InvalidConfigurationException('nowo_workflow.audit needs doctrine/dbal 4 (the after-commit dispatch observes the transactions with a DBAL 4 middleware); set audit.enabled: false.'); // @codeCoverageIgnore
+        }
+        $container->register(AfterCommitDispatcher::class, AfterCommitDispatcher::class)
+            ->setArguments([
+                new Reference('event_dispatcher', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            ])
+            ->addTag('kernel.event_subscriber')
+            ->addTag('kernel.reset', ['method' => 'reset'])
+            ->addTag('doctrine.event_listener', ['event' => 'postFlush', 'method' => 'postFlush']);
+        $container->register(AuditMiddleware::class, AuditMiddleware::class)
+            ->setArguments([new Reference(AfterCommitDispatcher::class)])
+            ->addTag('doctrine.middleware');
+        $container->register(TransitionAuditSubscriber::class, TransitionAuditSubscriber::class)
+            ->setArguments([new Reference(AfterCommitDispatcher::class), new Reference(TenancyContext::class)])
+            ->addTag('kernel.event_subscriber');
+        $container->getDefinition(WorkflowApplicator::class)->setArgument('$audit', new Reference(AfterCommitDispatcher::class));
     }
 
     /**

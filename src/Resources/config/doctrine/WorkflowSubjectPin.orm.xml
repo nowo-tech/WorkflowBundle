@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Since 1.15.0: XML mapping of the bundle entity (same table, columns and constraints as its attributes). -->
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\WorkflowBundle\Entity\WorkflowSubjectPin" table="workflow_subject_pin">
+        <unique-constraints>
+            <unique-constraint name="uniq_workflow_subject_pin" columns="tenant_key,workflow_slug,subject_ref"/>
+        </unique-constraints>
+        <id name="id" type="integer">
+            <generator strategy="AUTO"/>
+        </id>
+        <field name="tenantKey" column="tenant_key" type="string" length="128"/>
+        <field name="workflowSlug" column="workflow_slug" type="string" length="128"/>
+        <field name="subjectRef" column="subject_ref" type="string" length="128"/>
+        <field name="createdAt" column="created_at" type="datetime_immutable"/>
+        <many-to-one field="definition" target-entity="Nowo\WorkflowBundle\Entity\WorkflowDefinition">
+            <join-column name="definition_id" nullable="false" on-delete="CASCADE"/>
+        </many-to-one>
+    </entity>
+</doctrine-mapping>

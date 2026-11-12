@@ -28,12 +28,16 @@ action:
   add_match_rule: 'Regel hinzufügen'
   create_continue: 'Anlegen und weiter'
   remove: 'Entfernen'
+  new_draft: 'Neuer Entwurf'
+  publish: 'Veröffentlichen'
+  clone_template: 'Für diese Organisation anpassen'
 
 status:
   enabled: Aktiv
   disabled: Inaktiv
   default: Standard
   initial: Ausgangszustand
+  draft: 'Entwurf'
 
 workflow_type:
   state_machine: Zustandsautomat
@@ -79,6 +83,12 @@ definition:
   updated_at: 'Aktualisiert'
   section:
     general: 'Definition'
+  version_status: 'v%version% (%status%)'
+  version_short: 'v%version%'
+  template_version: 'Geklont aus Vorlagenversion'
+  confirm_draft: 'Einen Entwurf von „%name%“ anlegen? Subjekte laufen mit der veröffentlichten Version weiter, bis du den Entwurf veröffentlichst.'
+  confirm_publish: '„%name%“ veröffentlichen? Neue Subjekte starten mit dieser Version; laufende behalten ihre.'
+  confirm_clone: 'Die Vorlage „%name%“ als Entwurf in diese Organisation kopieren?'
 
 table:
   name: Bezeichnung
@@ -91,6 +101,8 @@ table:
   places: Zustände
   transitions: Übergänge
   actions: Aktionen
+  version: 'Version'
+  scope: 'Bereich'
 
 collection:
   no_places: 'Noch keine Zustände. Klicken Sie auf „Zustand hinzufügen“, um einen zu erstellen.'
@@ -120,6 +132,9 @@ form:
     places_list: 'Verwalten Sie Workflow-Zustände. Änderungen werden beim Absenden des Formulars gespeichert.'
     new_definition: 'Beginnen Sie mit den allgemeinen Angaben; Übereinstimmungsregeln, Zustände und Übergänge folgen danach.'
     general: 'Bezeichnung, Slug, Subjekt-Bindung und Priorität des Workflows.'
+    guard_permission: 'Nur ein Akteur mit dieser Berechtigung im Kontext des Subjekts darf den Übergang ausführen (z. B. leave.approve).'
+    guard_expression: 'Variablen mit Werten vergleichen, z. B. days <= 2 and type == ''vacation''. Variablen: %variables%.'
+    automatic: 'Wird angewendet, sobald er möglich ist und seine Guards erfüllt sind (z. B. automatische Genehmigung).'
   field:
     name: Bezeichnung
     slug: Slug
@@ -139,6 +154,9 @@ form:
     label: Bezeichnung
     from_places: 'Quellzustände'
     to_places: 'Zielzustände'
+    guard_permission: 'Erforderliche Berechtigung'
+    guard_expression: 'Bedingung'
+    automatic: 'Automatisch anwenden'
   placeholder:
     select_places: 'Zustände suchen und auswählen…'
 
@@ -168,10 +186,15 @@ flash:
   created: 'Workflow-Definition erstellt.'
   updated: 'Workflow-Definition aktualisiert.'
   deleted: 'Workflow-Definition gelöscht.'
+  published: 'Workflow-Definition veröffentlicht.'
+  cloned: 'Vorlage als Entwurf in diese Organisation kopiert.'
+  published_read_only: 'Eine veröffentlichte Version kann nicht bearbeitet werden: lege einen neuen Entwurf an.'
 
 error:
   not_found_id: 'Workflow-Definition #%id% nicht gefunden.'
   not_found_slug: 'Workflow-Definition "%slug%" nicht gefunden.'
+  slug_taken: 'Dieser Slug wird in diesem Bereich bereits verwendet.'
+  already_customized: 'Diese Organisation hat bereits eine eigene Version dieses Workflows.'
 
 kpi:
   definitions: 'Definitionen'
@@ -235,3 +258,7 @@ workflow_transition:
   label:
     placeholder: 'Zur Freigabe einreichen'
     help: 'Optionale Anzeigebezeichnung.'
+
+scope:
+  global: 'Globale Vorlage'
+  tenant: 'Diese Organisation'

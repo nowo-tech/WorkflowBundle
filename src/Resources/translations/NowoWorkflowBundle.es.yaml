@@ -28,12 +28,16 @@ action:
   add_match_rule: 'Añadir regla'
   create_continue: 'Crear y continuar'
   remove: 'Quitar'
+  new_draft: 'Nuevo borrador'
+  publish: 'Publicar'
+  clone_template: 'Personalizar para esta organización'
 
 status:
   enabled: Activo
   disabled: Inactivo
   default: Predeterminado
   initial: Inicial
+  draft: 'Borrador'
 
 workflow_type:
   state_machine: 'Máquina de estados'
@@ -79,6 +83,12 @@ definition:
   updated_at: 'Actualizada'
   section:
     general: 'Definición'
+  version_status: 'v%version% (%status%)'
+  version_short: 'v%version%'
+  template_version: 'Clonado de la versión de plantilla'
+  confirm_draft: '¿Crear un borrador de "%name%"? Los sujetos siguen usando la versión publicada hasta que publiques el borrador.'
+  confirm_publish: '¿Publicar "%name%"? Los sujetos nuevos empiezan con esta versión; los que ya están en curso mantienen la suya.'
+  confirm_clone: '¿Copiar la plantilla "%name%" a esta organización como borrador?'
 
 table:
   name: Nombre
@@ -91,6 +101,8 @@ table:
   places: Estados
   transitions: Transiciones
   actions: Acciones
+  version: 'Versión'
+  scope: 'Ámbito'
 
 collection:
   no_places: 'Aún no hay estados. Pulsa «Añadir estado» para crear uno.'
@@ -120,6 +132,9 @@ form:
     places_list: 'Gestiona los estados del workflow. Los cambios se guardan al enviar el formulario.'
     new_definition: 'Empieza por los datos generales; las reglas de coincidencia, los estados y las transiciones vienen después.'
     general: 'Nombre, slug, sujeto vinculado y prioridad del workflow.'
+    guard_permission: 'Solo un actor con este permiso en el contexto del sujeto puede aplicar la transición (p. ej. leave.approve).'
+    guard_expression: 'Compara variables con valores, p. ej. days <= 2 and type == ''vacation''. Variables: %variables%.'
+    automatic: 'Se aplica en cuanto está habilitada y sus guardas se cumplen (p. ej. autoaprobar).'
   field:
     name: Nombre
     slug: Slug
@@ -139,6 +154,9 @@ form:
     label: Etiqueta
     from_places: 'Estados origen'
     to_places: 'Estados destino'
+    guard_permission: 'Permiso requerido'
+    guard_expression: 'Condición'
+    automatic: 'Aplicar automáticamente'
   placeholder:
     select_places: 'Busca y selecciona estados…'
 
@@ -168,10 +186,15 @@ flash:
   created: 'Definición de workflow creada.'
   updated: 'Definición de workflow actualizada.'
   deleted: 'Definición de workflow eliminada.'
+  published: 'Definición de workflow publicada.'
+  cloned: 'Plantilla copiada a esta organización como borrador.'
+  published_read_only: 'Una versión publicada no se puede editar: crea un borrador nuevo.'
 
 error:
   not_found_id: 'Definición de workflow #%id% no encontrada.'
   not_found_slug: 'Definición de workflow "%slug%" no encontrada.'
+  slug_taken: 'Este slug ya se usa en este ámbito.'
+  already_customized: 'Esta organización ya tiene su propia versión de ese workflow.'
 
 kpi:
   definitions: 'Definiciones'
@@ -235,3 +258,7 @@ workflow_transition:
   label:
     placeholder: 'Enviar a aprobación'
     help: 'Etiqueta visible opcional.'
+
+scope:
+  global: 'Plantilla global'
+  tenant: 'Esta organización'

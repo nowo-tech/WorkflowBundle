@@ -28,12 +28,16 @@ action:
   add_match_rule: 'Regel toevoegen'
   create_continue: 'Aanmaken en doorgaan'
   remove: 'Verwijderen'
+  new_draft: 'Nieuw concept'
+  publish: 'Publiceren'
+  clone_template: 'Aanpassen voor deze organisatie'
 
 status:
   enabled: Actief
   disabled: Inactief
   default: Standaard
   initial: Initieel
+  draft: 'Concept'
 
 workflow_type:
   state_machine: 'Toestandsmachine'
@@ -79,6 +83,12 @@ definition:
   updated_at: 'Bijgewerkt'
   section:
     general: 'Definitie'
+  version_status: 'v%version% (%status%)'
+  version_short: 'v%version%'
+  template_version: 'Gekloond van sjabloonversie'
+  confirm_draft: 'Een concept van "%name%" maken? Subjecten blijven de gepubliceerde versie gebruiken tot je het concept publiceert.'
+  confirm_publish: '"%name%" publiceren? Nieuwe subjecten starten met deze versie; lopende houden de hunne.'
+  confirm_clone: 'Het sjabloon "%name%" als concept naar deze organisatie kopiëren?'
 
 table:
   name: Naam
@@ -91,6 +101,8 @@ table:
   places: Statussen
   transitions: Overgangen
   actions: Acties
+  version: 'Versie'
+  scope: 'Bereik'
 
 collection:
   no_places: 'Nog geen statussen. Klik op «Status toevoegen» om er een te maken.'
@@ -120,6 +132,9 @@ form:
     places_list: 'Beheer workflowstatussen. Wijzigingen worden opgeslagen bij het verzenden van het formulier.'
     new_definition: 'Begin met de algemene instellingen; overeenkomstregels, statussen en overgangen volgen daarna.'
     general: 'Naam, slug, gekoppeld subject en prioriteit van de workflow.'
+    guard_permission: 'Alleen een actor met deze toestemming in de context van het subject mag de overgang toepassen (bijv. leave.approve).'
+    guard_expression: 'Vergelijk variabelen met waarden, bijv. days <= 2 and type == ''vacation''. Variabelen: %variables%.'
+    automatic: 'Wordt toegepast zodra hij mogelijk is en de guards slagen (bijv. automatisch goedkeuren).'
   field:
     name: Naam
     slug: Slug
@@ -139,6 +154,9 @@ form:
     label: Etiket
     from_places: 'Bronstatussen'
     to_places: 'Doelstatussen'
+    guard_permission: 'Vereiste toestemming'
+    guard_expression: 'Voorwaarde'
+    automatic: 'Automatisch toepassen'
   placeholder:
     select_places: 'Statussen zoeken en selecteren…'
 
@@ -168,10 +186,15 @@ flash:
   created: 'Workflowdefinitie aangemaakt.'
   updated: 'Workflowdefinitie bijgewerkt.'
   deleted: 'Workflowdefinitie verwijderd.'
+  published: 'Workflowdefinitie gepubliceerd.'
+  cloned: 'Sjabloon als concept naar deze organisatie gekopieerd.'
+  published_read_only: 'Een gepubliceerde versie kan niet worden bewerkt: maak een nieuw concept.'
 
 error:
   not_found_id: 'Workflowdefinitie #%id% niet gevonden.'
   not_found_slug: 'Workflowdefinitie "%slug%" niet gevonden.'
+  slug_taken: 'Deze slug wordt in dit bereik al gebruikt.'
+  already_customized: 'Deze organisatie heeft al een eigen versie van die workflow.'
 
 kpi:
   definitions: 'Definities'
@@ -235,3 +258,7 @@ workflow_transition:
   label:
     placeholder: 'Ter goedkeuring indienen'
     help: 'Optioneel weergavelabel.'
+
+scope:
+  global: 'Globaal sjabloon'
+  tenant: 'Deze organisatie'

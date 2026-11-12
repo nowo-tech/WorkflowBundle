@@ -6,7 +6,7 @@
                   xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
     <entity name="Nowo\WorkflowBundle\Entity\WorkflowDefinition" table="workflow_definition" repository-class="Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository">
         <unique-constraints>
-            <unique-constraint name="uniq_workflow_definition_slug" columns="slug"/>
+            <unique-constraint name="uniq_workflow_definition_scope" columns="tenant_key,slug,version"/>
         </unique-constraints>
         <id name="id" type="integer">
             <generator strategy="AUTO"/>
@@ -25,6 +25,22 @@
             </options>
         </field>
         <field name="metadata" type="json"/>
+        <field name="tenantKey" column="tenant_key" type="string" length="128">
+            <options>
+                <option name="default"></option>
+            </options>
+        </field>
+        <field name="version" type="integer">
+            <options>
+                <option name="default">1</option>
+            </options>
+        </field>
+        <field name="status" type="string" length="16" enum-type="Nowo\WorkflowBundle\Enum\WorkflowDefinitionStatus">
+            <options>
+                <option name="default">published</option>
+            </options>
+        </field>
+        <field name="templateVersion" column="template_version" type="integer" nullable="true"/>
         <field name="createdAt" column="created_at" type="datetime_immutable"/>
         <field name="updatedAt" column="updated_at" type="datetime_immutable"/>
         <one-to-many field="matchRules" target-entity="Nowo\WorkflowBundle\Entity\WorkflowMatchRule" mapped-by="workflow" orphan-removal="true">

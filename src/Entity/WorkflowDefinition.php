@@ -9,8 +9,10 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Nowo\WorkflowBundle\Enum\WorkflowDefinitionStatus;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
+use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Util\SubjectClass;
 use SortDirection;
@@ -20,7 +22,7 @@ use SortDirection;
  */
 #[ORM\Entity(repositoryClass: WorkflowDefinitionRepository::class)]
 #[ORM\Table(name: 'workflow_definition')]
-#[ORM\UniqueConstraint(name: 'uniq_workflow_definition_slug', columns: ['slug'])]
+#[ORM\UniqueConstraint(name: 'uniq_workflow_definition_scope', columns: ['tenant_key', 'slug', 'version'])]
 class WorkflowDefinition
 {
     #[ORM\Id]
@@ -92,6 +94,22 @@ class WorkflowDefinition
     )]
     #[ORM\OrderBy(['name' => SortDirection::Ascending])]
     private Collection $transitions;
+
+    /** Owner tenant of this definition ('' = global template), since 1.15. */
+    #[ORM\Column(name: 'tenant_key', type: Types::STRING, length: 128, options: ['default' => ''])]
+    private string $tenantKey = '';
+
+    /** Version number within (tenant, slug), since 1.15 (always 1 without tenancy). */
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
+    private int $version = 1;
+
+    /** Since 1.15: published (runs) or draft (edited, never runs). */
+    #[ORM\Column(type: Types::STRING, length: 16, enumType: WorkflowDefinitionStatus::class, options: ['default' => 'published'])]
+    private WorkflowDefinitionStatus $status = WorkflowDefinitionStatus::Published;
+
+    /** Version of the global template this tenant definition was cloned from (null = not a clone), since 1.15. */
+    #[ORM\Column(name: 'template_version', type: Types::INTEGER, nullable: true)]
+    private ?int $templateVersion = null;
 
     #[ORM\Column(name: 'created_at', type: Types::DATETIME_IMMUTABLE)]
     private DateTimeImmutable $createdAt;
@@ -506,6 +524,130 @@ class WorkflowDefinition
             static fn (WorkflowPlace $place): string => $place->getName(),
             $this->places->toArray(),
         ));
+    }
+
+    /**
+     * The owner tenant (null = global template), since 1.15.
+     */
+    public function getTenant(): ?WorkflowTenant
+    {
+        return WorkflowTenant::fromStorageKey($this->tenantKey);
+    }
+
+    /**
+     * The stored tenant key ('' = global template), since 1.15.
+     */
+    public function getTenantKey(): string
+    {
+        return $this->tenantKey;
+    }
+
+    /**
+     * Whether this definition belongs to the tenant (null = global), compared byte for byte (since 1.15).
+     */
+    public function belongsTo(?WorkflowTenant $tenant): bool
+    {
+        return $this->tenantKey === WorkflowTenant::storageKey($tenant);
+    }
+
+    /**
+     * Sets the owner tenant (null = global template), since 1.15.
+     */
+    public function setTenant(?WorkflowTenant $tenant): self
+    {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->tenantKey = WorkflowTenant::storageKey($tenant);
+
+        return $this->touch();
+    }
+
+    /**
+     * The version number within (tenant, slug), since 1.15.
+     */
+    public function getVersion(): int
+    {
+        return $this->version;
+    }
+
+    /**
+     * The lifecycle status of this version, since 1.15.
+     */
+    public function getStatus(): WorkflowDefinitionStatus
+    {
+        return $this->status;
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === WorkflowDefinitionStatus::Draft;
+    }
+
+    /**
+     * Makes a new, unsaved definition the first draft of a scope (since 1.15, tenancy).
+     */
+    public function startAsDraft(?WorkflowTenant $tenant): self
+    {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->tenantKey = WorkflowTenant::storageKey($tenant);
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->version = 1;
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->status = WorkflowDefinitionStatus::Draft;
+
+        return $this->touch();
+    }
+
+    /**
+     * Turns this draft into a published version (new subjects start with it), since 1.15.
+     */
+    public function publish(): self
+    {
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->status = WorkflowDefinitionStatus::Published;
+
+        return $this->touch();
+    }
+
+    /**
+     * The version of the global template this definition was cloned from (null = not a clone), since 1.15.
+     */
+    public function getTemplateVersion(): ?int
+    {
+        return $this->templateVersion;
+    }
+
+    /**
+     * A new, unsaved draft copy of this definition (since 1.15): same name, slug, binding, places, transitions (with
+     * their guards), match rules and metadata, for the given tenant and version.
+     *
+     * @param int|null $templateVersion version of the global template it is cloned from (null = not a clone)
+     */
+    public function copyAsDraft(?WorkflowTenant $tenant, int $version, ?int $templateVersion = null): self
+    {
+        $copy                  = new self($this->name, $this->slug, $this->initialPlace, $this->subjectClass, $this->type);
+        $copy->markingProperty = $this->markingProperty;
+        $copy->enabled         = $this->enabled;
+        $copy->description     = $this->description;
+        $copy->priority        = $this->priority;
+        $copy->metadata        = $this->metadata;
+        $copy->tenantKey       = WorkflowTenant::storageKey($tenant);
+        $copy->version         = $version;
+        $copy->status          = WorkflowDefinitionStatus::Draft;
+        $copy->templateVersion = $templateVersion ?? ($this->tenantKey === $copy->tenantKey ? $this->templateVersion : null);
+        foreach ($this->places as $place) {
+            $copy->addPlace(new WorkflowPlace($place->getName(), $place->getLabel(), $place->getSortOrder()));
+        }
+        foreach ($this->transitions as $transition) {
+            $copy->addTransition((new WorkflowTransition($transition->getName(), $transition->getFromPlaces(), $transition->getToPlaces(), $transition->getLabel()))
+                ->setGuardPermission($transition->getGuardPermission())
+                ->setGuardExpression($transition->getGuardExpression())
+                ->setAutomatic($transition->isAutomatic()));
+        }
+        foreach ($this->matchRules as $rule) {
+            $copy->addMatchRule((new WorkflowMatchRule($rule->getParameterKey(), $rule->getParameterValue(), $rule->getSortOrder()))->setMetadata($rule->getMetadata()));
+        }
+
+        return $copy;
     }
 
     private function touch(): self

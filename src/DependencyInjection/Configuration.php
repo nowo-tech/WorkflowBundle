@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\DependencyInjection;
 use Nowo\WorkflowBundle\Enum\CssFramework;
 use Nowo\WorkflowBundle\Enum\IconSet;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
+use Symfony\Component\Config\Definition\Builder\NodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
@@ -135,6 +136,18 @@ final class Configuration implements ConfigurationInterface
                         ->end()
                     ->end()
                 ->end()
+                ->append($this->tenancyNode())
+                ->append($this->guardsNode())
+                ->arrayNode('audit')
+                    ->info('Since 1.15: WorkflowTransitionAppliedEvent after the commit of every applied transition (ids only; forward it to an audit log). Requires doctrine/dbal 4.')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->booleanNode('enabled')
+                            ->info('null (default) = on with tenancy (tenancy.tenant_resolver set), off without.')
+                            ->defaultNull()
+                        ->end()
+                    ->end()
+                ->end()
                 ->append($this->webUiNode())
                 ->append($this->deprecatedUiNode())
                 ->arrayNode('security')
@@ -176,6 +189,12 @@ final class Configuration implements ConfigurationInterface
                 ->end()
             ->end()
             ->validate()
+                ->ifTrue(static fn (array $config): bool => is_string($config['tenancy']['tenant_resolver'] ?? null)
+                    && ($config['web_ui']['enabled'] ?? true) === true
+                    && (!is_string($config['tenancy']['ui']['tenant_resolver'] ?? null) || !is_string($config['tenancy']['ui']['action_checker'] ?? null)))
+                ->thenInvalid('With tenancy (nowo_workflow.tenancy.tenant_resolver) and the Workflow UI enabled, set nowo_workflow.tenancy.ui.tenant_resolver and nowo_workflow.tenancy.ui.action_checker (or disable web_ui): the UI must know the tenant of each request and who may view, edit and publish (deny by default).')
+            ->end()
+            ->validate()
                 ->always(static function (array $config): array {
                     $ui = $config['ui'];
                     if (is_string($ui['css_framework'] ?? null)) {
@@ -190,6 +209,65 @@ final class Configuration implements ConfigurationInterface
             ->end();
 
         return $treeBuilder;
+    }
+
+    /**
+     * Since 1.15: tenant-scoped definitions (docs/MULTITENANCY.md). Every option is a service id of a host port.
+     */
+    private function tenancyNode(): ArrayNodeDefinition
+    {
+        $node = (new TreeBuilder('tenancy'))->getRootNode();
+        $node
+            ->info('Since 1.15: tenant-scoped workflow definitions, global templates, versions pinned per subject. Off (1.14 behaviour) unless tenant_resolver is set.')
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->append(self::serviceIdNode('tenant_resolver', 'Service id implementing WorkflowTenantResolverInterface (the tenant of a subject). Setting it turns tenancy on.'))
+                ->append(self::serviceIdNode('subject_reference_resolver', 'Service id implementing WorkflowSubjectReferenceResolverInterface (a stable id of a subject): pins the version a subject started with; also used by permission checks and the audit event.'))
+                ->append(self::serviceIdNode('actor_provider', 'Service id implementing WorkflowActorProviderInterface. null = the Symfony security token\'s user identifier (when SecurityBundle is installed).'))
+                ->arrayNode('ui')
+                    ->addDefaultsIfNotSet()
+                    ->children()
+                        ->append(self::serviceIdNode('tenant_resolver', 'Service id implementing WorkflowUiTenantResolverInterface (the tenant scope of a UI request, e.g. from the {uuid} of a host route prefix). Required with tenancy and the UI.'))
+                        ->append(self::serviceIdNode('action_checker', 'Service id implementing WorkflowUiActionCheckerInterface (view / edit / publish per scope). Required with tenancy and the UI; optional without tenancy (asked on top of the access policy).'))
+                    ->end()
+                ->end()
+            ->end();
+
+        return $node;
+    }
+
+    /**
+     * Since 1.15: per-transition guards configured in the editor.
+     */
+    private function guardsNode(): ArrayNodeDefinition
+    {
+        $node = (new TreeBuilder('guards'))->getRootNode();
+        $node
+            ->info('Since 1.15: guards an editor sets per transition (permission in the subject\'s context, conditions on whitelisted variables, automatic transitions). Fields are hidden while their port is not configured; a stored guard without its port blocks the transition.')
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->append(self::serviceIdNode('permission_checker', 'Service id implementing WorkflowTransitionPermissionCheckerInterface.'))
+                ->append(self::serviceIdNode('variables_provider', 'Service id implementing WorkflowSubjectVariablesProviderInterface (the whitelist of scalar variables conditions may read).'))
+                ->integerNode('max_automatic_transitions')
+                    ->info('Most automatic transitions applied one after the other for one subject (loop guard).')
+                    ->defaultValue(10)
+                    ->min(0)
+                    ->max(100)
+                ->end()
+            ->end();
+
+        return $node;
+    }
+
+    private static function serviceIdNode(string $name, string $info): NodeDefinition
+    {
+        return (new TreeBuilder($name, 'scalar'))->getRootNode()
+            ->info($info)
+            ->defaultNull()
+            ->validate()
+                ->ifTrue(static fn (mixed $v): bool => $v !== null && (!is_string($v) || $v === ''))
+                ->thenInvalid('Expected a service id or null; got %s.')
+            ->end();
     }
 
     private function webUiNode(): ArrayNodeDefinition

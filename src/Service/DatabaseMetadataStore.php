@@ -17,6 +17,24 @@ use function is_string;
  */
 final class DatabaseMetadataStore implements MetadataStoreInterface
 {
+    /** Workflow metadata key: id of the stored definition version (since 1.15). */
+    public const DEFINITION_ID = 'nowo_definition_id';
+
+    /** Workflow metadata key: version number of the stored definition (since 1.15). */
+    public const DEFINITION_VERSION = 'nowo_definition_version';
+
+    /** Workflow metadata key: tenant key of the stored definition ('' = global template), since 1.15. */
+    public const DEFINITION_TENANT = 'nowo_definition_tenant';
+
+    /** Transition metadata key: permission guard (since 1.15). */
+    public const GUARD_PERMISSION = 'nowo_guard_permission';
+
+    /** Transition metadata key: condition guard (since 1.15). */
+    public const GUARD_EXPRESSION = 'nowo_guard_expression';
+
+    /** Transition metadata key: automatic transition (since 1.15). */
+    public const AUTOMATIC = 'nowo_automatic';
+
     /** @var array<string, mixed> */
     private readonly array $workflowMetadata;
 
@@ -25,6 +43,9 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
 
     /** @var array<string, string> */
     private readonly array $transitionLabels;
+
+    /** @var array<string, array<string, bool|string>> guard settings of the transitions that have some (since 1.15) */
+    private readonly array $transitionGuards;
 
     /**
      * Copies the workflow, place and transition labels out of the definition entity.
@@ -35,6 +56,10 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
             'name' => $definition->getName(),
             'slug' => $definition->getSlug(),
             'type' => $definition->getType()->value,
+            // Since 1.15: which stored version runs (tenant isolation, version pinning, audit).
+            self::DEFINITION_ID      => $definition->getId(),
+            self::DEFINITION_VERSION => $definition->getVersion(),
+            self::DEFINITION_TENANT  => $definition->getTenantKey(),
         ];
 
         $placeLabels = [];
@@ -44,10 +69,21 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
         $this->placeLabels = $placeLabels;
 
         $transitionLabels = [];
+        $transitionGuards = [];
         foreach ($definition->getTransitions() as $workflowTransition) {
-            $transitionLabels[$workflowTransition->getName()] ??= $workflowTransition->getDisplayLabel();
+            $name = $workflowTransition->getName();
+            $transitionLabels[$name] ??= $workflowTransition->getDisplayLabel();
+            $guards = array_filter([
+                self::GUARD_PERMISSION => $workflowTransition->getGuardPermission(),
+                self::GUARD_EXPRESSION => $workflowTransition->getGuardExpression(),
+                self::AUTOMATIC        => $workflowTransition->isAutomatic() ?: null,
+            ], static fn (bool|string|null $value): bool => $value !== null);
+            if ($guards !== [] && !isset($transitionGuards[$name])) {
+                $transitionGuards[$name] = $guards;
+            }
         }
         $this->transitionLabels = $transitionLabels;
+        $this->transitionGuards = $transitionGuards;
     }
 
     /**
@@ -85,7 +121,7 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
             return [];
         }
 
-        return ['label' => $this->transitionLabels[$transition->getName()]];
+        return ['label' => $this->transitionLabels[$transition->getName()]] + ($this->transitionGuards[$transition->getName()] ?? []);
     }
 
     /**

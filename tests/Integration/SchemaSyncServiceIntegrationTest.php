@@ -72,7 +72,7 @@ final class SchemaSyncServiceIntegrationTest extends TestCase
 
         self::assertStringContainsString('acme_definition', $sql);
         self::assertStringContainsString('acme_place', $sql);
-        self::assertStringContainsString('uniq_acme_definition_slug', $sql);
+        self::assertStringContainsString('uniq_acme_definition_scope', $sql);
         self::assertStringNotContainsString('CREATE TABLE workflow_', $sql);
     }
 

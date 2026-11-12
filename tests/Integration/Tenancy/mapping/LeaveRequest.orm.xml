@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest" table="host_leave_request">
+        <id name="id" type="integer">
+            <generator strategy="AUTO"/>
+        </id>
+        <field name="uuid" type="string" length="64"/>
+        <field name="organization" type="string" length="64"/>
+        <field name="days" type="integer"/>
+        <field name="type" type="string" length="32"/>
+        <field name="status" type="string" length="32"/>
+    </entity>
+</doctrine-mapping>

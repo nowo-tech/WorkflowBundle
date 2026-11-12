@@ -28,12 +28,16 @@ action:
   add_match_rule: 'Add match rule'
   create_continue: 'Create and continue'
   remove: 'Remove'
+  new_draft: 'New draft'
+  publish: 'Publish'
+  clone_template: 'Customize for this organization'
 
 status:
   enabled: Enabled
   disabled: Disabled
   default: Default
   initial: Initial
+  draft: 'Draft'
 
 workflow_type:
   state_machine: State machine
@@ -79,6 +83,12 @@ definition:
   updated_at: 'Updated'
   section:
     general: 'Definition'
+  version_status: 'v%version% (%status%)'
+  version_short: 'v%version%'
+  template_version: 'Cloned from template version'
+  confirm_draft: 'Create a draft of "%name%"? Subjects keep running the published version until you publish the draft.'
+  confirm_publish: 'Publish "%name%"? New subjects start with this version; subjects already running keep theirs.'
+  confirm_clone: 'Copy the template "%name%" into this organization as a draft?'
 
 table:
   name: Name
@@ -91,6 +101,8 @@ table:
   places: Places
   transitions: Transitions
   actions: Actions
+  version: 'Version'
+  scope: 'Scope'
 
 collection:
   no_places: 'No places yet. Click “Add place” to create one.'
@@ -120,6 +132,9 @@ form:
     places_list: 'Manage workflow states. Changes are saved when you submit the form.'
     new_definition: 'Start with the general settings; match rules, places and transitions come next.'
     general: 'Name, slug, subject binding and priority of the workflow.'
+    guard_permission: 'Only an actor with this permission in the subject''s context may apply the transition (e.g. leave.approve).'
+    guard_expression: 'Compare variables with values, e.g. days <= 2 and type == ''vacation''. Variables: %variables%.'
+    automatic: 'Applied as soon as it is enabled and its guards pass (e.g. auto-approve).'
   field:
     name: Name
     slug: Slug
@@ -139,6 +154,9 @@ form:
     label: Label
     from_places: 'From places'
     to_places: 'To places'
+    guard_permission: 'Required permission'
+    guard_expression: 'Condition'
+    automatic: 'Apply automatically'
   placeholder:
     select_places: 'Search and select places…'
 
@@ -168,10 +186,15 @@ flash:
   created: 'Workflow definition created.'
   updated: 'Workflow definition updated.'
   deleted: 'Workflow definition deleted.'
+  published: 'Workflow definition published.'
+  cloned: 'Template copied into this organization as a draft.'
+  published_read_only: 'A published version cannot be edited: create a new draft.'
 
 error:
   not_found_id: 'Workflow definition #%id% not found.'
   not_found_slug: 'Workflow definition "%slug%" not found.'
+  slug_taken: 'This slug is already used in this scope.'
+  already_customized: 'This organization already has its own version of that workflow.'
 
 kpi:
   definitions: 'Definitions'
@@ -235,3 +258,7 @@ workflow_transition:
   label:
     placeholder: 'Submit for approval'
     help: 'Optional display label.'
+
+scope:
+  global: 'Global template'
+  tenant: 'This organization'

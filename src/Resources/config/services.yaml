@@ -20,6 +20,17 @@ services:
             - '../../Http/'
             - '../../Internal/'
             - '../../Model/'
+            # Since 1.15: value objects, the condition language and explicitly wired tenancy / audit services.
+            - '../../Event/'
+            - '../../Expression/'
+            - '../../Audit/'
+            - '../../Tenancy/'
+            - '../../View/WorkflowUiScope.php'
+            - '../../EventListener/TransitionGuardSubscriber.php'
+            - '../../EventListener/TenantIsolationGuardSubscriber.php'
+            - '../../EventListener/TransitionAuditSubscriber.php'
+            - '../../EventListener/WorkflowUiRouteContextSubscriber.php'
+            - '../../Service/WorkflowVersioning.php'
 
     # Routes stay opt-in (REQ-SF-004 rule 7): controllers are not autoconfigured, so the #[Route] classes never get
     # the `routing.controller` tag and a host `routing.controllers` import does not mount them without the prefix.
@@ -92,7 +103,12 @@ services:
         arguments:
             $flushAfterApply: '%nowo_workflow.runtime.flush_after_apply%'
 
+    # SPI of WorkflowApplicator (deprecated for callers since 1.15: use WorkflowRuntimeInterface). WorkflowRuntimePass
+    # checks a host replacement or decorator of it.
     Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface: '@Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry'
+
+    # Since 1.15: the framework-free runtime port hosts call (REQ-ARCH-001 rule 3).
+    Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface: '@Nowo\WorkflowBundle\Service\WorkflowRuntime'
 
     # Form Kit injects FormOptionsMerger into tagged form types (FormOptionsMergerInjectorCompilerPass).
     Nowo\WorkflowBundle\Form\:

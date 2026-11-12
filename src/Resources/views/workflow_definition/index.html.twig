@@ -1,7 +1,7 @@
 {#
   Workflow definitions list — UiKit page/list (REQ-UI-003).
 
-  Variable: page (View\ListPage: columns name, slug, matchRules, priority, places, transitions — the four numeric
+  Variables: scope (View\WorkflowUiScope, since 1.15: template / draft / version badges with tenancy), page (View\ListPage: columns name, slug, matchRules, priority, places, transitions — the four numeric
   columns end-aligned, cells keep the column's nowo-ui-cell--<align>; row actions view,
   edit, delete with confirm; pagination; empty state). Data block: nowo_ui_list_row (cells).
 #}
@@ -19,6 +19,15 @@
         <a class="nowo-workflow-name" href="{{ path('nowo_workflow_definition_show', {id: row.id}) }}">{{ row.name }}</a>
         {% if not row.enabled %}
             <span class="{{ nowo_ui_class('badge_neutral', _b) }}">{{ 'status.disabled'|trans({}, _d) }}</span>
+        {% endif %}
+        {% if scope is defined and scope.tenancy %}
+            {% if scope.template(row) %}
+                <span class="{{ nowo_ui_class('badge_neutral', _b) }}" data-testid="workflow-badge-template">{{ 'scope.global'|trans({}, _d) }}</span>
+            {% endif %}
+            {% if row.draft %}
+                <span class="{{ nowo_ui_class('badge_warning', _b) }}" data-testid="workflow-badge-draft">{{ 'status.draft'|trans({}, _d) }}</span>
+            {% endif %}
+            <span class="{{ nowo_ui_class('badge_neutral', _b) }}">{{ 'definition.version_short'|trans({'%version%': row.version}, _d) }}</span>
         {% endif %}
     </td>
     <td class="{{ nowo_ui_class('table_cell', _b) }} nowo-ui-cell--start" data-label="{{ 'table.slug'|trans({}, _d) }}"><code class="{{ nowo_ui_class('code', _b) }}">{{ row.slug }}</code></td>
