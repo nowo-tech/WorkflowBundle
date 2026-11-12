@@ -4,7 +4,6 @@
 
 - [Unreleased](#unreleased)
 - [To 1.15.0](#to-1150)
-- [To 1.15.0](#to-1150-1)
 - [To 1.14.1](#to-1141)
 - [To 1.14.0](#to-1140)
   - [Workflow UI access port](#workflow-ui-access-port)
@@ -74,14 +73,6 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
-
-## To 1.15.0
-
-From **1.14.1**:
-
-```bash
-composer update nowo-tech/workflow-bundle
-```
 
 ## To 1.15.0
 
