@@ -13,8 +13,8 @@ use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use Nowo\WorkflowBundle\Tests\Support\GuardProbeSubject;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Workflow\Transition;
 
@@ -94,6 +94,7 @@ final class WorkflowDefinitionBuilderTest extends TestCase
         $entity->addTransition(new WorkflowTransition('fork', $from, $to));
         $logger       = new RecordingLogger();
         $deprecations = [];
+        // @phpstan-ignore-next-line (test-only, restored in finally)
         set_error_handler(static function (int $level, string $message) use (&$deprecations): bool {
             $deprecations[] = $message;
 
@@ -126,6 +127,7 @@ final class WorkflowDefinitionBuilderTest extends TestCase
         $entity->addTransition(new WorkflowTransition('fork', ['review'], ['done', 'cancelled']));
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('findOneBySlug')->willReturn($entity);
+        // @phpstan-ignore-next-line (test-only, restored in finally)
         set_error_handler(static fn (): bool => true, E_USER_DEPRECATED);
 
         try {

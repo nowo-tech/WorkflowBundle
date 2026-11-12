@@ -17,12 +17,12 @@ use Doctrine\ORM\ORMSetup;
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\ToolEvents;
+use Exception;
 use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 use Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber;
 use Nowo\WorkflowBundle\Doctrine\UnprefixedTablesGuard;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Exception;
 use RuntimeException;
 
 use function dirname;
@@ -105,7 +105,7 @@ final class UnprefixedTablesGuardTest extends TestCase
         if (PHP_VERSION_ID >= 80400) {
             $config->enableNativeLazyObjects(true);
         }
-        $manager = new EntityManager($connection, $config);
+        $manager  = new EntityManager($connection, $config);
         $prefixer = new TableNamePrefixer($prefix);
         $manager->getEventManager()->addEventListener(Events::loadClassMetadata, new TablePrefixSubscriber($prefixer));
         $manager->getEventManager()->addEventListener(ToolEvents::postGenerateSchema, new UnprefixedTablesGuard($prefixer));

@@ -8,10 +8,10 @@ use Nowo\FormKitBundle\Attribute\FormKitConfig;
 use Nowo\FormKitBundle\Form\FormOptionsTrait;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
+use Nowo\WorkflowBundle\Service\WorkflowShapeValidator;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
-use Nowo\WorkflowBundle\Service\WorkflowShapeValidator;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormEvent;
@@ -62,12 +62,9 @@ final class WorkflowDefinitionFormType extends AbstractType
             // type to state_machine in General cannot leave a transition with several targets behind).
             $builder->addEventListener(FormEvents::POST_SUBMIT, static function (FormEvent $event) use ($section): void {
                 $definition = $event->getData();
-                if (!$definition instanceof WorkflowDefinition) {
-                    return;
-                }
-                $form   = $event->getForm();
-                $target = $section === WorkflowDefinitionFormSection::General && $form->has('type') ? $form->get('type') : $form;
-                foreach (WorkflowShapeValidator::violations($definition) as $violation) {
+                $form       = $event->getForm();
+                $target     = $section === WorkflowDefinitionFormSection::General && $form->has('type') ? $form->get('type') : $form;
+                foreach ($definition instanceof WorkflowDefinition ? WorkflowShapeValidator::violations($definition) : [] as $violation) {
                     $target->addError(new FormError($violation));
                 }
             });

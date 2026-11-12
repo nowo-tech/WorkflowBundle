@@ -141,7 +141,7 @@ final class WorkflowDefinitionFormTypeTest extends TypeTestCase
         }
         $definition->addTransition(new WorkflowTransition('close', ['draft'], ['done', 'cancelled']));
         $general = [
-            'name' => 'Order', 'slug' => 'order', 'initialPlace' => 'draft', 'subjectClass' => 'App\\Entity\\Order',
+            'name'            => 'Order', 'slug' => 'order', 'initialPlace' => 'draft', 'subjectClass' => 'App\\Entity\\Order',
             'markingProperty' => 'status', 'enabled' => true, 'priority' => 0, 'description' => '',
         ];
 
