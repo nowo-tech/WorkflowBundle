@@ -56,6 +56,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Doctrine listeners under DoctrineBundle 3.x (Beacon):** `TablePrefixSubscriber` and `BinaryKeyCollationSubscriber`
+  were tagged `doctrine.event_subscriber`, which DoctrineBundle 3 no longer registers: on DoctrineBundle 3 hosts the
+  key-column collation was never added to the generated schema (so `doctrine:migrations:diff` proposed dropping a
+  collation a migration had set) and `table_prefix` was ignored. Both are now plain listeners tagged
+  `doctrine.event_listener` with an explicit event (`loadClassMetadata`, `postGenerateSchemaTable`), registered by
+  DoctrineBundle 2.x and 3.x alike; they no longer implement `Doctrine\Common\EventSubscriber`. Kernel test
+  `DoctrineListenersKernelTest` (runs on DoctrineBundle 3 in the Symfony 8.1 CI cells).
+- **NO PAD key collation (PAD SPACE lesson):** `utf8mb4_bin` on MySQL 8 and MariaDB's `_bin` collations treat `'abc '`
+  as equal to `'abc'`. The key columns (`tenant_key`, `slug`, `workflow_slug`, `subject_ref`) now get
+  `utf8mb4_nopad_bin` on MariaDB and `utf8mb4_0900_bin` on MySQL 8.0.17+; MySQL < 8.0.17 (and a `server_version`
+  without a patch number such as `8.0`) keeps `utf8mb4_bin`. Defence in depth: keys with spaces were already refused
+  and every key is re-checked with `===`. Same rule as AuthKitBundle 1.46.0. New CI job `mysql-schema` (MySQL 8.4,
+  MariaDB 11.4): after the schema is created the migrations diff is empty, a 1.15.1 column is altered once, and
+  `acme`, `acme ` and `Acme` are three keys.
+- **State machine transitions with several `from` places (Beacon):** the definition builder now mirrors
+  FrameworkBundle: a `state_machine` transition becomes one Symfony `Transition` per (`from`, `to`) pair with the same
+  name, so it fires from any of its `from` places (before, a single `Transition` needed all of them marked and never
+  fired on a state machine). A `workflow` transition is unchanged (all `from` places must be marked).
 - **SQL filter mirroring (audit NZ-I6):** the private manager registers the class of each enabled source filter
   *instance* (not the class named in the source configuration), so the mirror is exact, also when a filter is
   registered again under the same name with another class.

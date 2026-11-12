@@ -32,8 +32,8 @@ Everything here is **opt-in**: without `nowo_workflow.tenancy.tenant_resolver` t
 - **Exact keys (audit NO M1).** A tenant key (and a subject reference) is 1 to 128 printable ASCII characters
   without spaces, so no accent and no trailing space can make two keys equal under a database collation. Keys are
   compared exactly: every row the repositories and the pin store read is re-checked in PHP (`acme` is never `Acme`);
-  on MySQL / MariaDB the `tenant_key`, `slug`, `workflow_slug` and `subject_ref` columns use the binary collation
-  `utf8mb4_bin`, added whenever the schema is generated (migrations diff, schema tools, `sync-schema`; set
+  on MySQL / MariaDB the `tenant_key`, `slug`, `workflow_slug` and `subject_ref` columns use a binary NO PAD collation
+  (since 1.15.2: `utf8mb4_0900_bin` on MySQL 8.0.17+, `utf8mb4_nopad_bin` on MariaDB, `utf8mb4_bin` on older MySQL), added whenever the schema is generated (migrations diff, schema tools, `sync-schema`; set
   `doctrine.dbal.server_version` or keep the database reachable then); other platforms already compare them exactly.
   List totals, counts and "latest version" are computed from the re-checked rows too. Use the canonical form of your keys (e.g.
   lower-case UUIDs) everywhere.

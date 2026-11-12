@@ -75,6 +75,30 @@
 
 ## Unreleased
 
+From **1.15.1** (patch, no configuration change):
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+php bin/console doctrine:migrations:diff   # MySQL / MariaDB only, see below
+```
+
+- **MySQL / MariaDB:** the key columns (`tenant_key`, `slug`, `workflow_slug`, `subject_ref`) move to a NO PAD binary
+  collation: `utf8mb4_0900_bin` on MySQL 8.0.17+, `utf8mb4_nopad_bin` on MariaDB (MySQL < 8.0.17 keeps `utf8mb4_bin`).
+  Generate one migration: it alters those five columns once (`CHARACTER SET utf8mb4 COLLATE …`); afterwards the diff
+  is empty. Set `doctrine.dbal.server_version` (or `?serverVersion=` in the URL) with the full version (`8.4.3`,
+  `9.7`, `11.4.4-MariaDB`); `8.0` without a patch number is read as `8.0.0` and keeps `utf8mb4_bin`. PostgreSQL and
+  SQLite: nothing changes.
+- **DoctrineBundle 3 hosts:** the collation and `table_prefix` now apply (1.15.0 / 1.15.1 ignored them there). If you
+  set `table_prefix` on DoctrineBundle 3, the generated migration also renames the bundle tables to the prefixed names;
+  if you added the collation by hand in a migration, the diff no longer proposes to drop it.
+- `TablePrefixSubscriber` and `BinaryKeyCollationSubscriber` no longer implement `Doctrine\Common\EventSubscriber`
+  (no `getSubscribedEvents()`); they are tagged `doctrine.event_listener`. If you registered them on an event manager
+  yourself, use `addEventListener(Events::loadClassMetadata, …)` / `addEventListener(ToolEvents::postGenerateSchemaTable, …)`.
+- **State machines:** a transition with several `from` places now fires from any of them (FrameworkBundle semantics),
+  and one with several `to` places becomes one transition per target. Review state machine definitions that relied on
+  such a transition never being enabled. `workflow`-type definitions are unchanged.
+
 ## To 1.15.1
 
 From **1.15.0**:

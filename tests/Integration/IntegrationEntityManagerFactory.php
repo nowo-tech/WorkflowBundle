@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Integration;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Events;
 use Doctrine\ORM\ORMSetup;
 use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 use Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber;
@@ -72,7 +73,8 @@ final class IntegrationEntityManagerFactory
             return;
         }
 
-        $entityManager->getEventManager()->addEventSubscriber(
+        $entityManager->getEventManager()->addEventListener(
+            Events::loadClassMetadata,
             new TablePrefixSubscriber(new TableNamePrefixer($prefix)),
         );
         $entityManager->getClassMetadata(WorkflowDefinition::class);
