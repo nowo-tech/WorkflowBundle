@@ -178,8 +178,11 @@ Notes:
   that mode `save()` / `remove()` flush the application's **default** entity manager, including every change your
   application left pending in it.
 - `doctrine.entity_manager` names the source manager when the entities are mapped on a dedicated one. Without it, the
-  source is the **default** manager, which must map the bundle entities (it does with the default
-  `doctrine.register_mapping: true`); the build fails otherwise.
+  source is the manager 1.13 used: the first manager of `doctrine.orm.entity_managers` that maps the bundle entities
+  (resolved when the container is built, host mapping passes included). For example, when your default manager is
+  named `main`, the bundle mapping lands on a manager named `default` and that one keeps being used. A deprecation asks
+  you to set `doctrine.entity_manager` when it is not your default manager; the build fails only when no manager maps
+  the entities.
 
 ### XML mapping
 

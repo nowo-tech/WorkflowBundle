@@ -24,6 +24,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -134,6 +135,41 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
         (new WorkflowUiSecurityPass())->process($container);
 
         self::assertSame(WorkflowUiSecurityPass::MODE_BOTH, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
+    }
+
+    #[Test]
+    public function aConfiguredNewPortServiceNeverReplacesTheHostsOwnAlias(): void
+    {
+        $container = $this->container(accessChecker: 'app.dual');
+        $container->register('app.dual', DualPredicate::class);
+        $container->register('app.policy', PolicyPredicate::class);
+        $container->setAlias(WorkflowUiAccessPolicyInterface::class, 'app.policy');
+
+        try {
+            (new WorkflowUiSecurityPass())->process($container);
+            self::fail('NF2-4a: two different 1.14 services.');
+        } catch (LogicException $exception) {
+            self::assertStringContainsString('"app.policy"', $exception->getMessage());
+        }
+
+        $container = $this->container(accessChecker: 'app.policy');
+        $container->register('app.policy', PolicyPredicate::class);
+        $container->setAlias(WorkflowUiAccessPolicyInterface::class, 'app.policy');
+        (new WorkflowUiSecurityPass())->process($container);
+        self::assertSame('app.policy', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class), 'the same service twice is fine');
+    }
+
+    #[Test]
+    public function aDeprecatedPortDecoratorOverANewPortOnlyServiceFailsTheBuild(): void
+    {
+        $container = $this->container(accessChecker: 'app.policy');
+        $container->register('app.policy', PolicyPredicate::class);
+        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class, null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('"app.audit"');
+
+        (new WorkflowUiSecurityPass())->process($container);
     }
 
     #[Test]

@@ -18,6 +18,7 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\EventListener\WorkflowUnitOfWorkSubscriber;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Service\ResetInterface;
+use Throwable;
 
 use function array_keys;
 use function array_sum;
@@ -32,9 +33,9 @@ use function sprintf;
  * manager, so saving a definition flushed every change the application had left pending, and a failed save reset the
  * application's manager. The bundle now writes the definitions through a **private** manager created on the
  * connection, configuration (mapping, metadata cache, proxies, repository factory) and event manager (table prefix,
- * host listeners) of the source manager: `doctrine.entity_manager` when set, else the application's default manager
- * (where the bundle registers its mapping; the same manager {@see PrivateEntityManagerPass} attaches the rollback
- * middleware to, audit NF-3). The source must map {@see WorkflowDefinition}. Its unit of work holds only definition
+ * host listeners) of the source manager: `doctrine.entity_manager` when set, else the manager that maps
+ * {@see WorkflowDefinition} first (the 1.13 rule; {@see PrivateEntityManagerPass} derives its name at build time and
+ * attaches the rollback middleware to its connection, audit NF2-1; `getManagerForClass()` when it could not). Its unit of work holds only definition
  * rows: a bundle flush never commits an application change, and a failed write closes only this manager. The tables
  * do not move. The connection is shared, so a transaction the application opened around a bundle call includes the
  * bundle's rows.
@@ -65,7 +66,8 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
 
     /**
      * @param ManagerRegistry $registry The application's Doctrine registry (the source manager is resolved per call)
-     * @param string|null $sourceManagerName `doctrine.entity_manager` (null = the default manager)
+     * @param string|null $sourceManagerName `doctrine.entity_manager` or the name derived at build time (null = the
+     *                                       manager `getManagerForClass()` returns)
      * @param LoggerInterface|null $logger warns when a boundary drops pending changes
      */
     public function __construct(
@@ -159,12 +161,23 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
      */
     public function reset(): void
     {
-        $this->warnAboutDroppedChanges();
-        $this->clear();
+        $current = $this->current;
+        // Dropped first, so a failure below can never keep a manager across the boundary (audit NF2-2).
         // @igor-ignore - Boundary drop of the bundle's own manager (no state kept).
         $this->current = null;
         // @igor-ignore - Boundary drop of the bundle's own manager (no state kept).
         $this->stale = false;
+        if (!$current instanceof EntityManagerInterface || !$current->isOpen()) {
+            return;
+        }
+
+        try {
+            $this->warnAboutDroppedChanges($current);
+        } catch (Throwable $exception) {
+            // Computing the change sets can throw (invalid association, detached or half-built entity).
+            $this->logGenericWarning($exception);
+        }
+        $current->clear();
     }
 
     /**
@@ -175,25 +188,42 @@ final class WorkflowEntityManager extends EntityManagerDecorator implements Rese
      */
     public function source(): EntityManagerInterface
     {
-        $source = $this->registry->getManager($this->sourceManagerName);
+        $source = $this->sourceManagerName !== null
+            ? $this->registry->getManager($this->sourceManagerName)
+            : $this->registry->getManagerForClass(WorkflowDefinition::class);
         if (!$source instanceof EntityManagerInterface || $source->getMetadataFactory()->isTransient(WorkflowDefinition::class)) {
-            throw new LogicException(sprintf('The Doctrine entity manager "%s" does not map %s: keep the bundle mapping on the default manager, or set nowo_workflow.doctrine.entity_manager to the manager that maps it (see docs/CONFIGURATION.md, "Doctrine").', $this->sourceManagerName ?? $this->registry->getDefaultManagerName(), WorkflowDefinition::class));
+            throw new LogicException(sprintf('No Doctrine entity manager%s maps %s: keep the bundle mapping, or set nowo_workflow.doctrine.entity_manager to the manager that maps it (see docs/CONFIGURATION.md, "Doctrine").', $this->sourceManagerName !== null ? ' "' . $this->sourceManagerName . '"' : '', WorkflowDefinition::class));
         }
 
         return $source;
     }
 
     /**
+     * The fallback warning of {@see reset()}; a failing logger never breaks the boundary.
+     */
+    private function logGenericWarning(Throwable $exception): void
+    {
+        try {
+            $this->logger?->warning('Workflow definitions: the bundle\'s private entity manager was dropped at a unit-of-work boundary; its pending changes could not be inspected ({exception}).', [
+                'bundle'    => 'NowoWorkflowBundle',
+                'exception' => $exception::class,
+            ]);
+        } catch (Throwable) {
+            // Nothing else to report to: the manager is dropped anyway.
+        }
+    }
+
+    /**
      * Audit NF-2 safety net: a boundary that drops the private manager while it still has inserts, updates or deletes
      * waiting (a definition edited and never saved through the bundle) logs them, per entity class.
      */
-    private function warnAboutDroppedChanges(): void
+    private function warnAboutDroppedChanges(EntityManagerInterface $manager): void
     {
-        if (!$this->logger instanceof LoggerInterface || !$this->current instanceof EntityManagerInterface || !$this->current->isOpen()) {
+        if (!$this->logger instanceof LoggerInterface) {
             return;
         }
 
-        $unitOfWork = $this->current->getUnitOfWork();
+        $unitOfWork = $manager->getUnitOfWork();
         $unitOfWork->computeChangeSets();
         $changes = [];
         foreach ([$unitOfWork->getScheduledEntityInsertions(), $unitOfWork->getScheduledEntityUpdates(), $unitOfWork->getScheduledEntityDeletions()] as $entities) {

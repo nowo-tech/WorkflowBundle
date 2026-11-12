@@ -87,9 +87,14 @@ for new installs and an XML mapping (REQ-ARCH-001 rules 2, 3 and 6). See [UPGRAD
 - Decorators of the 1.14 port wrap the policy selected by the configuration; with a decorator of the deprecated port
   as well, both ports are asked (both must grant) and a deprecation names the deprecated-port service to migrate. A
   1.14-port decorator over an `access_checker` that implements only the deprecated port fails the build (audit NF-1).
-- Without `doctrine.entity_manager` the private manager's source is the default manager, which must map the bundle
-  entities (build-time check, audit NF-3). SQL filter parameters are copied as stored, list types included (NF-7).
-- A boundary that drops pending private-manager changes logs a warning with the entity classes and count (NF-2).
+- Without `doctrine.entity_manager` the private manager's source is the manager that maps the bundle entities first
+  (the 1.13 `getManagerForClass()` rule), resolved at build time and shared with the rollback middleware; a
+  deprecation asks for the explicit option when it is not the default manager, and the build fails only when no
+  manager maps the entities (audit NF-3, NF2-1, NF2-3). SQL filter parameters are copied as stored, list types included (NF-7).
+- A boundary that drops pending private-manager changes logs a warning with the entity classes and count (NF-2); the
+  manager is dropped even when those changes cannot be inspected (NF2-2).
+- `security.access_checker` on the 1.14 port next to a different host alias of that port, or a decorator of the
+  deprecated port over an `access_checker` that implements only the 1.14 port, fails the build (NF2-4).
 
 ### Deprecated
 

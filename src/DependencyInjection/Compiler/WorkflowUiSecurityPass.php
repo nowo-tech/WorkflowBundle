@@ -178,8 +178,16 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
             throw new LogicException(sprintf('nowo_workflow.security.access_checker "%s" (%s) must implement "%s".', $id, $class, WorkflowUiAccessPolicyInterface::class));
         }
 
+        if ($implementsPolicy && $hostPolicyAlias && $this->resolveAlias($container, WorkflowUiAccessPolicyInterface::class) !== $this->resolveAlias($container, $id)) {
+            // Audit NF2-4a: never replace the host's own alias of the 1.14 port silently.
+            throw new LogicException(sprintf('"%s" is aliased to "%s" by the application and nowo_workflow.security.access_checker names "%s": keep only one of them.', WorkflowUiAccessPolicyInterface::class, $this->resolveAlias($container, WorkflowUiAccessPolicyInterface::class), $id));
+        }
+
         if ($implementsLegacy) {
             $this->aliasLegacy($container, $id);
+        } elseif ($this->isDecorated($container, WorkflowUiAccessCheckerInterface::class)) {
+            // Audit NF2-4b: a decorator of the deprecated port would be dropped (or wrap nothing): never silently.
+            throw new LogicException(sprintf('"%s" decorates the deprecated "%s", but nowo_workflow.security.access_checker "%s" (%s) does not implement it: decorate "%s" instead.', implode('", "', $this->decoratorsOf($container, WorkflowUiAccessCheckerInterface::class)), WorkflowUiAccessCheckerInterface::class, $id, $class, WorkflowUiAccessPolicyInterface::class));
         } else {
             // The deprecated alias is registered only for a class that implements that port.
             $container->removeAlias(WorkflowUiAccessCheckerInterface::class);

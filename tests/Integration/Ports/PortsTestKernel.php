@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Integration\Ports;
 
 use Composer\InstalledVersions;
+use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\DoctrineOrmMappingsPass;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Nowo\FormKitBundle\NowoFormKitBundle;
 use Nowo\UiKitBundle\NowoUiKitBundle;
@@ -26,6 +27,7 @@ use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\TwigBundle\TwigBundle;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
@@ -61,6 +63,13 @@ use const PHP_VERSION_ID;
  *   on a dedicated `workflow` entity manager (register_mapping: false), the host's own policy aliased to the 1.14
  *   port, flush_after_apply: false.
  *
+ * Persistence shapes without `doctrine.entity_manager` (audit NF2-1 / NF2-3):
+ *
+ * - `main-default`: the application's default manager is `main` (connection `main`); the bundle mapping lands on a
+ *   manager named `default` (connection `default`), as in 1.13;
+ * - `mapped-elsewhere`: register_mapping: false, the host maps the bundle XML on a `workflow` manager only;
+ * - `host-mapping-pass`: register_mapping: false, the host maps the bundle XML with a DoctrineOrmMappingsPass.
+ *
  * SecurityBundle is not installed: the kernel registers `security.token_storage` and `security.authorization_checker`
  * itself, and {@see TestTokenListener} stands in for the firewall.
  */
@@ -70,7 +79,7 @@ final class PortsTestKernel extends Kernel
 
     public const CACHE_ROOT = '/nowo-workflow-ports-kernel';
 
-    public const VARIANTS = ['builtin', 'new', 'legacy', 'both', 'decorator', 'policy-decorator', 'both-decorators', 'ddd'];
+    public const VARIANTS = ['builtin', 'new', 'legacy', 'both', 'decorator', 'policy-decorator', 'both-decorators', 'ddd', 'main-default', 'mapped-elsewhere', 'host-mapping-pass'];
 
     public function __construct(private readonly string $variant, bool $debug = true, private readonly bool $flushAfterApply = false)
     {
@@ -123,7 +132,33 @@ final class PortsTestKernel extends Kernel
             'security' => ['access_roles' => ['ROLE_ADMIN']],
         ];
 
-        if ($this->variant === 'ddd') {
+        if ($this->variant === 'main-default') {
+            $container->extension('doctrine', [
+                'dbal' => ['default_connection' => 'default', 'connections' => ['default' => ['url' => 'sqlite:///:memory:'], 'main' => ['url' => 'sqlite:///:memory:']]],
+                'orm'  => $orm + [
+                    'default_entity_manager' => 'main',
+                    'entity_managers'        => ['main' => ['connection' => 'main', 'mappings' => ['Host' => ['type' => 'xml', 'dir' => __DIR__ . '/../Ddd/mapping', 'prefix' => 'Nowo\\WorkflowBundle\\Tests\\Integration\\Ddd\\Domain', 'is_bundle' => false]]]],
+                ],
+            ]);
+        } elseif ($this->variant === 'mapped-elsewhere') {
+            $container->extension('doctrine', [
+                'dbal' => ['default_connection' => 'default', 'connections' => ['default' => ['url' => 'sqlite:///:memory:'], 'workflow' => ['url' => 'sqlite:///:memory:']]],
+                'orm'  => $orm + [
+                    'default_entity_manager' => 'default',
+                    'entity_managers'        => [
+                        'default'  => ['connection' => 'default', 'mappings' => ['Host' => ['type' => 'xml', 'dir' => __DIR__ . '/../Ddd/mapping', 'prefix' => 'Nowo\\WorkflowBundle\\Tests\\Integration\\Ddd\\Domain', 'is_bundle' => false]]],
+                        'workflow' => ['connection' => 'workflow', 'mappings' => ['NowoWorkflowBundle' => ['type' => 'xml', 'dir' => NowoWorkflowExtension::XML_MAPPING_DIR, 'prefix' => 'Nowo\\WorkflowBundle\\Entity', 'is_bundle' => false]]],
+                    ],
+                ],
+            ]);
+            $workflow['doctrine'] = ['register_mapping' => false];
+        } elseif ($this->variant === 'host-mapping-pass') {
+            $container->extension('doctrine', [
+                'dbal' => ['url' => 'sqlite:///:memory:'],
+                'orm'  => $orm + ['mappings' => ['Host' => ['type' => 'xml', 'dir' => __DIR__ . '/../Ddd/mapping', 'prefix' => 'Nowo\\WorkflowBundle\\Tests\\Integration\\Ddd\\Domain', 'is_bundle' => false]]],
+            ]);
+            $workflow['doctrine'] = ['register_mapping' => false];
+        } elseif ($this->variant === 'ddd') {
             $container->extension('doctrine', [
                 'dbal' => [
                     'default_connection' => 'default',
@@ -216,6 +251,13 @@ final class PortsTestKernel extends Kernel
         }
 
         $container->extension('nowo_workflow', $workflow);
+    }
+
+    protected function build(ContainerBuilder $container): void
+    {
+        if ($this->variant === 'host-mapping-pass') {
+            $container->addCompilerPass(DoctrineOrmMappingsPass::createXmlMappingDriver([NowoWorkflowExtension::XML_MAPPING_DIR => 'Nowo\\WorkflowBundle\\Entity']));
+        }
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void

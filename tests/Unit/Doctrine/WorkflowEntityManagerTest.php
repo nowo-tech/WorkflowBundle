@@ -15,6 +15,10 @@ use Nowo\WorkflowBundle\Tests\Support\SqliteManagerRegistry;
 use Nowo\WorkflowBundle\Tests\Support\TenantFilter;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use ReflectionProperty;
+use RuntimeException;
+use Stringable;
 
 use function dirname;
 
@@ -136,6 +140,52 @@ final class WorkflowEntityManagerTest extends TestCase
     }
 
     #[Test]
+    public function aBoundaryThatCannotInspectThePendingChangesStillDropsTheManager(): void
+    {
+        $logger     = new RecordingLogger();
+        [$doctrine] = $this->synced();
+        $private    = new WorkflowEntityManager($doctrine, null, $logger);
+        // A unit of work whose change sets cannot be computed (invalid association, detached or half-built entity).
+        $failing = $this->createMock(EntityManagerInterface::class);
+        $failing->method('isOpen')->willReturn(true);
+        $failing->method('getUnitOfWork')->willThrowException(new RuntimeException('change sets'));
+        $failing->expects(self::once())->method('clear');
+        (new ReflectionProperty(WorkflowEntityManager::class, 'current'))->setValue($private, $failing);
+
+        $private->reset();
+
+        self::assertFalse($private->isCreated(), 'NF2-2: dropped although the inspection failed');
+        self::assertCount(1, $logger->records);
+        self::assertSame(RuntimeException::class, $logger->records[0]['context']['exception'] ?? null);
+
+        $private->persist($this->definition('next'));
+        $private->flush();
+        $private->reset();
+        self::assertCount(1, $logger->records, 'the next unit of work and boundary work');
+    }
+
+    #[Test]
+    public function aFailingLoggerNeverBreaksTheBoundary(): void
+    {
+        [$doctrine] = $this->synced();
+        $logger     = new class extends AbstractLogger {
+            public function log(mixed $level, string|Stringable $message, array $context = []): void
+            {
+                throw new RuntimeException('logger down');
+            }
+        };
+        $private = new WorkflowEntityManager($doctrine, null, $logger);
+        $failing = $this->createMock(EntityManagerInterface::class);
+        $failing->method('isOpen')->willReturn(true);
+        $failing->method('getUnitOfWork')->willThrowException(new RuntimeException('change sets'));
+        (new ReflectionProperty(WorkflowEntityManager::class, 'current'))->setValue($private, $failing);
+
+        $private->reset();
+
+        self::assertFalse($private->isCreated());
+    }
+
+    #[Test]
     public function aSourceManagerThatDoesNotMapTheEntitiesFails(): void
     {
         $entities = ['Nowo\\WorkflowBundle\\Entity' => dirname(__DIR__, 3) . '/src/Entity'];
@@ -143,7 +193,7 @@ final class WorkflowEntityManagerTest extends TestCase
 
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('"default"');
-        (new WorkflowEntityManager($doctrine))->source();
+        (new WorkflowEntityManager($doctrine, 'default'))->source();
     }
 
     #[Test]
