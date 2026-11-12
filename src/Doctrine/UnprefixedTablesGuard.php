@@ -74,11 +74,7 @@ final readonly class UnprefixedTablesGuard
             return;
         }
 
-        throw new RuntimeException(sprintf(
-            "nowo_workflow.table_prefix is \"%s\", but the Workflow tables still have their default names (created while DoctrineBundle 3 ignored the prefix, WorkflowBundle 1.15.0 / 1.15.1). A generated migration would DROP them and create empty ones. Back up the database, rename them first, then generate the migration again:\n%s",
-            $this->prefixer->getTablePrefix(),
-            implode("\n", $renames),
-        ));
+        throw new RuntimeException(sprintf("nowo_workflow.table_prefix is \"%s\", but the Workflow tables still have their default names (created while DoctrineBundle 3 ignored the prefix, WorkflowBundle 1.15.0 / 1.15.1). A generated migration would DROP them and create empty ones. Back up the database, rename them first, then generate the migration again:\n%s", $this->prefixer->getTablePrefix(), implode("\n", $renames)));
     }
 
     private static function renameSql(AbstractPlatform $platform, string $from, string $to): string

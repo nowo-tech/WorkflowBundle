@@ -104,7 +104,7 @@ final readonly class BinaryKeyCollationSubscriber
         if ($class === WorkflowDefinition::class) {
             $this->warnAboutPartialVersion($connection, $platform);
         }
-        $collation  = self::collationFor($platform, $platform instanceof MySQL80Platform ? self::serverVersion($connection) : null);
+        $collation = self::collationFor($platform, $platform instanceof MySQL80Platform ? self::serverVersion($connection) : null);
         if ($collation === null) {
             return;
         }
