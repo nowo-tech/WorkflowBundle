@@ -114,14 +114,14 @@ nowo_workflow:
         path_prefix: '/workflow'
     security:
         access_roles: [ROLE_ADMIN]
-        # access_checker: App\Security\WorkflowUiAccessChecker
+        # access_checker: App\Security\WorkflowUiAccessPolicy   # implements WorkflowUiAccessPolicyInterface
         allow_unauthenticated: false
 ```
 
 | Key | Default | Notes |
 | --- | ------- | ----- |
 | `security.access_roles` | `[ROLE_ADMIN]` | At least one non-empty role required. Empty list is rejected at compile time unless `allow_unauthenticated` or a custom `access_checker` is set. |
-| `security.access_checker` | `null` | Custom service id implementing `WorkflowUiAccessCheckerInterface`. |
+| `security.access_checker` | `null` | Custom service id implementing `WorkflowUiAccessPolicyInterface` (1.14, framework-free VO). The deprecated `WorkflowUiAccessCheckerInterface` still works; a service implementing neither fails the build. A policy that answers `false` or throws never grants (fail closed). |
 | `security.allow_unauthenticated` | `false` | Without SecurityBundle, compilation **fails** unless this is `true` or a custom checker is set. **Never `true` in production.** |
 | `ui.required_roles` | `[ROLE_ADMIN]` | BC alias mirrored to/from `security.access_roles`. |
 

@@ -3,6 +3,11 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.14.0](#to-1140)
+  - [Workflow UI access port](#workflow-ui-access-port)
+  - [flush_after_apply](#flush_after_apply)
+  - [Private entity manager for the definitions](#private-entity-manager-for-the-definitions)
+  - [XML mapping](#xml-mapping)
 - [To 1.13.0](#to-1130)
 - [To 1.12.0](#to-1120)
 - [To 1.11.2](#to-1112)
@@ -66,6 +71,91 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.14.0
+
+From **1.13.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+No change is required: every 1.13 configuration keeps its behaviour. Three deprecations may appear when the container
+is built; each one says what to change before 2.0.
+
+### Workflow UI access port
+
+`Contract\WorkflowUiAccessCheckerInterface::isGranted(Request $request)` is **deprecated** (REQ-ARCH-001 rule 3:
+no Symfony `Request` in a public port) and removed in 2.0. Its framework-free twin is
+`Contract\WorkflowUiAccessPolicyInterface::allows(Model\WorkflowUiAccessCheck $check)`; the VO carries the method,
+route name, controller, path, scalar route parameters and a `Model\WorkflowActor` (identifier, token role names,
+impersonator; the user object is reachable through `user()` but never dumped).
+
+| Your 1.13 setup | 1.14 behaviour |
+|-----------------|----------------|
+| No `access_checker` (role-based, allow-all, deny-all) | Same decisions, through the new port. |
+| `access_checker` implementing only the deprecated interface | Asked exactly as in 1.13; deprecation at build time. |
+| `access_checker` implementing neither interface | **The build fails** (1.13 failed with a `TypeError` on the first request). |
+| Service whose class is unknown at build time (factory) | Asked as in 1.13 through the deprecated port, no deprecation. |
+| A decorator of `WorkflowUiAccessCheckerInterface` | Keeps running: the deprecated port stays the one asked. |
+| You alias `WorkflowUiAccessPolicyInterface` to your service | Your policy is asked; with a decorator of the deprecated port too, both must grant. |
+
+The `WorkflowUiAccessCheckerInterface` service alias is deprecated, and it is only registered when the configured
+class implements that interface. Migrate:
+
+```php
+// Before (1.13)
+final class WorkflowUiAccessChecker implements WorkflowUiAccessCheckerInterface
+{
+    public function isGranted(Request $request): bool { /* … */ }
+}
+
+// After (1.14)
+final class WorkflowUiAccessChecker implements WorkflowUiAccessPolicyInterface
+{
+    public function allows(WorkflowUiAccessCheck $check): bool { /* $check->actor, $check->path(), … */ }
+}
+```
+
+Implementing both interfaces during the transition is fine: the new one is asked. The constructor of the internal
+`WorkflowUiAccessSubscriber` gained two optional arguments (`$accessPolicy`, `$tokenStorage`) and its first argument
+is now nullable.
+
+### flush_after_apply
+
+`runtime.flush_after_apply` keeps its 1.13 default (`true`) when you do not set it, so upgraded applications keep
+flushing; a deprecation tells you to set it explicitly. The 1.14 Flex recipe writes `false` for new installs, and the
+default becomes `false` in 2.0. To keep the current behaviour without the deprecation:
+
+```yaml
+nowo_workflow:
+    runtime:
+        flush_after_apply: true
+```
+
+To move to the 2.0 behaviour, set `false` and flush (or save through your repository) after `apply*()`.
+
+### Private entity manager for the definitions
+
+The admin UI, `nowo:workflow:seed-demo` and `WorkflowDefinitionRepository` now read and write the definitions
+through a private entity manager of the bundle (same connection, mapping, listeners and SQL filters as your manager).
+Visible differences:
+
+- saving a definition no longer flushes changes your application left pending, and a failed save no longer resets
+  your entity manager;
+- entities returned by `WorkflowDefinitionRepository` are managed by the private manager: persist changes to them
+  through `$repository->getEntityManager()`, not through your own manager (your `flush()` no longer writes them).
+  Creating a `new WorkflowDefinition()` and persisting it with your own manager still works;
+- in long-running workers the definitions are re-read at each request, Messenger message and console command.
+
+`doctrine.private_entity_manager: false` restores the 1.13 behaviour for one minor (deprecated, removed in 2.0).
+`doctrine.entity_manager` names the source manager when the entities are mapped on a dedicated one.
+
+### XML mapping
+
+`src/Resources/config/doctrine/*.orm.xml` maps the four entities with the same tables, columns and constraints as the
+attributes. Nothing changes unless you opt in with `doctrine.mapping_type: xml`, or with `doctrine.register_mapping:
+false` and your own mapping of that directory (DDD hosts, see [USAGE.md](USAGE.md#ddd--hexagonal-host)).
 
 ## To 1.13.0
 

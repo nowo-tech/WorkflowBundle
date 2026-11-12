@@ -1,0 +1,15 @@
+Workflow Bundle installed.
+
+Next steps (security):
+  1. Keep nowo_workflow.security.access_roles (default ROLE_ADMIN); never set allow_unauthenticated: true in production.
+  2. Protect the UI path with Symfony security.access_control (e.g. ^/workflow → ROLE_ADMIN).
+  3. See docs/SECURITY.md and the commented snippet in config/packages/nowo_workflow.yaml.
+
+Persistence:
+  4. The recipe sets nowo_workflow.runtime.flush_after_apply: false: after WorkflowApplicator::apply*(), flush or
+     save the subject yourself. Workflow definitions are stored through the bundle's private entity manager.
+
+Assets:
+  5. Run php bin/console assets:install (files land in public/bundles/nowoworkflow/).
+  6. The pages load them through the nowo_workflow asset package, e.g. {{ asset('css/nowo-workflow.css', 'nowo_workflow') }};
+     do not declare that package in config/packages/framework.yaml.

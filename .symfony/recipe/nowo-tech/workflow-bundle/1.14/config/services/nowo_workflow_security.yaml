@@ -1,0 +1,11 @@
+# Optional: your own Workflow UI access policy (1.14, framework-free port).
+#
+# Implement Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface (allows(WorkflowUiAccessCheck $check): bool)
+# and point nowo_workflow.security.access_checker at it, or alias the port:
+#
+# services:
+#     Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface:
+#         alias: App\Security\WorkflowUiAccessPolicy
+#
+# Without it, the bundle wires the role-based policy from nowo_workflow.security.access_roles (SecurityBundle).
+# Prefer also protecting web_ui.path_prefix with security.access_control.

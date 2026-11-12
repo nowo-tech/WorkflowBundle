@@ -1,4 +1,7 @@
 nowo_workflow:
+    runtime:
+        # 1.14 recipe default: apply*() changes the marking only; the demo controllers flush their own subjects.
+        flush_after_apply: false
     web_ui:
         path_prefix: '/workflow'
         # null (default) = UiKit layout: nowo_ui_kit.layouts.admin → templates/layouts/admin.html.twig

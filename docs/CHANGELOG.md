@@ -50,6 +50,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Framework-free Workflow UI access port, a private entity manager for the definitions, an explicit `flush_after_apply`
+for new installs and an XML mapping (REQ-ARCH-001 rules 2, 3 and 6). See [UPGRADING](UPGRADING.md#to-1140).
+
+### Added
+
+- `Contract\WorkflowUiAccessPolicyInterface::allows(Model\WorkflowUiAccessCheck $check)`: framework-free twin of the
+  Workflow UI access checker (no `Request`, `TokenInterface` or `UserInterface`). The VOs `Model\WorkflowUiAccessCheck`
+  and `Model\WorkflowActor` keep the path, the route parameters and the user object in an internal `WeakMap`, so no
+  dump or serialization shows them. The built-in role-based, allow-all and deny-all checkers implement it.
+- Private entity manager for the workflow definitions (`Doctrine\WorkflowEntityManager`, internal): created on the
+  source manager's connection, configuration and event manager, SQL filters mirrored, recreated when closed, kept while
+  it has pending work after a rollback, dropped at every outermost unit-of-work boundary
+  (`EventListener\WorkflowUnitOfWorkSubscriber`: main request, Messenger message, outermost console command, with a
+  nesting depth and an in-flight message flag) and at `kernel.reset`. Options `doctrine.entity_manager` and
+  `doctrine.private_entity_manager` (deprecated opt-out).
+- XML mapping of the four entities (`src/Resources/config/doctrine/*.orm.xml`, parity with the attributes tested);
+  options `doctrine.mapping_type` (`attribute` / `xml`) and `doctrine.register_mapping`.
+- Flex recipe `1.14`: writes `runtime.flush_after_apply: false` for new installs.
+- Tests: access-decision equivalence matrix against a verbatim copy of the 1.13.0 subscriber and checker (new port,
+  deprecated port, dual service, decorator; mutation-checked), `lint:container` for every port shape, a DDD host
+  kernel (XML mapping, dedicated manager, host policy), a flush / no-flush database-state equivalence test and a
+  1,000-request worker test without the services resetter.
+
+### Changed
+
+- The admin UI, `nowo:workflow:seed-demo` and `WorkflowDefinitionRepository` use the private entity manager: a
+  definition save never flushes the application's pending changes, and a failed one never resets the application's
+  entity manager (REQ-ARCH-001 rule 6).
+- `nowo_workflow.security.access_checker` naming a service that implements neither access port now fails the
+  container build (it failed with a `TypeError` on the first request before).
+- `WorkflowUiAccessSubscriber` (internal): the first constructor argument is nullable; `$accessPolicy` and
+  `$tokenStorage` were added. With no port wired it denies.
+
+### Deprecated
+
+- `Contract\WorkflowUiAccessCheckerInterface` and its service alias (removed in 2.0): implement
+  `WorkflowUiAccessPolicyInterface`. A service implementing only the deprecated interface triggers a deprecation when the
+  container is built and keeps working unchanged.
+- Not setting `runtime.flush_after_apply`: the 1.13 default (`true`) stays for upgraded applications, with a
+  deprecation; it becomes `false` in 2.0.
+- `doctrine.private_entity_manager` (any value): the private entity manager becomes the only mode in 2.0.
+
 ## [1.13.0] - 2026-11-10
 
 Database workflows now dispatch the standard Symfony workflow events, so guard listeners run (they never did before 1.13.0). See [UPGRADING](https://github.com/nowo-tech/WorkflowBundle/blob/v1.13.0/docs/UPGRADING.md#to-1130).

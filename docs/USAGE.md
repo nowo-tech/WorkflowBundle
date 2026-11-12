@@ -6,6 +6,8 @@
 - [Runtime API](#runtime-api)
 - [Extending entities](#extending-entities)
 - [Protecting the CRUD UI](#protecting-the-crud-ui)
+- [Standard Symfony host](#standard-symfony-host)
+- [DDD / hexagonal host](#ddd--hexagonal-host)
 - [Workflow events and guards](#workflow-events-and-guards)
   - [Listeners run before the flush](#listeners-run-before-the-flush)
   - [Slugs and transition names are configuration](#slugs-and-transition-names-are-configuration)
@@ -63,7 +65,102 @@ $slug = $resolver->resolveSlugForSubject($expense);
 
 ## Protecting the CRUD UI
 
-Access is **deny-by-default**: the `nowo_workflow_*` routes require one of `security.access_roles` (default `[ROLE_ADMIN]`, checked by `RoleBasedWorkflowUiAccessChecker`). Without SecurityBundle the container does not compile unless you set `security.access_checker` or `security.allow_unauthenticated: true` (dev / demo only). Implement `WorkflowUiAccessCheckerInterface` and set it as `security.access_checker` to enforce your own policy (roles, IP allowlist, etc.). Also add an `access_control` rule for the UI path. See [SECURITY.md](SECURITY.md#protecting-the-crud-ui) and [CONFIGURATION.md](CONFIGURATION.md).
+Access is **deny-by-default**: the `nowo_workflow_*` routes require one of `security.access_roles` (default `[ROLE_ADMIN]`, checked by `RoleBasedWorkflowUiAccessChecker`). Without SecurityBundle the container does not compile unless you set `security.access_checker` or `security.allow_unauthenticated: true` (dev / demo only). Also add an `access_control` rule for the UI path. See [SECURITY.md](SECURITY.md#protecting-the-crud-ui) and [CONFIGURATION.md](CONFIGURATION.md).
+
+To enforce your own policy (roles, IP allowlist, tenant…), implement the framework-free port
+`Contract\WorkflowUiAccessPolicyInterface` (since 1.14) and point `security.access_checker` at it, or alias the
+interface to your service:
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
+use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
+
+final readonly class WorkflowUiAccessPolicy implements WorkflowUiAccessPolicyInterface
+{
+    public function allows(WorkflowUiAccessCheck $check): bool
+    {
+        // $check->method, $check->routeName, $check->controller, $check->path(), $check->routeParam('id'),
+        // $check->actor?->userIdentifier, $check->actor?->roles, $check->actor?->isImpersonated(), $check->actor?->user()
+        return $check->actor?->hasRole('ROLE_WORKFLOW_ADMIN') === true && !$check->actor->isImpersonated();
+    }
+}
+```
+
+The `WorkflowUiAccessCheck` value object carries no Symfony type: the actor is a `Model\WorkflowActor` (identifier,
+token role names before the role hierarchy, impersonator) built from the security token, and the path, the route
+parameters and the user object are kept out of its properties (no dump, `serialize()` or `json_encode()` shows them).
+Use your own authorization checker inside the policy when the role hierarchy or voters must apply. Answer `false` to
+deny: the bundle answers 403, and anything else (an exception) never becomes a grant.
+
+The 1.x `WorkflowUiAccessCheckerInterface::isGranted(Request)` is **deprecated** (removed in 2.0). A service that
+implements only it keeps working exactly as in 1.13 (with a deprecation when the container is built); a service that
+implements both is asked through the new port; a service that implements neither fails the build. A decorator of the
+deprecated interface keeps running (with your own 1.14 policy on the new port, both must grant). See
+[UPGRADING.md](UPGRADING.md#to-1140).
+
+## Standard Symfony host
+
+Zero configuration beyond the recipe:
+
+- the bundle maps its entities on the default entity manager with attributes (`doctrine.mapping_type: attribute`);
+  the definitions are read and written through the bundle's private entity manager on that same connection, so a
+  definition save never flushes your pending changes ([CONFIGURATION.md](CONFIGURATION.md#doctrine-the-private-entity-manager-114));
+- the CRUD UI is protected by the role-based policy (`security.access_roles`), or by your
+  `WorkflowUiAccessPolicyInterface` service;
+- after `WorkflowApplicator::apply*()`, flush your entity manager (`runtime.flush_after_apply: false`, the 1.14
+  recipe value), or keep `true` to let the bundle flush the default manager as in 1.13:
+
+```php
+$this->workflowApplicator->applyForSubject($order, 'approve');
+$this->entityManager->flush();
+```
+
+## DDD / hexagonal host
+
+Opt-in, nothing of it is forced on standard hosts:
+
+- **Mapping**: set `doctrine.register_mapping: false` and map `Nowo\WorkflowBundle\Entity` from the shipped XML
+  (`vendor/nowo-tech/workflow-bundle/src/Resources/config/doctrine`, same tables and columns as the attributes) on the
+  manager you choose, e.g. a dedicated one; or keep the bundle's registration with `doctrine.mapping_type: xml`. Your
+  own aggregates keep their own XML mapping and never extend, use or implement anything of the bundle: a definition
+  references them by class name (`subject_class`, an interface is fine).
+- **Persistence**: set `doctrine.entity_manager` to that manager. The bundle reads and writes the definitions through
+  its private manager built on it (never flushing, clearing or resetting yours), and `runtime.flush_after_apply: false`
+  leaves the subject to your repository and transaction boundary.
+- **Access**: implement `WorkflowUiAccessPolicyInterface` (no `Request`, `TokenInterface` or `UserInterface` in the
+  signature) and alias the port to it.
+
+```yaml
+# config/packages/doctrine.yaml (excerpt)
+doctrine:
+    orm:
+        entity_managers:
+            workflow:
+                connection: workflow
+                mappings:
+                    NowoWorkflowBundle:
+                        type: xml
+                        dir: '%kernel.project_dir%/vendor/nowo-tech/workflow-bundle/src/Resources/config/doctrine'
+                        prefix: 'Nowo\WorkflowBundle\Entity'
+                        is_bundle: false
+
+# config/packages/nowo_workflow.yaml
+nowo_workflow:
+    connection: workflow            # nowo:workflow:sync-schema
+    runtime:
+        flush_after_apply: false
+    doctrine:
+        entity_manager: workflow
+        register_mapping: false
+
+# config/services.yaml
+services:
+    Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface: '@App\Infrastructure\Workflow\WorkflowUiAccessPolicy'
+```
+
+`tests/Integration/Ddd/DddHostKernelTest.php` boots exactly this shape (a plain-PHP aggregate mapped in XML, the
+bundle on a dedicated manager from the shipped XML, the host policy on the new port) and applies a transition. See
+also [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application).
 
 ## Workflow events and guards
 
@@ -120,8 +217,8 @@ the new marking: keep guard listeners free of side effects and cheap (no writes,
 ### Listeners run before the flush
 
 `WorkflowApplicator::apply*()` changes the marking and dispatches `leave`, `transition`, `enter`, `entered`,
-`completed` and `announce` **inside** Symfony's `apply()`, then flushes (with the default
-`runtime.flush_after_apply: true`). So when a `completed` or `announce` listener runs:
+`completed` and `announce` **inside** Symfony's `apply()`, then flushes (with `runtime.flush_after_apply: true`) or
+leaves the flush to you (`false`, the 1.14 recipe value). So when a `completed` or `announce` listener runs:
 
 - the marking is already changed in memory but **not persisted yet**;
 - if the flush fails, or a later listener throws, the transition is not stored, but whatever the listener already did
@@ -189,8 +286,8 @@ The bundle has two parts:
   `can()` / `getEnabledTransitions*()`, so the UI and your code only offer transitions the domain accepts.
 - Publish domain events after the commit, not from `completed` listeners (they run before the flush, see
   [Listeners run before the flush](#listeners-run-before-the-flush)).
-- Set `runtime.flush_after_apply: false` and persist through your own repository, so the workflow never flushes
-  unrelated pending changes of the entity manager outside your transaction boundary.
+- Set `runtime.flush_after_apply: false` (the 1.14 recipe value) and persist through your own repository, so the
+  workflow never flushes unrelated pending changes of the entity manager outside your transaction boundary.
 - Wrap the runtime in your own application service:
 
 ```php
@@ -225,14 +322,14 @@ final readonly class ApproveExpense
 - The marking is read and written with `MethodMarkingStore`: the subject needs a public getter and setter for the
   configured marking property (default `status`). Use a dedicated state-holder object if your aggregate only changes
   state through intention-revealing methods.
-- With the default `runtime.flush_after_apply: true`, `apply*()` flushes the default entity manager after each
-  transition (including your other pending changes).
+- With `runtime.flush_after_apply: true` (the value when the key is not set, deprecated since 1.14), `apply*()`
+  flushes the default entity manager after each transition (including your other pending changes).
 - `WorkflowApplicator` and `WorkflowResolver` are final classes without interfaces; `WorkflowRegistryInterface` is
   the replaceable port.
 
 ## FrankenPHP / long-running workers
 
-`DatabaseWorkflowRegistry` memoizes built workflows only for the **current main request** (and implements `ResetInterface`). Edits in one worker are visible to every worker on the next request; outside HTTP (CLI, Messenger) nothing is memoized. Prefer keeping Symfony's `services_resetter` enabled so Doctrine's identity map is cleared between requests; the bundle never calls `EntityManager::clear()`. Details: [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md).
+Worker mode with the kernel kept alive and **not reset** is supported (REQ-RUNTIME-002). `DatabaseWorkflowRegistry` memoizes built workflows only for the **current main request** (and implements `ResetInterface`). Since 1.14 the bundle's private entity manager (the definitions) is dropped at every outermost boundary (main request, Messenger message, outermost console command), so edits in one worker are visible to every worker on the next request, also without the services resetter. The bundle never clears **your** entity managers: a host that disables or bypasses `services_resetter` must clear them itself at every boundary (REQ-RUNTIME-002 rule 7). Details: [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md).
 
 ## Overriding Twig templates (REQ-TWIG-001)
 
