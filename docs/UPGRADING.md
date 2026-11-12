@@ -144,7 +144,8 @@ Visible differences:
 - saving a definition no longer flushes changes your application left pending, and a failed save no longer resets
   your entity manager;
 - entities returned by `WorkflowDefinitionRepository` are managed by the private manager: persist changes to them
-  through `$repository->getEntityManager()`, not through your own manager (your `flush()` no longer writes them).
+  with `$repository->save($definition)` / `$repository->remove($definition)` (new in 1.14), not through your own
+  manager (your `flush()` no longer writes them).
   Creating a `new WorkflowDefinition()` and persisting it with your own manager still works;
 - in long-running workers the definitions are re-read at each request, Messenger message and console command.
 

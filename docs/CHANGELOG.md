@@ -67,6 +67,8 @@ for new installs and an XML mapping (REQ-ARCH-001 rules 2, 3 and 6). See [UPGRAD
   `doctrine.private_entity_manager` (deprecated opt-out).
 - XML mapping of the four entities (`src/Resources/config/doctrine/*.orm.xml`, parity with the attributes tested);
   options `doctrine.mapping_type` (`attribute` / `xml`) and `doctrine.register_mapping`.
+- `WorkflowDefinitionRepository::save()` / `remove()` (persist / remove, flush unless `$flush` is false) to write
+  definitions through the repository's manager.
 - Flex recipe `1.14`: writes `runtime.flush_after_apply: false` for new installs.
 - Tests: access-decision equivalence matrix against a verbatim copy of the 1.13.0 subscriber and checker (new port,
   deprecated port, dual service, decorator; mutation-checked), `lint:container` for every port shape, a DDD host

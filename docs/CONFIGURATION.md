@@ -120,7 +120,7 @@ definition rows:
 
 The connection is shared: a transaction your code opens around a bundle call includes the bundle's writes.
 `WorkflowDefinitionRepository` returns entities managed by the private manager: change and persist them through the
-bundle (admin UI) or through `$repository->getEntityManager()`, not through your own manager. Set
+bundle (admin UI) or with `$repository->save($definition)` / `remove()` (1.14), not through your own manager. Set
 `doctrine.private_entity_manager: false` (deprecated) to keep the 1.13 behaviour for one minor while you migrate.
 
 The application's subjects (the objects a workflow applies to) are never in the private manager: they stay in your
