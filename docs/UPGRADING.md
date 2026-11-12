@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.15.0](#to-1150)
 - [To 1.14.0](#to-1140)
   - [Workflow UI access port](#workflow-ui-access-port)
   - [flush_after_apply](#flush_after_apply)
@@ -71,6 +72,57 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.15.0
+
+From **1.14.x**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+**What changes for you:**
+
+1. **Update the database schema** (required for every application): new columns on `workflow_definition` and
+   `workflow_transition`, a new unique constraint and a new table `workflow_subject_pin`. Generate a migration
+   (`php bin/console doctrine:migrations:diff`) or run `php bin/console nowo:workflow:sync-schema` (it drops `uniq_workflow_definition_slug` and creates `uniq_workflow_definition_scope`). Existing
+   rows become global (`tenant_key ''`), version 1, published: nothing else changes for them.
+2. **Nothing else, unless you opt in.** Without `nowo_workflow.tenancy.tenant_resolver` (and without the guard ports)
+   the runtime, the events and the UI behave as in 1.14 (tested: same workflow events in the same order, same
+   markings, no tenancy service registered).
+3. **If you replaced or decorated `WorkflowRegistryInterface`**, you get a deprecation when the container is built:
+   it keeps working until 2.0. Call the new framework-free `WorkflowRuntimeInterface` from your code instead (it
+   returns `WorkflowTransitionResult` / `WorkflowMarkingView`, and reports a blocked transition in the result instead
+   of throwing). We deprecated the interface rather than marking it `@internal`: it was documented as the replaceable
+   port, so hosts get a full minor cycle with a build-time notice; until 2.0 it stays the SPI the applicator asks. A
+   host registry cannot be combined with tenancy (the build fails: the runtime builds tenant versions itself).
+
+To enable multitenancy (organizations, templates, versions, guards, audit) follow
+[MULTITENANCY.md](MULTITENANCY.md); the short version:
+
+```yaml
+nowo_workflow:
+    web_ui:
+        path_prefix: '/organizations/{uuid}/settings/workflows'
+    tenancy:
+        tenant_resolver: App\Workflow\WorkflowTenancy            # WorkflowTenantResolverInterface
+        subject_reference_resolver: App\Workflow\WorkflowTenancy # pins in-flight subjects to their version
+        ui:
+            tenant_resolver: App\Workflow\WorkflowTenancy        # required with the UI
+            action_checker: App\Workflow\WorkflowTenancy         # required with the UI
+    guards:
+        permission_checker: App\Workflow\WorkflowTenancy
+        variables_provider: App\Workflow\WorkflowTenancy
+```
+
+When you turn tenancy on, your existing definitions become the global templates (published version 1); the editor
+then edits drafts and "Publish" makes them run. Other 1.15 notes:
+
+- the internal controller actions take the `Request` (only code that calls them directly is affected);
+- built workflows carry three more workflow metadata keys (`nowo_definition_*`) and the guard settings as transition
+  metadata;
+- `WorkflowDefinitionRepository::findOneBySlug()` returns the global, current published version (the only one in
+  1.14 data).
 
 ## To 1.14.0
 

@@ -10,6 +10,7 @@ use Nowo\WorkflowBundle\Contract\WorkflowTenantResolverInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowTransitionPermissionCheckerInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiActionCheckerInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiTenantResolverInterface;
+use Nowo\WorkflowBundle\Model\WorkflowActorRef;
 use Nowo\WorkflowBundle\Model\WorkflowSubject;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectVariables;
@@ -72,9 +73,9 @@ final class HostTenancyPorts implements WorkflowTenantResolverInterface, Workflo
     {
         return $check->permission === 'leave.approve'
             && $check->tenant instanceof WorkflowTenant
-            && $check->actor !== null
+            && $check->actor instanceof WorkflowActorRef
             && $check->actor->id === 'manager-' . $check->tenant->key
-            && $check->subject !== null
+            && $check->subject instanceof WorkflowSubjectRef
             && str_starts_with($check->subject->id, 'leave-');
     }
 

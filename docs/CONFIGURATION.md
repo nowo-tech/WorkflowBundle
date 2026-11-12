@@ -19,6 +19,20 @@ nowo_workflow:
         list_page_size: 20          # 0 = load all (not recommended in production)
         default_locale: en
         locales: [en, es, fr, it]
+    # Since 1.15, all optional (docs/MULTITENANCY.md). Service ids of host ports.
+    tenancy:
+        tenant_resolver: null              # WorkflowTenantResolverInterface: turns tenancy on
+        subject_reference_resolver: null   # WorkflowSubjectReferenceResolverInterface: version pins, guards, audit
+        actor_provider: null               # WorkflowActorProviderInterface (null = security token user identifier)
+        ui:
+            tenant_resolver: null          # WorkflowUiTenantResolverInterface (required with tenancy + UI)
+            action_checker: null           # WorkflowUiActionCheckerInterface (required with tenancy + UI)
+    guards:
+        permission_checker: null           # WorkflowTransitionPermissionCheckerInterface
+        variables_provider: null           # WorkflowSubjectVariablesProviderInterface
+        max_automatic_transitions: 10
+    audit:
+        enabled: null                      # null = on with tenancy (WorkflowTransitionAppliedEvent after commit)
     security:
         access_roles: [ROLE_ADMIN]
         # access_checker: App\Security\WorkflowUiAccessPolicy   # implements WorkflowUiAccessPolicyInterface
@@ -35,12 +49,20 @@ nowo_workflow:
 | `doctrine.register_mapping` | `true` | Since 1.14. `false` = the bundle does not prepend its mapping; map `Nowo\WorkflowBundle\Entity` yourself (e.g. only on a dedicated manager, from the shipped XML). |
 | `doctrine.mapping_type` | `attribute` | Since 1.14. `xml` = the bundle registers `src/Resources/config/doctrine/*.orm.xml` (same tables, columns, indexes and constraints as the attributes; a test asserts the parity). |
 | `web_ui.enabled` | `true` | When `false`, every Workflow UI route (`nowo_workflow_*`) answers 404; UI access checks stay wired (fail-closed). The registry keeps working. |
-| `web_ui.path_prefix` | `/workflow` | Base path of the UI routes (use it as Symfony `access_control` path prefix) |
+| `web_ui.path_prefix` | `/workflow` | Base path of the UI routes (use it as Symfony `access_control` path prefix). Since 1.15 it may hold route variables, e.g. `/organizations/{uuid}/settings/workflows`: they are passed to the UI tenant resolver and kept in every bundle link. |
 | `web_ui.layout_template` | `null` | Layout the pages extend. `null` = UiKit's `nowo_ui_kit.layouts.admin` (recommended: configure the layout once in UiKit). A custom value must render the UiKit canonical blocks (REQ-UI-003). |
 | `web_ui.templates.<page>` | bundle templates | Per-page template (`dashboard`, `index`, `show`, `new`, `edit`); see [TEMPLATES.md](TEMPLATES.md#per-page-overrides) |
 | `web_ui.list_page_size` | `20` | Definitions per page on the list (and rows of the dashboard card) (REQ-PERF-001). `0` = load all (not recommended in production). Query param `?page=` |
 | `web_ui.default_locale` | `en` | Default locale for the UI (applied only to `nowo_workflow_*` routes; host routes keep their locale) |
 | `web_ui.locales` | `en`, `es`, `fr`, `it` | Enabled UI locales (`/locale/{_locale}` accepts exactly these values, any other answers 404; Twig global `nowo_workflow_locales`). |
+| `tenancy.tenant_resolver` | `null` | Since 1.15. Service id implementing `WorkflowTenantResolverInterface`. Setting it turns tenancy on: tenant-scoped definitions, global templates, drafts and published versions, version pins, the tenant isolation guard. See [MULTITENANCY.md](MULTITENANCY.md). |
+| `tenancy.subject_reference_resolver` | `null` | Since 1.15. `WorkflowSubjectReferenceResolverInterface`: a stable id of a subject. Without it nothing is pinned (subjects follow the current version). |
+| `tenancy.actor_provider` | `null` | Since 1.15. `WorkflowActorProviderInterface`; `null` = the user identifier of the Symfony security token. |
+| `tenancy.ui.tenant_resolver` / `tenancy.ui.action_checker` | `null` | Since 1.15. `WorkflowUiTenantResolverInterface` (scope of a UI request, e.g. the `{uuid}` of `web_ui.path_prefix`) and `WorkflowUiActionCheckerInterface` (view / edit / publish). Both are **required** with tenancy while `web_ui.enabled` is true (the build fails otherwise). The action checker can be set without tenancy too (asked on top of the access policy). |
+| `guards.permission_checker` | `null` | Since 1.15. `WorkflowTransitionPermissionCheckerInterface`: enables the "permission" guard field of transitions. A stored permission guard without this port blocks the transition. |
+| `guards.variables_provider` | `null` | Since 1.15. `WorkflowSubjectVariablesProviderInterface`: the whitelist of scalar variables of the "condition" field. A stored condition without this port blocks the transition. |
+| `guards.max_automatic_transitions` | `10` | Since 1.15. Automatic transitions applied in a row for one subject (0–100); the run also stops when a marking repeats. |
+| `audit.enabled` | `null` | Since 1.15. `WorkflowTransitionAppliedEvent` after the commit of each applied transition (DBAL 4 middleware on every connection). `null` = on with tenancy, off without. |
 | `security.access_roles` | `ROLE_ADMIN` | User must have **at least one** role. An empty list is **rejected** unless `security.access_checker` is set (your checker decides) or `security.allow_unauthenticated: true` (dev/demo only). |
 | `security.access_checker` | `null` | Optional service id implementing `WorkflowUiAccessPolicyInterface` (1.14). A service implementing only the deprecated `WorkflowUiAccessCheckerInterface` keeps working (deprecation at build time); a service implementing neither fails the build. |
 | `security.allow_unauthenticated` | `false` | **DEV/DEMO only.** When `false` (default), SecurityBundle (`security.authorization_checker`) is required. Never `true` in production. |

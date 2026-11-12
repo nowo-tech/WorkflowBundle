@@ -108,6 +108,17 @@ final class TenantIsolationKernelTest extends TestCase
     }
 
     #[Test]
+    public function aPinOnADeletedVersionIsIgnored(): void
+    {
+        $this->kernel = $kernel = self::boot('tenancy');
+        $global       = self::seedLeaveTemplate($kernel);
+        self::hostManager($kernel)->getConnection()->insert('workflow_subject_pin', ['tenant_key' => 'org-b', 'workflow_slug' => 'leave', 'subject_ref' => 'leave-b', 'definition_id' => 9999, 'created_at' => '2026-11-12 00:00:00']);
+
+        $workflow = self::registry($kernel)->forSubject(new LeaveRequest('leave-b', 'org-b', 1), 'leave');
+        self::assertSame($global->getId(), $workflow->getMetadataStore()->getWorkflowMetadata()[DatabaseMetadataStore::DEFINITION_ID]);
+    }
+
+    #[Test]
     public function aDisabledTenantVersionDoesNotFallBackToTheTemplate(): void
     {
         $this->kernel = $kernel = self::boot('tenancy');

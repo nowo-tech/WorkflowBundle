@@ -13,6 +13,7 @@ use Nowo\WorkflowBundle\Tenancy\TenancyContext;
 use Nowo\WorkflowBundle\Util\SubjectClass;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Workflow\Event\CompletedEvent;
+use Symfony\Component\Workflow\Transition;
 
 use function array_key_exists;
 use function array_values;
@@ -47,7 +48,7 @@ final readonly class TransitionAuditSubscriber implements EventSubscriberInterfa
         }
 
         $transition = $event->getTransition();
-        if ($transition === null) {
+        if (!$transition instanceof Transition) {
             return;
         }
 

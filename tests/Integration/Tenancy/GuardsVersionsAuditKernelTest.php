@@ -11,6 +11,7 @@ use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
+use Nowo\WorkflowBundle\Event\WorkflowTransitionAppliedEvent;
 use Nowo\WorkflowBundle\EventListener\TransitionGuardSubscriber;
 use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
@@ -78,8 +79,8 @@ final class GuardsVersionsAuditKernelTest extends TestCase
         self::assertSame('approved', $long->getStatus());
 
         $events = self::audit($kernel)->events;
-        self::assertSame(['submit', 'auto_approve', 'submit', 'approve'], array_map(static fn ($e): string => $e->transition, $events));
-        self::assertSame([false, true, false, false], array_map(static fn ($e): bool => $e->automatic, $events));
+        self::assertSame(['submit', 'auto_approve', 'submit', 'approve'], array_map(static fn (WorkflowTransitionAppliedEvent $e): string => $e->transition, $events));
+        self::assertSame([false, true, false, false], array_map(static fn (WorkflowTransitionAppliedEvent $e): bool => $e->automatic, $events));
         self::assertSame('org-a', $events[3]->tenant);
         self::assertSame('leave-2', $events[3]->subjectRef);
         self::assertSame('manager-org-a', $events[3]->actorRef);

@@ -130,6 +130,24 @@ response must show the new name), a failed definition write that closes the priv
 console + two Messenger boundaries. Memory margin: < 2 MB growth after a 100-iteration warm-up. Igor and the PHPStan
 FrankenPHP worker ruleset pass.
 
+### Re-audit 2026-11-12: tenancy, guards, audit event, runtime port (1.15.0)
+
+**Kernel reset false is supported** (REQ-RUNTIME-002), also when the services resetter does not run.
+
+| Service | State | Cleared at |
+|---------|-------|------------|
+| `Tenancy\TenancyContext`, `Tenancy\WorkflowDefinitionLocator`, `Tenancy\SubjectPinStore`, `Http\WorkflowUiTenancy`, `Service\WorkflowRuntime`, `Service\WorkflowVersioning`, guard / isolation / audit subscribers | none (`readonly`): tenant, subject reference, actor and variables are asked to the host ports per call | — |
+| `Audit\AfterCommitDispatcher` | audit events held per open transaction (`WeakMap` keyed by the driver connection), committed events, events of markings not persisted yet | committed events are dispatched at the next safe point (after the applicator's flush, `postFlush`, end of request / console command / Messenger message); unpersisted ones are dropped (warning) at those boundaries; everything on `kernel.reset` |
+| `EventListener\WorkflowUiRouteContextSubscriber` | router context parameters of a Workflow UI route prefix (`{uuid}`) | removed at `kernel.finish_request` of the main request (always dispatched, also after an exception) |
+| `Expression\GuardExpression` | parser cursor | a new parser per `parse()` call; never a service |
+| `DatabaseWorkflowRegistry` | built workflows also memoized by definition version | same main-request scope as W-01 |
+
+Worker test: `tests/Integration/Tenancy/TenancyWorkerKernelTest.php`: one kernel, requests sent to `http_kernel`
+(no services resetter), N = 1,000 rounds alternating two organizations: each round lists the definitions of its
+organization (UI, `/organizations/{uuid}/settings/workflow/definitions`) and resolves the workflow of one of its
+subjects; organization A never sees B's view and vice versa. Memory margin: < 2 MB growth after a 100-round warm-up.
+Igor: 110 services, 0 KO.
+
 ## Usage recommendations in worker mode
 
 - Workers no longer need a restart after editing definitions: every request rebuilds workflows from the database.

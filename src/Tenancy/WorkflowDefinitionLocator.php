@@ -113,18 +113,6 @@ final readonly class WorkflowDefinitionLocator
         $this->pins->pin($this->tenancy->tenantOf($subject, $definition->getSlug()), $definition->getSlug(), $reference, $definition);
     }
 
-    /**
-     * Whether the subject may run this stored definition: it is the version {@see forSubject()} returns for it.
-     */
-    public function isExpected(object $subject, WorkflowDefinition $definition): bool
-    {
-        try {
-            return $this->forSubject($subject, $definition->getSlug())->getId() === $definition->getId();
-        } catch (WorkflowNotFoundException) {
-            return false;
-        }
-    }
-
     private function pinned(object $subject, string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition
     {
         $reference = $this->tenancy->referenceOf($subject, $slug);
@@ -144,7 +132,7 @@ final readonly class WorkflowDefinitionLocator
         // A pin must name this slug, a published version and the subject's tenant or a global template: anything else
         // (a tampered row, a tenant key changed by the host) is refused, never followed.
         if ($definition->getSlug() !== $slug || $definition->isDraft()
-            || !($definition->getTenantKey() === '' || $definition->belongsTo($tenant))) {
+            || $definition->getTenantKey() !== '' && !$definition->belongsTo($tenant)) {
             throw WorkflowNotFoundException::forSlug($slug);
         }
 

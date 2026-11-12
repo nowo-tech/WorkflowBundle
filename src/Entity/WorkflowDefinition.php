@@ -551,17 +551,6 @@ class WorkflowDefinition
     }
 
     /**
-     * Sets the owner tenant (null = global template), since 1.15.
-     */
-    public function setTenant(?WorkflowTenant $tenant): self
-    {
-        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
-        $this->tenantKey = WorkflowTenant::storageKey($tenant);
-
-        return $this->touch();
-    }
-
-    /**
      * The version number within (tenant, slug), since 1.15.
      */
     public function getVersion(): int

@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Service;
 use LogicException;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
+use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
@@ -102,6 +103,17 @@ final readonly class WorkflowVersioning
     }
 
     /**
+     * Removes the version pins of a subject in every workflow (since 1.15), e.g. when the host deletes or anonymises
+     * the subject: the bundle stores no actor id, only this business reference (docs/MULTITENANCY.md, "GDPR").
+     *
+     * @return int pins removed
+     */
+    public function forgetSubject(WorkflowSubjectRef $subject, ?WorkflowTenant $tenant): int
+    {
+        return $this->pins?->forget($subject, $tenant) ?? 0;
+    }
+
+    /**
      * Deletes a draft, or every version of a published definition of this scope (subjects pinned to one of them lose
      * their pin and follow the scope's current version, else the global template).
      */
@@ -112,6 +124,7 @@ final readonly class WorkflowVersioning
             if ($version->getId() !== null) {
                 $this->pins?->forgetDefinition($version->getId());
             }
+            // @igor-ignore - Schedules a delete in the private manager, flushed just below (no state kept).
             $this->repository->remove($version, false);
         }
         $this->repository->flush();

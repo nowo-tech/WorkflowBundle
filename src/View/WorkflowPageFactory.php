@@ -212,7 +212,7 @@ final class WorkflowPageFactory
     /**
      * Builds the form page view model of the new-definition form.
      */
-    public function newForm(FormView $form, WorkflowUiScope $scope = new WorkflowUiScope()): FormPage
+    public function newForm(FormView $form): FormPage
     {
         return new FormPage(
             new PageHeader(

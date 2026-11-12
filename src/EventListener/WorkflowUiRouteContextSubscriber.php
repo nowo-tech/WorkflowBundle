@@ -54,6 +54,7 @@ final readonly class WorkflowUiRouteContextSubscriber implements EventSubscriber
 
         $context = $this->router->getContext();
         foreach (self::prefixVariables($event->getRequest()) as $name => $value) {
+            // @igor-ignore - Prefix variables of the current Workflow UI request only; removed at kernel.finish_request.
             $context->setParameter($name, $value);
         }
     }
@@ -69,6 +70,7 @@ final readonly class WorkflowUiRouteContextSubscriber implements EventSubscriber
             if ($context->getParameter($name) === $value) {
                 $parameters = $context->getParameters();
                 unset($parameters[$name]);
+                // @igor-ignore - Removes the prefix variables this subscriber set for the finished request.
                 $context->setParameters($parameters);
             }
         }

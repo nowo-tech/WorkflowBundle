@@ -158,7 +158,7 @@ final class RuntimePortKernelTest extends TestCase
         self::assertFalse($runtime->can($leave, 'leave', 'approve'));
 
         $doctrine = self::service($kernel, ManagerRegistry::class, 'doctrine');
-        self::assertSame(1, \count($doctrine->getManager('workflow')->getRepository(WorkflowSubjectPin::class)->findAll()), 'pinned on the workflow connection');
+        self::assertCount(1, $doctrine->getManager('workflow')->getRepository(WorkflowSubjectPin::class)->findAll(), 'pinned on the workflow connection');
         self::assertCount(1, self::audit($kernel)->events, 'the host flush on the default connection committed it');
         self::assertSame(0, self::service($kernel, AfterCommitDispatcher::class, 'test.' . AfterCommitDispatcher::class)->countPending());
     }

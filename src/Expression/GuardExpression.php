@@ -265,6 +265,7 @@ final class GuardExpression
         $left = $this->parseOperand($depth);
         $next = $this->tokens[$this->position] ?? null;
         if ($next !== null && $next[0] === 'op' && in_array($next[1], self::COMPARATORS, true)) {
+            // @igor-ignore - Cursor of a parser instance created per parse() call (never a shared service).
             ++$this->position;
 
             return ['cmp', (string) $next[1], $left, $this->parseOperand($depth)];
@@ -282,6 +283,7 @@ final class GuardExpression
         if ($token === null) {
             throw new GuardExpressionException('The condition ends too early.');
         }
+        // @igor-ignore - Cursor of a parser instance created per parse() call (never a shared service).
         ++$this->position;
 
         return match (true) {
@@ -318,6 +320,7 @@ final class GuardExpression
     {
         $token = $this->tokens[$this->position] ?? null;
         if ($token !== null && $token[0] === $kind && $token[1] === $value) {
+            // @igor-ignore - Cursor of a parser instance created per parse() call (never a shared service).
             ++$this->position;
 
             return true;

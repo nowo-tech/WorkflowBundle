@@ -39,7 +39,7 @@ final readonly class WorkflowTenant
      */
     public static function storageKey(?self $tenant): string
     {
-        return $tenant === null ? '' : $tenant->key;
+        return $tenant instanceof self ? $tenant->key : '';
     }
 
     /**
@@ -48,13 +48,5 @@ final readonly class WorkflowTenant
     public static function fromStorageKey(string $key): ?self
     {
         return $key === '' ? null : new self($key);
-    }
-
-    /**
-     * Byte-for-byte equality; two "no tenant" values (null) are equal.
-     */
-    public static function same(?self $a, ?self $b): bool
-    {
-        return self::storageKey($a) === self::storageKey($b);
     }
 }

@@ -221,14 +221,14 @@ final class Configuration implements ConfigurationInterface
             ->info('Since 1.15: tenant-scoped workflow definitions, global templates, versions pinned per subject. Off (1.14 behaviour) unless tenant_resolver is set.')
             ->addDefaultsIfNotSet()
             ->children()
-                ->append(self::serviceIdNode('tenant_resolver', 'Service id implementing WorkflowTenantResolverInterface (the tenant of a subject). Setting it turns tenancy on.'))
-                ->append(self::serviceIdNode('subject_reference_resolver', 'Service id implementing WorkflowSubjectReferenceResolverInterface (a stable id of a subject): pins the version a subject started with; also used by permission checks and the audit event.'))
-                ->append(self::serviceIdNode('actor_provider', 'Service id implementing WorkflowActorProviderInterface. null = the Symfony security token\'s user identifier (when SecurityBundle is installed).'))
+                ->append($this->serviceIdNode('tenant_resolver', 'Service id implementing WorkflowTenantResolverInterface (the tenant of a subject). Setting it turns tenancy on.'))
+                ->append($this->serviceIdNode('subject_reference_resolver', 'Service id implementing WorkflowSubjectReferenceResolverInterface (a stable id of a subject): pins the version a subject started with; also used by permission checks and the audit event.'))
+                ->append($this->serviceIdNode('actor_provider', 'Service id implementing WorkflowActorProviderInterface. null = the Symfony security token\'s user identifier (when SecurityBundle is installed).'))
                 ->arrayNode('ui')
                     ->addDefaultsIfNotSet()
                     ->children()
-                        ->append(self::serviceIdNode('tenant_resolver', 'Service id implementing WorkflowUiTenantResolverInterface (the tenant scope of a UI request, e.g. from the {uuid} of a host route prefix). Required with tenancy and the UI.'))
-                        ->append(self::serviceIdNode('action_checker', 'Service id implementing WorkflowUiActionCheckerInterface (view / edit / publish per scope). Required with tenancy and the UI; optional without tenancy (asked on top of the access policy).'))
+                        ->append($this->serviceIdNode('tenant_resolver', 'Service id implementing WorkflowUiTenantResolverInterface (the tenant scope of a UI request, e.g. from the {uuid} of a host route prefix). Required with tenancy and the UI.'))
+                        ->append($this->serviceIdNode('action_checker', 'Service id implementing WorkflowUiActionCheckerInterface (view / edit / publish per scope). Required with tenancy and the UI; optional without tenancy (asked on top of the access policy).'))
                     ->end()
                 ->end()
             ->end();
@@ -246,8 +246,8 @@ final class Configuration implements ConfigurationInterface
             ->info('Since 1.15: guards an editor sets per transition (permission in the subject\'s context, conditions on whitelisted variables, automatic transitions). Fields are hidden while their port is not configured; a stored guard without its port blocks the transition.')
             ->addDefaultsIfNotSet()
             ->children()
-                ->append(self::serviceIdNode('permission_checker', 'Service id implementing WorkflowTransitionPermissionCheckerInterface.'))
-                ->append(self::serviceIdNode('variables_provider', 'Service id implementing WorkflowSubjectVariablesProviderInterface (the whitelist of scalar variables conditions may read).'))
+                ->append($this->serviceIdNode('permission_checker', 'Service id implementing WorkflowTransitionPermissionCheckerInterface.'))
+                ->append($this->serviceIdNode('variables_provider', 'Service id implementing WorkflowSubjectVariablesProviderInterface (the whitelist of scalar variables conditions may read).'))
                 ->integerNode('max_automatic_transitions')
                     ->info('Most automatic transitions applied one after the other for one subject (loop guard).')
                     ->defaultValue(10)
@@ -259,7 +259,7 @@ final class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    private static function serviceIdNode(string $name, string $info): NodeDefinition
+    private function serviceIdNode(string $name, string $info): NodeDefinition
     {
         return (new TreeBuilder($name, 'scalar'))->getRootNode()
             ->info($info)

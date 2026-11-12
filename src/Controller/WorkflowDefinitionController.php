@@ -114,7 +114,7 @@ final class WorkflowDefinitionController extends AbstractController
         }
 
         return $this->render($this->template('new'), [
-            'page'    => $this->pages->newForm($form->createView(), $this->scope($tenant)),
+            'page'    => $this->pages->newForm($form->createView()),
             'section' => WorkflowDefinitionFormSection::General,
         ], $this->formResponse($form));
     }
@@ -371,11 +371,8 @@ final class WorkflowDefinitionController extends AbstractController
 
     private function versioning(): WorkflowVersioning
     {
-        if (!$this->versioning instanceof WorkflowVersioning) {
-            throw $this->createNotFoundException('Versioning is not available.');
-        }
-
-        return $this->versioning;
+        // Wired by the extension; only a hand-built controller lacks it (tenancyAction() answered 404 already).
+        return $this->versioning ?? throw new LogicException('WorkflowVersioning is not wired.');
     }
 
     /**
@@ -386,7 +383,7 @@ final class WorkflowDefinitionController extends AbstractController
      */
     private function tenancyAction(Request $request, int $id, WorkflowUiAction $action, string $intention, bool $write = true): array
     {
-        if (!$this->tenancy->enabled()) {
+        if (!$this->tenancy->enabled() || !$this->versioning instanceof WorkflowVersioning) {
             throw $this->createNotFoundException('Tenancy is not enabled.');
         }
         $tenant     = $this->tenancy->tenant($request);

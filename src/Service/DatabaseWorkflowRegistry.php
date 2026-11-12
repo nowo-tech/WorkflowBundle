@@ -81,7 +81,7 @@ final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, Reset
     public function forDefinition(WorkflowDefinition $definition): WorkflowInterface
     {
         $request = $this->currentCacheOwner();
-        $key     = '#' . (string) $definition->getId();
+        $key     = '#' . $definition->getId();
 
         if ($request instanceof Request && $definition->getId() !== null && isset($this->cache[$key])) {
             return $this->cache[$key];
