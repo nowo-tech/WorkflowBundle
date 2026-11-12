@@ -43,7 +43,8 @@ use function trigger_deprecation;
  *   fails only when every chain was inspected and none maps the bundle entities. A derived manager that is not the
  *   default one triggers a deprecation asking to set `doctrine.entity_manager`;
  * - attaches {@see PrivateEntityManagerMiddleware} only to the connection of that source manager: the host's other
- *   connections are never wrapped.
+ *   connections are never wrapped. When the manager is left to the runtime rule, it goes on the connection of every
+ *   manager that rule may pick, in order (audit NF3-1).
  *
  * Runs before DoctrineBundle's MiddlewaresPass.
  *
@@ -88,16 +89,20 @@ final class PrivateEntityManagerPass implements CompilerPassInterface
             if ($this->mapsTheEntities($container, $configured, $pending) === false) {
                 throw new InvalidConfigurationException(sprintf('The Doctrine entity manager "%s" (nowo_workflow.doctrine.entity_manager) does not map %s. Map the entities on that manager (e.g. from the shipped XML) or remove the option.', $configured, WorkflowManagerRegistry::ENTITY_NAMESPACE));
             }
-            $manager = $configured;
+            $candidates = [$configured];
         } else {
             $manager = $this->derive($container, array_keys($managers), $pending);
             if ($manager !== null) {
                 $container->getDefinition(WorkflowEntityManager::class)->setArgument(1, $manager);
+                $candidates = [$manager];
             } else {
-                // A chain could not be inspected: the private manager uses getManagerForClass() at runtime (1.13 rule);
-                // the rollback middleware goes on the default manager's connection.
-                $default = $container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null;
-                $manager = is_string($default) && $default !== '' ? $default : 'default';
+                // A chain could not be inspected: the private manager uses getManagerForClass() at runtime (1.13 rule),
+                // which may return any manager not proven to not map the entities (audit NF3-1).
+                $candidates = $this->runtimeCandidates($container, array_keys($managers), $pending);
+                if ($candidates === []) {
+                    $default    = $container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null;
+                    $candidates = [is_string($default) && $default !== '' ? $default : 'default'];
+                }
             }
         }
 
@@ -105,18 +110,61 @@ final class PrivateEntityManagerPass implements CompilerPassInterface
             return;
         }
 
-        $id = sprintf('doctrine.orm.%s_entity_manager', $manager);
-        // DoctrineBundle passes the connection as the manager's first argument.
-        $argument   = $container->hasDefinition($id) ? ($container->getDefinition($id)->getArguments()[0] ?? null) : null;
-        $connection = $argument instanceof Reference && preg_match('/^doctrine\.dbal\.(.+)_connection$/D', (string) $argument, $match) === 1 ? $match[1] : null;
-        if ($connection === null) {
-            $default    = $container->hasParameter('doctrine.default_connection') ? $container->getParameter('doctrine.default_connection') : null;
-            $connection = is_string($default) && $default !== '' ? $default : 'default';
+        $connections = [];
+        foreach ($candidates as $manager) {
+            $connection               = $this->connectionOf($container, $manager);
+            $connections[$connection] = $connection;
         }
 
-        $container->getDefinition(PrivateEntityManagerMiddleware::class)
-            ->clearTag('doctrine.middleware')
-            ->addTag('doctrine.middleware', ['connection' => $connection]);
+        $definition = $container->getDefinition(PrivateEntityManagerMiddleware::class)->clearTag('doctrine.middleware');
+        foreach ($connections as $connection) {
+            $definition->addTag('doctrine.middleware', ['connection' => $connection]);
+        }
+    }
+
+    /**
+     * The DBAL connection of a manager: DoctrineBundle passes it as the manager's first argument; the default
+     * connection when the manager definition does not say.
+     */
+    private function connectionOf(ContainerBuilder $container, string $manager): string
+    {
+        $id       = sprintf('doctrine.orm.%s_entity_manager', $manager);
+        $argument = $container->hasDefinition($id) ? ($container->getDefinition($id)->getArguments()[0] ?? null) : null;
+        if ($argument instanceof Reference && preg_match('/^doctrine\.dbal\.(.+)_connection$/D', (string) $argument, $match) === 1) {
+            return $match[1];
+        }
+        $default = $container->hasParameter('doctrine.default_connection') ? $container->getParameter('doctrine.default_connection') : null;
+
+        return is_string($default) && $default !== '' ? $default : 'default';
+    }
+
+    /**
+     * The managers `getManagerForClass()` may return at runtime when a chain could not be inspected (audit NF3-1):
+     * in order, every manager not proven to not map the bundle entities, up to and including the first one proven to
+     * map them. The rollback middleware goes on the connection of each one, so it is on the source connection
+     * whichever of them the runtime rule picks (a rollback on another of them only replaces the private manager once
+     * more).
+     *
+     * @param list<int|string> $managers
+     * @param array<string, list<string>> $pending
+     *
+     * @return list<string>
+     */
+    private function runtimeCandidates(ContainerBuilder $container, array $managers, array $pending): array
+    {
+        $candidates = [];
+        foreach ($managers as $manager) {
+            $maps = $this->mapsTheEntities($container, (string) $manager, $pending);
+            if ($maps === false) {
+                continue;
+            }
+            $candidates[] = (string) $manager;
+            if ($maps === true) {
+                break;
+            }
+        }
+
+        return $candidates;
     }
 
     /**

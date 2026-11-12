@@ -185,10 +185,13 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
 
         if ($implementsLegacy) {
             $this->aliasLegacy($container, $id);
-        } elseif ($this->isDecorated($container, WorkflowUiAccessCheckerInterface::class)) {
-            // Audit NF2-4b: a decorator of the deprecated port would be dropped (or wrap nothing): never silently.
-            throw new LogicException(sprintf('"%s" decorates the deprecated "%s", but nowo_workflow.security.access_checker "%s" (%s) does not implement it: decorate "%s" instead.', implode('", "', $this->decoratorsOf($container, WorkflowUiAccessCheckerInterface::class)), WorkflowUiAccessCheckerInterface::class, $id, $class, WorkflowUiAccessPolicyInterface::class));
+        } elseif ($this->decoratorsOf($container, WorkflowUiAccessCheckerInterface::class, true) !== []) {
+            // Audit NF2-4b: a decorator of the deprecated port would be dropped (or wrap nothing): never silently. A
+            // decorator registered with on_invalid: ignore asked to be dropped when there is nothing to decorate, so
+            // it is (audit NF3-3).
+            throw new LogicException(sprintf('"%s" decorates the deprecated "%s", but nowo_workflow.security.access_checker "%s" (%s) does not implement it: decorate "%s" instead.', implode('", "', $this->decoratorsOf($container, WorkflowUiAccessCheckerInterface::class, true)), WorkflowUiAccessCheckerInterface::class, $id, $class, WorkflowUiAccessPolicyInterface::class));
         } else {
+            // Without the alias, Symfony removes the decorators registered with on_invalid: ignore (audit NF3-3).
             // The deprecated alias is registered only for a class that implements that port.
             $container->removeAlias(WorkflowUiAccessCheckerInterface::class);
         }
@@ -272,15 +275,23 @@ final class WorkflowUiSecurityPass implements CompilerPassInterface
     }
 
     /**
+     * @param bool $requiredOnly skip the decorators registered with on_invalid: ignore (dropped by Symfony when the
+     *                           decorated service does not exist)
+     *
      * @return list<string> ids of the definitions that decorate the port
      */
-    private function decoratorsOf(ContainerBuilder $container, string $port): array
+    private function decoratorsOf(ContainerBuilder $container, string $port, bool $requiredOnly = false): array
     {
         $ids = [];
         foreach ($container->getDefinitions() as $id => $definition) {
-            if (($definition->getDecoratedService()[0] ?? null) === $port) {
-                $ids[] = $id;
+            $decorated = $definition->getDecoratedService();
+            if (($decorated[0] ?? null) !== $port) {
+                continue;
             }
+            if ($requiredOnly && ($decorated[3] ?? ContainerInterface::EXCEPTION_ON_INVALID_REFERENCE) === ContainerInterface::IGNORE_ON_INVALID_REFERENCE) {
+                continue;
+            }
+            $ids[] = $id;
         }
 
         return $ids;
