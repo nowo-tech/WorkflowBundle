@@ -3,7 +3,8 @@
   places, transitions); each tab is its own form (links between tabs, the current one carries the form).
 
   Variables: page (View\SettingsPage; the current section carries the form and its formThemes), definition
-  (WorkflowDefinition), section (WorkflowDefinitionFormSection).
+  (WorkflowDefinition), section (WorkflowDefinitionFormSection), structure_locked (bool, since 1.16: places and
+  transitions of a tenant clone follow its template; no add / remove, only guards are edited).
   Data block: nowo_ui_settings_section (general fields grid, or the collection editor of the section).
 #}
 {% extends '@NowoUiKit/page/settings.html.twig' %}
@@ -22,7 +23,11 @@
     {% if section.form %}
         {% set _b = page.bundle %}
         {% set form = section.form %}
+        {% set _locked = structure_locked|default(false) %}
         {{ form_start(form, {attr: {id: 'workflow-definition-form', class: nowo_ui_class('form', _b), 'data-nowo-ui-region': 'form'}|merge(nowo_ui_theme.attributesFor('form', _b, {}, nowo_ui_page_type))}) }}
+            {% if _locked and section.id in ['general', 'places', 'transitions'] %}
+                <p class="{{ nowo_ui_class('flash_info', _b) }}" data-testid="workflow-structure-locked">{{ 'definition.structure_locked'|trans({}, 'NowoWorkflowBundle') }}</p>
+            {% endif %}
             {% if section.id == 'general' %}
                 {{ include('@NowoWorkflowBundle/workflow_definition/_general_fields.html.twig', {form: form}, false) }}
             {% else %}
@@ -70,6 +75,7 @@
                     config: _collections[section.id],
                     key: section.id,
                     place_names: section.id == 'transitions' ? definition.placeNames : [],
+                    locked: _locked and section.id in ['places', 'transitions'],
                     bundle: _b,
                 }, false) }}
             {% endif %}

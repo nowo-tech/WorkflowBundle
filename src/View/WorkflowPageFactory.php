@@ -134,7 +134,7 @@ final class WorkflowPageFactory
             return [$view, $this->cloneAction($definition)];
         }
         if (!$scope->isEditable($definition)) {
-            return [$view, $this->draftAction($definition), $this->deleteAction($definition)];
+            return [$view, $this->draftAction($definition), ...$this->lifecycleActions($definition, $scope), $this->deleteAction($definition)];
         }
 
         return [
@@ -154,7 +154,7 @@ final class WorkflowPageFactory
         if ($scope->isTemplate($definition)) {
             $actions = [$this->cloneAction($definition, 'primary')];
         } elseif (!$scope->isEditable($definition)) {
-            $actions = [$this->draftAction($definition, 'primary'), $this->deleteAction($definition)];
+            $actions = [$this->draftAction($definition, 'primary'), ...$this->lifecycleActions($definition, $scope), $this->deleteAction($definition)];
         } elseif ($scope->tenancy) {
             $actions = [
                 new Action('edit', self::label('action.edit'), $this->url('nowo_workflow_definition_edit_general', ['id' => $id])),
@@ -317,6 +317,36 @@ final class WorkflowPageFactory
     public function publishAction(WorkflowDefinition $definition): Action
     {
         return $this->postAction('send', 'nowo_workflow_definition_publish', 'publish', $definition, 'action.publish', 'definition.confirm_publish', 'primary');
+    }
+
+    /**
+     * POST "retire" of a published tenant clone (CSRF token "retire<id>"), since 1.16.
+     */
+    public function retireAction(WorkflowDefinition $definition): Action
+    {
+        return $this->postAction('archive', 'nowo_workflow_definition_retire', 'retire', $definition, 'action.retire', 'definition.confirm_retire', null);
+    }
+
+    /**
+     * POST "reinstate" of a retired tenant clone (CSRF token "reinstate<id>"), since 1.16.
+     */
+    public function reinstateAction(WorkflowDefinition $definition): Action
+    {
+        return $this->postAction('restore', 'nowo_workflow_definition_reinstate', 'reinstate', $definition, 'action.reinstate', 'definition.confirm_reinstate', null);
+    }
+
+    /**
+     * Retire (published) or reinstate (retired) of a tenant's own definition, since 1.16.
+     *
+     * @return list<Action>
+     */
+    private function lifecycleActions(WorkflowDefinition $definition, WorkflowUiScope $scope): array
+    {
+        return match (true) {
+            $scope->canRetire($definition)    => [$this->retireAction($definition)],
+            $scope->canReinstate($definition) => [$this->reinstateAction($definition)],
+            default                           => [],
+        };
     }
 
     /**

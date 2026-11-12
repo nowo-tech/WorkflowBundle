@@ -38,11 +38,23 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
     /** Transition metadata key: automatic transition (since 1.15). */
     public const AUTOMATIC = 'nowo_automatic';
 
+    /** Place / transition metadata key: translation key of the label (since 1.16, only when one is set). */
+    public const LABEL_KEY = 'label_key';
+
+    /** Place / transition metadata key: translation domain of the label key (since 1.16, `messages` by default). */
+    public const LABEL_DOMAIN = 'label_domain';
+
     /** @var array<string, mixed> */
     private readonly array $workflowMetadata;
 
     /** @var array<string, string> */
     private readonly array $placeLabels;
+
+    /** @var array<string, array{label_key: string, label_domain: string}> label translations of places and transitions (since 1.16) */
+    private readonly array $placeTranslations;
+
+    /** @var array<string, array{label_key: string, label_domain: string}> */
+    private readonly array $transitionTranslations;
 
     /** @var array<string, string> */
     private readonly array $transitionLabels;
@@ -66,17 +78,26 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
             self::DEFINITION_TENANT  => $definition->getTenantKey(),
         ];
 
-        $placeLabels = [];
+        $placeLabels       = [];
+        $placeTranslations = [];
         foreach ($definition->getPlaces() as $workflowPlace) {
             $placeLabels[$workflowPlace->getName()] ??= $workflowPlace->getDisplayLabel();
+            if ($workflowPlace->getLabelKey() !== null) {
+                $placeTranslations[$workflowPlace->getName()] ??= [self::LABEL_KEY => $workflowPlace->getLabelKey(), self::LABEL_DOMAIN => $workflowPlace->getLabelDomain() ?? WorkflowLabelTranslator::DEFAULT_DOMAIN];
+            }
         }
-        $this->placeLabels = $placeLabels;
+        $this->placeLabels       = $placeLabels;
+        $this->placeTranslations = $placeTranslations;
 
-        $transitionLabels = [];
-        $transitionGuards = [];
+        $transitionLabels       = [];
+        $transitionGuards       = [];
+        $transitionTranslations = [];
         foreach ($definition->getTransitions() as $workflowTransition) {
             $name = $workflowTransition->getName();
             $transitionLabels[$name] ??= $workflowTransition->getDisplayLabel();
+            if ($workflowTransition->getLabelKey() !== null) {
+                $transitionTranslations[$name] ??= [self::LABEL_KEY => $workflowTransition->getLabelKey(), self::LABEL_DOMAIN => $workflowTransition->getLabelDomain() ?? WorkflowLabelTranslator::DEFAULT_DOMAIN];
+            }
             $guards = array_filter([
                 self::GUARD_PERMISSION => $workflowTransition->getGuardPermission(),
                 self::GUARD_EXPRESSION => $workflowTransition->getGuardExpression(),
@@ -86,8 +107,9 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
                 $transitionGuards[$name] = $guards;
             }
         }
-        $this->transitionLabels = $transitionLabels;
-        $this->transitionGuards = $transitionGuards;
+        $this->transitionLabels       = $transitionLabels;
+        $this->transitionGuards       = $transitionGuards;
+        $this->transitionTranslations = $transitionTranslations;
     }
 
     /**
@@ -101,7 +123,8 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
     }
 
     /**
-     * Returns the metadata (label) of a place.
+     * Returns the metadata of a place: the plain `label` and, since 1.16, `label_key` / `label_domain` when the place
+     * has a translation key (translate them in your templates, e.g. `workflow_metadata(subject, 'label_key', place)`).
      *
      * @return array<string, mixed>
      */
@@ -111,7 +134,7 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
             return [];
         }
 
-        return ['label' => $this->placeLabels[$place]];
+        return ['label' => $this->placeLabels[$place]] + ($this->placeTranslations[$place] ?? []);
     }
 
     /**
@@ -125,7 +148,7 @@ final class DatabaseMetadataStore implements MetadataStoreInterface
             return [];
         }
 
-        return ['label' => $this->transitionLabels[$transition->getName()]] + ($this->transitionGuards[$transition->getName()] ?? []);
+        return ['label' => $this->transitionLabels[$transition->getName()]] + ($this->transitionTranslations[$transition->getName()] ?? []) + ($this->transitionGuards[$transition->getName()] ?? []);
     }
 
     /**

@@ -7,19 +7,25 @@ namespace Nowo\WorkflowBundle\Service;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use InvalidArgumentException;
+use LogicException;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Enum\WorkflowPinMode;
+use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Model\WorkflowMarkingView;
+use Nowo\WorkflowBundle\Model\WorkflowPinResult;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Tenancy\WorkflowDefinitionLocator;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Workflow\Exception\NotEnabledTransitionException;
 use Symfony\Component\Workflow\Exception\UndefinedTransitionException;
+use Symfony\Component\Workflow\MarkingStore\MethodMarkingStore;
 use Symfony\Component\Workflow\Transition;
 use Symfony\Component\Workflow\WorkflowInterface;
 use Throwable;
@@ -136,6 +142,32 @@ final class WorkflowApplicator
             $definition->getVersion(),
             $definition->getTenantKey() === '' ? null : $definition->getTenantKey(),
             array_values(array_map('strval', array_keys($this->workflowFor($definition)->getMarking($subject)->getPlaces()))),
+        );
+    }
+
+    /**
+     * Pins the subject to the version it would start with, without applying any transition (since 1.16, see
+     * {@see WorkflowRuntimeInterface::pin()}). Nothing is flushed and no workflow
+     * event is dispatched: the marking is read straight from the subject's marking property.
+     *
+     * @throws WorkflowNotFoundException
+     * @throws InvalidArgumentException
+     * @throws LogicException when tenancy is off
+     */
+    public function pin(object $subject, string $workflowSlug, WorkflowPinMode $mode = WorkflowPinMode::KeepExisting): WorkflowPinResult
+    {
+        if (!$this->locator instanceof WorkflowDefinitionLocator) {
+            throw new LogicException('Pinning a subject needs tenancy (nowo_workflow.tenancy.tenant_resolver).');
+        }
+
+        return $this->locator->pinSubject(
+            $subject,
+            $workflowSlug,
+            $mode,
+            fn (WorkflowDefinition $definition) => $this->assertSubjectSupported($subject, $definition),
+            static fn (WorkflowDefinition $definition): array => array_values(array_map('strval', array_keys(
+                (new MethodMarkingStore($definition->getType() === WorkflowType::StateMachine, $definition->getMarkingProperty()))->getMarking($subject)->getPlaces(),
+            ))),
         );
     }
 

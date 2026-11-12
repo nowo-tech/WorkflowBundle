@@ -31,6 +31,8 @@ action:
   new_draft: 'Nieuw concept'
   publish: 'Publiceren'
   clone_template: 'Aanpassen voor deze organisatie'
+  retire: 'Buiten gebruik stellen'
+  reinstate: 'Opnieuw activeren'
 
 status:
   enabled: Actief
@@ -38,6 +40,7 @@ status:
   default: Standaard
   initial: Initieel
   draft: 'Concept'
+  retired: 'Buiten gebruik'
 
 workflow_type:
   state_machine: 'Toestandsmachine'
@@ -89,6 +92,9 @@ definition:
   confirm_draft: 'Een concept van "%name%" maken? Subjecten blijven de gepubliceerde versie gebruiken tot je het concept publiceert.'
   confirm_publish: '"%name%" publiceren? Nieuwe subjecten starten met deze versie; lopende houden de hunne.'
   confirm_clone: 'Het sjabloon "%name%" als concept naar deze organisatie kopiëren?'
+  confirm_retire: '"%name%" buiten gebruik stellen? Nieuwe aanvragen gebruiken weer het platformsjabloon; lopende aanvragen houden deze versie.'
+  confirm_reinstate: '"%name%" opnieuw activeren? Nieuwe aanvragen gebruiken weer deze versie in plaats van het platformsjabloon.'
+  structure_locked: 'Plaatsen en overgangen volgen het platformsjabloon: alleen guards en voorwaarden kunnen worden gewijzigd.'
 
 table:
   name: Naam
@@ -134,6 +140,7 @@ form:
     general: 'Naam, slug, gekoppeld subject en prioriteit van de workflow.'
     guard_permission: 'Alleen een actor met deze toestemming in de context van het subject mag de overgang toepassen (bijv. leave.approve).'
     guard_expression: 'Vergelijk variabelen met waarden, bijv. days <= 2 and type == ''vacation''. Variabelen: %variables%.'
+    label_key: 'Optionele vertaalsleutel van het label (bijv. workflow.leave.approved); zonder vertaling wordt het label getoond.'
     automatic: 'Wordt toegepast zodra hij mogelijk is en de guards slagen (bijv. automatisch goedkeuren).'
   field:
     name: Naam
@@ -156,6 +163,8 @@ form:
     to_places: 'Doelstatussen'
     guard_permission: 'Vereiste toestemming'
     guard_expression: 'Voorwaarde'
+    label_key: 'Vertaalsleutel van het label'
+    label_domain: 'Vertaaldomein'
     automatic: 'Automatisch toepassen'
   placeholder:
     select_places: 'Statussen zoeken en selecteren…'
@@ -188,6 +197,8 @@ flash:
   deleted: 'Workflowdefinitie verwijderd.'
   published: 'Workflowdefinitie gepubliceerd.'
   cloned: 'Sjabloon als concept naar deze organisatie gekopieerd.'
+  retired: 'Workflow buiten gebruik: nieuwe aanvragen gebruiken het platformsjabloon.'
+  reinstated: 'Workflow opnieuw actief: nieuwe aanvragen gebruiken hem weer.'
   published_read_only: 'Een gepubliceerde versie kan niet worden bewerkt: maak een nieuw concept.'
 
 error:
@@ -197,6 +208,8 @@ error:
   already_customized: 'Deze organisatie heeft al een eigen versie van die workflow.'
   subject_class_not_allowed: 'Deze organisatie kan geen workflows maken voor deze subjectklasse.'
   definition_in_use: 'Deze workflow kan niet worden verwijderd: %count% lopende aanvraag/aanvragen gebruiken nog een van de versies. Schakel hem in plaats daarvan uit.'
+  cannot_retire: 'Deze workflow kan niet buiten gebruik worden gesteld: nieuwe aanvragen hebben een ingeschakeld platformsjabloon nodig.'
+  structure_locked: 'Plaatsen en overgangen volgen het platformsjabloon en kunnen hier niet worden gewijzigd.'
 
 kpi:
   definitions: 'Definities'
@@ -249,6 +262,11 @@ workflow_place:
   label:
     placeholder: 'Ingediend'
     help: 'Optioneel weergavelabel.'
+  label_key:
+    placeholder: 'workflow.leave.approved'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domein van de vertaalsleutel (leeg = messages).'
   sort_order:
     placeholder: '0'
     help: 'Positie in lijsten en in het diagram.'
@@ -260,6 +278,11 @@ workflow_transition:
   label:
     placeholder: 'Ter goedkeuring indienen'
     help: 'Optioneel weergavelabel.'
+  label_key:
+    placeholder: 'workflow.leave.approve'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domein van de vertaalsleutel (leeg = messages).'
 
 scope:
   global: 'Globaal sjabloon'

@@ -4,13 +4,22 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tenancy;
 
+use InvalidArgumentException;
+use LogicException;
+use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Enum\WorkflowPinMode;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
+use Nowo\WorkflowBundle\Model\WorkflowPinResult;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
+
+use function array_diff;
+use function implode;
+use function sprintf;
 
 /**
  * Picks the stored definition version a subject runs (since 1.15).
@@ -118,6 +127,61 @@ final readonly class WorkflowDefinitionLocator
         $pinned = $this->pins->pin($this->tenancy->tenantOf($subject, $slug), $slug, $reference, $definition);
 
         return $pinned === $definition->getId() ? $definition : $this->forSubject($subject, $slug);
+    }
+
+    /**
+     * Pins the subject explicitly, without applying anything (since 1.16, {@see WorkflowRuntimeInterface::pin()}).
+     *
+     * @param callable(WorkflowDefinition): void $assertSupported throws when the subject is not supported
+     * @param callable(WorkflowDefinition): list<string> $placesOf the subject's current places as that version
+     *                                                             reads them (no event, no initial marking)
+     *
+     * @throws WorkflowNotFoundException
+     * @throws InvalidArgumentException
+     * @throws LogicException when tenancy is off
+     */
+    public function pinSubject(object $subject, string $slug, WorkflowPinMode $mode, callable $assertSupported, callable $placesOf): WorkflowPinResult
+    {
+        if (!$this->tenancy->enabled()) {
+            throw new LogicException('Pinning a subject needs tenancy (nowo_workflow.tenancy.tenant_resolver).');
+        }
+        $reference = $this->tenancy->referenceOf($subject, $slug);
+        if (!$reference instanceof WorkflowSubjectRef) {
+            throw new InvalidArgumentException(sprintf('The subject has no reference for workflow "%s" (WorkflowSubjectReferenceResolverInterface): it cannot be pinned.', $slug));
+        }
+        $tenant = $this->tenancy->tenantOf($subject, $slug);
+        // An existing pin of another tenant (or a draft, another slug) is refused here, as in every other call.
+        $pinned = $this->pinned($subject, $slug, $tenant);
+        if ($pinned instanceof WorkflowDefinition && $mode === WorkflowPinMode::KeepExisting) {
+            $assertSupported($pinned);
+
+            return $this->pinResult($this->enabledOrFail($pinned, $slug), $reference, false);
+        }
+
+        // The version a new subject of the tenant starts with now: never a draft, a retired clone or another tenant's.
+        $target = $this->enabledOrFail($this->repository->findForTenant($slug, $tenant), $slug);
+        $assertSupported($target);
+        if (!$pinned instanceof WorkflowDefinition) {
+            $winner = $this->pins->pin($tenant, $slug, $reference, $target);
+
+            return $winner === $target->getId() ? $this->pinResult($target, $reference, true) : $this->pinResult($this->forSubject($subject, $slug), $reference, false);
+        }
+        if ($pinned->getId() === $target->getId()) {
+            return $this->pinResult($target, $reference, false);
+        }
+
+        $missing = array_diff($placesOf($target), $target->getPlaceNames());
+        if ($missing !== []) {
+            throw new InvalidArgumentException(sprintf('The subject cannot be moved to version %d of workflow "%s": its place(s) "%s" do not exist there.', $target->getVersion(), $slug, implode('", "', $missing)));
+        }
+        $this->pins->repin($tenant, $slug, $reference, $target);
+
+        return $this->pinResult($target, $reference, false, true, $pinned->getVersion());
+    }
+
+    private function pinResult(WorkflowDefinition $definition, WorkflowSubjectRef $subject, bool $created, bool $replaced = false, ?int $previousVersion = null): WorkflowPinResult
+    {
+        return new WorkflowPinResult($definition->getSlug(), $definition->getVersion(), $definition->getTenantKey() === '' ? null : $definition->getTenantKey(), $subject, $created, $replaced, $previousVersion);
     }
 
     private function pinned(object $subject, string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition

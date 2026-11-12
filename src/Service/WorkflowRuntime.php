@@ -6,8 +6,10 @@ namespace Nowo\WorkflowBundle\Service;
 
 use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
+use Nowo\WorkflowBundle\Enum\WorkflowPinMode;
 use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
 use Nowo\WorkflowBundle\Model\WorkflowMarkingView;
+use Nowo\WorkflowBundle\Model\WorkflowPinResult;
 use Nowo\WorkflowBundle\Model\WorkflowTransitionResult;
 
 use function array_values;
@@ -48,5 +50,10 @@ final readonly class WorkflowRuntime implements WorkflowRuntimeInterface
     public function marking(object $subject, string $workflowSlug): WorkflowMarkingView
     {
         return $this->applicator->markingView($subject, $workflowSlug);
+    }
+
+    public function pin(object $subject, string $workflowSlug, WorkflowPinMode $mode = WorkflowPinMode::KeepExisting): WorkflowPinResult
+    {
+        return $this->applicator->pin($subject, $workflowSlug, $mode);
     }
 }

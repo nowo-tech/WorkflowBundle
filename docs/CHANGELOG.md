@@ -54,6 +54,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Retire a tenant clone (Beacon, 1.16.0):** new status `WorkflowDefinitionStatus::Retired`. `WorkflowVersioning::retire()`
+  / `reinstate()` and the UI actions "Retire" / "Reinstate" (permission `publish`, CSRF `retire<id>` / `reinstate<id>`,
+  routes `nowo_workflow_definition_retire` / `_reinstate`): new subjects of the tenant run the global template again,
+  subjects pinned to the clone keep their version. Deleting stays blocked while pins exist (owner decision
+  2026-11-12). Retiring is refused without an enabled global template to fall back to. A retired clone can be
+  reinstated, get a new draft, or be customized again from the template (`cloneTemplate()` then creates its next
+  version). Logged like publish and delete (`retire_definition`, `reinstate_definition`). List badge "Retired".
+- **Locked clone structure (Beacon):** `nowo_workflow.tenancy.lock_clone_structure` (default `false`). Tenant clones keep
+  the template's places, transitions and initial place; only guards and conditions are edited. Enforced by the editor
+  (disabled fields, no add / remove, notice) and by `WorkflowVersioning::publish()` (`WorkflowStructureLockedException`
+  when the structure differs from the template version it was cloned from). A tenant cannot shadow a template slug with
+  its own definition. `WorkflowDefinition::structure()`.
+- **Translatable labels (Beacon):** places and transitions get `label_key` / `label_domain` (nullable columns,
+  `setLabelTranslation()`, editor fields). The flow diagram shows the translation with a fallback to the plain label;
+  the workflow metadata adds `label_key` / `label_domain`. New `Service\WorkflowLabelTranslator`.
+- **`WorkflowRuntimeInterface::pin()` (Beacon):** pins a subject to the version it would start with, without any
+  transition, event, initial marking or flush. Idempotent (`WorkflowPinMode::KeepExisting`), explicit re-pin
+  (`WorkflowPinMode::Repin`, refused when the subject's places do not exist in the new version), tenant-checked. Returns
+  `Model\WorkflowPinResult`.
+
 ### Fixed
 
 - **Doctrine listeners under DoctrineBundle 3.x (Beacon):** `TablePrefixSubscriber` and `BinaryKeyCollationSubscriber`

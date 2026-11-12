@@ -27,6 +27,9 @@
             {% if row.draft %}
                 <span class="{{ nowo_ui_class('badge_warning', _b) }}" data-testid="workflow-badge-draft">{{ 'status.draft'|trans({}, _d) }}</span>
             {% endif %}
+            {% if row.retired %}
+                <span class="{{ nowo_ui_class('badge_neutral', _b) }}" data-testid="workflow-badge-retired">{{ 'status.retired'|trans({}, _d) }}</span>
+            {% endif %}
             <span class="{{ nowo_ui_class('badge_neutral', _b) }}">{{ 'definition.version_short'|trans({'%version%': row.version}, _d) }}</span>
         {% endif %}
     </td>

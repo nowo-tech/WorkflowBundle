@@ -31,6 +31,8 @@ action:
   new_draft: 'Nuevo borrador'
   publish: 'Publicar'
   clone_template: 'Personalizar para esta organización'
+  retire: 'Retirar'
+  reinstate: 'Reactivar'
 
 status:
   enabled: Activo
@@ -38,6 +40,7 @@ status:
   default: Predeterminado
   initial: Inicial
   draft: 'Borrador'
+  retired: 'Retirado'
 
 workflow_type:
   state_machine: 'Máquina de estados'
@@ -89,6 +92,9 @@ definition:
   confirm_draft: '¿Crear un borrador de "%name%"? Los sujetos siguen usando la versión publicada hasta que publiques el borrador.'
   confirm_publish: '¿Publicar "%name%"? Los sujetos nuevos empiezan con esta versión; los que ya están en curso mantienen la suya.'
   confirm_clone: '¿Copiar la plantilla "%name%" a esta organización como borrador?'
+  confirm_retire: '¿Retirar "%name%"? Las solicitudes nuevas vuelven a usar la plantilla de la plataforma; las que ya están en curso conservan esta versión.'
+  confirm_reinstate: '¿Reactivar "%name%"? Las solicitudes nuevas vuelven a usar esta versión en lugar de la plantilla de la plataforma.'
+  structure_locked: 'Los lugares y las transiciones siguen la plantilla de la plataforma: solo se pueden cambiar las guardas y las condiciones.'
 
 table:
   name: Nombre
@@ -134,6 +140,7 @@ form:
     general: 'Nombre, slug, sujeto vinculado y prioridad del workflow.'
     guard_permission: 'Solo un actor con este permiso en el contexto del sujeto puede aplicar la transición (p. ej. leave.approve).'
     guard_expression: 'Compara variables con valores, p. ej. days <= 2 and type == ''vacation''. Variables: %variables%.'
+    label_key: 'Clave de traducción opcional de la etiqueta (p. ej. workflow.leave.approved); si no tiene traducción se muestra la etiqueta.'
     automatic: 'Se aplica en cuanto está habilitada y sus guardas se cumplen (p. ej. autoaprobar).'
   field:
     name: Nombre
@@ -156,6 +163,8 @@ form:
     to_places: 'Estados destino'
     guard_permission: 'Permiso requerido'
     guard_expression: 'Condición'
+    label_key: 'Clave de traducción de la etiqueta'
+    label_domain: 'Dominio de traducción'
     automatic: 'Aplicar automáticamente'
   placeholder:
     select_places: 'Busca y selecciona estados…'
@@ -188,6 +197,8 @@ flash:
   deleted: 'Definición de workflow eliminada.'
   published: 'Definición de workflow publicada.'
   cloned: 'Plantilla copiada a esta organización como borrador.'
+  retired: 'Workflow retirado: las solicitudes nuevas usan la plantilla de la plataforma.'
+  reinstated: 'Workflow reactivado: las solicitudes nuevas vuelven a usarlo.'
   published_read_only: 'Una versión publicada no se puede editar: crea un borrador nuevo.'
 
 error:
@@ -197,6 +208,8 @@ error:
   already_customized: 'Esta organización ya tiene su propia versión de ese workflow.'
   subject_class_not_allowed: 'Esta organización no puede crear workflows para esta clase de sujeto.'
   definition_in_use: 'Este workflow no se puede borrar: %count% solicitud(es) en curso usan todavía una de sus versiones. Deshabilítalo en su lugar.'
+  cannot_retire: 'Este workflow no se puede retirar: las solicitudes nuevas necesitan una plantilla de la plataforma habilitada.'
+  structure_locked: 'Los lugares y las transiciones siguen la plantilla de la plataforma y no se pueden cambiar aquí.'
 
 kpi:
   definitions: 'Definiciones'
@@ -249,6 +262,11 @@ workflow_place:
   label:
     placeholder: 'Enviado'
     help: 'Etiqueta visible opcional.'
+  label_key:
+    placeholder: 'workflow.leave.approved'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Dominio de la clave de traducción (vacío = messages).'
   sort_order:
     placeholder: '0'
     help: 'Posición en los listados y en el diagrama.'
@@ -260,6 +278,11 @@ workflow_transition:
   label:
     placeholder: 'Enviar a aprobación'
     help: 'Etiqueta visible opcional.'
+  label_key:
+    placeholder: 'workflow.leave.approve'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Dominio de la clave de traducción (vacío = messages).'
 
 scope:
   global: 'Plantilla global'

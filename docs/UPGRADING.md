@@ -3,6 +3,8 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [To 1.16.0](#to-1160)
+  - [To 1.15.2](#to-1152)
 - [To 1.15.1](#to-1151)
 - [To 1.15.0](#to-1150)
 - [To 1.14.1](#to-1141)
@@ -74,6 +76,34 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+### To 1.16.0
+
+From **1.15.x** (minor):
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+php bin/console doctrine:migrations:diff   # four nullable columns
+```
+
+- **Schema:** `workflow_place` and `workflow_transition` get `label_key` (string 255, nullable) and `label_domain`
+  (string 128, nullable). Generate and run a migration (or `nowo:workflow:sync-schema`). Hosts mapping the bundle
+  entities from the shipped XML get them too; a host with its own mapping of `WorkflowPlace` / `WorkflowTransition`
+  adds both fields.
+- **`WorkflowRuntimeInterface::pin()`** is a new interface method. Hosts that only *call* the runtime port have
+  nothing to do. A host that *implements* the interface itself (its own runtime service aliased to it) must add
+  `pin(object $subject, string $workflowSlug, WorkflowPinMode $mode = WorkflowPinMode::KeepExisting):
+  WorkflowPinResult`, or decorate the bundle's `Service\WorkflowRuntime`.
+- **`WorkflowDefinitionStatus::Retired`** is a new enum case: a `match` over the status in host code must handle it.
+  `WorkflowDefinitionRepository::findCurrent()` no longer returns a retired version (a retired clone has no current
+  version); `findRetired()` and `findVersion()` are new.
+- **Locked clones** are opt-in: `nowo_workflow.tenancy.lock_clone_structure: true`. Enable it before tenants
+  customize; a clone whose structure already differs from its template cannot be published while it is on.
+- Templates: `edit.html.twig` receives `structure_locked` and
+  `_collection_section.html.twig` an optional `locked`; overridden copies keep working (both default to false).
+
+### To 1.15.2
 
 From **1.15.1** (patch, no configuration change):
 

@@ -21,6 +21,14 @@ use function in_array;
 final class WorkflowGraphPresenter
 {
     /**
+     * Since 1.16: display labels are translated (label key and domain, fallback to the plain label).
+     */
+    public function __construct(
+        private readonly WorkflowLabelTranslator $labels = new WorkflowLabelTranslator(),
+    ) {
+    }
+
+    /**
      * @return array{
      *     initialPlace: string,
      *     type: string,
@@ -242,7 +250,7 @@ final class WorkflowGraphPresenter
             'id'           => $place->getId(),
             'name'         => $name,
             'label'        => $place->getLabel(),
-            'displayLabel' => $place->getDisplayLabel(),
+            'displayLabel' => $this->labels->place($place),
             'sortOrder'    => $place->getSortOrder(),
             'index'        => $placeIndex,
             'isInitial'    => $name === $definition->getInitialPlace(),
@@ -258,7 +266,7 @@ final class WorkflowGraphPresenter
             'id'           => $transition->getId(),
             'name'         => $transition->getName(),
             'label'        => $transition->getLabel(),
-            'displayLabel' => $transition->getDisplayLabel(),
+            'displayLabel' => $this->labels->transition($transition),
             'fromPlaces'   => $transition->getFromPlaces(),
             'toPlaces'     => $transition->getToPlaces(),
         ];

@@ -9,13 +9,19 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use LogicException;
 use Nowo\WorkflowBundle\Enum\WorkflowDefinitionStatus;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Service\WorkflowVersioning;
 use Nowo\WorkflowBundle\Util\SubjectClass;
 use SortDirection;
+
+use function implode;
+use function sort;
+use function sprintf;
 
 /**
  * Persisted Symfony Workflow definition (places, transitions, subject binding).
@@ -572,6 +578,87 @@ class WorkflowDefinition
     }
 
     /**
+     * Whether this version is published and picked for new subjects (not a draft, not retired), since 1.16.
+     */
+    public function isPublished(): bool
+    {
+        return $this->status === WorkflowDefinitionStatus::Published;
+    }
+
+    /**
+     * Whether this version belongs to a retired tenant clone (since 1.16): it still runs the subjects pinned to it, new
+     * subjects run the global template.
+     */
+    public function isRetired(): bool
+    {
+        return $this->status === WorkflowDefinitionStatus::Retired;
+    }
+
+    /**
+     * A tenant definition copied from a global template (since 1.16): a tenant scope and a template version.
+     */
+    public function isTemplateClone(): bool
+    {
+        return $this->tenantKey !== '' && $this->templateVersion !== null;
+    }
+
+    /**
+     * Retires this published version (since 1.16, see {@see WorkflowDefinitionStatus::Retired}).
+     *
+     * @throws LogicException when the version is not published
+     */
+    public function retire(): self
+    {
+        if (!$this->isPublished()) {
+            throw new LogicException(sprintf('Version %d of workflow "%s" is not published.', $this->version, $this->slug));
+        }
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->status = WorkflowDefinitionStatus::Retired;
+
+        return $this->touch();
+    }
+
+    /**
+     * Puts this retired version back into service (since 1.16).
+     *
+     * @throws LogicException when the version is not retired
+     */
+    public function reinstate(): self
+    {
+        if (!$this->isRetired()) {
+            throw new LogicException(sprintf('Version %d of workflow "%s" is not retired.', $this->version, $this->slug));
+        }
+        // @igor-ignore - Doctrine entity field; instance-scoped, not a shared service.
+        $this->status = WorkflowDefinitionStatus::Published;
+
+        return $this->touch();
+    }
+
+    /**
+     * The structure of the workflow (since 1.16): initial place, place names and transitions (name, from and to places),
+     * in a canonical order. Labels, guards and the order of places are not part of it. Two definitions with the same
+     * structure accept the same markings and moves ({@see WorkflowVersioning} compares a locked clone with its template).
+     *
+     * @return array{initial: string, places: list<string>, transitions: list<string>}
+     */
+    public function structure(): array
+    {
+        $places = $this->getPlaceNames();
+        sort($places);
+        $transitions = [];
+        foreach ($this->transitions as $transition) {
+            $from = $transition->getFromPlaces();
+            $to   = $transition->getToPlaces();
+            sort($from);
+            sort($to);
+            $transitions[] = $transition->getName() . ':' . implode(',', $from) . '>' . implode(',', $to);
+        }
+        sort($transitions);
+
+        return ['initial' => $this->initialPlace, 'places' => $places, 'transitions' => $transitions];
+    }
+
+    /**
      * Makes a new, unsaved definition the first draft of a scope (since 1.15, tenancy).
      */
     public function startAsDraft(?WorkflowTenant $tenant): self
@@ -624,13 +711,14 @@ class WorkflowDefinition
         $copy->status          = WorkflowDefinitionStatus::Draft;
         $copy->templateVersion = $templateVersion ?? ($this->tenantKey === $copy->tenantKey ? $this->templateVersion : null);
         foreach ($this->places as $place) {
-            $copy->addPlace(new WorkflowPlace($place->getName(), $place->getLabel(), $place->getSortOrder()));
+            $copy->addPlace((new WorkflowPlace($place->getName(), $place->getLabel(), $place->getSortOrder()))->setLabelTranslation($place->getLabelKey(), $place->getLabelDomain()));
         }
         foreach ($this->transitions as $transition) {
             $copy->addTransition((new WorkflowTransition($transition->getName(), $transition->getFromPlaces(), $transition->getToPlaces(), $transition->getLabel()))
                 ->setGuardPermission($transition->getGuardPermission())
                 ->setGuardExpression($transition->getGuardExpression())
-                ->setAutomatic($transition->isAutomatic()));
+                ->setAutomatic($transition->isAutomatic())
+                ->setLabelTranslation($transition->getLabelKey(), $transition->getLabelDomain()));
         }
         foreach ($this->matchRules as $rule) {
             $copy->addMatchRule((new WorkflowMatchRule($rule->getParameterKey(), $rule->getParameterValue(), $rule->getSortOrder()))->setMetadata($rule->getMetadata()));

@@ -31,6 +31,8 @@ action:
   new_draft: 'Nuova bozza'
   publish: 'Pubblica'
   clone_template: 'Personalizza per questa organizzazione'
+  retire: 'Ritira'
+  reinstate: 'Ripristina'
 
 status:
   enabled: Attivo
@@ -38,6 +40,7 @@ status:
   default: Predefinito
   initial: Iniziale
   draft: 'Bozza'
+  retired: 'Ritirato'
 
 workflow_type:
   state_machine: 'Macchina a stati'
@@ -89,6 +92,9 @@ definition:
   confirm_draft: 'Creare una bozza di "%name%"? I soggetti usano la versione pubblicata finché non pubblichi la bozza.'
   confirm_publish: 'Pubblicare "%name%"? I nuovi soggetti partono da questa versione; quelli in corso mantengono la loro.'
   confirm_clone: 'Copiare il modello "%name%" in questa organizzazione come bozza?'
+  confirm_retire: 'Ritirare "%name%"? Le nuove richieste usano di nuovo il modello della piattaforma; quelle già in corso mantengono questa versione.'
+  confirm_reinstate: 'Ripristinare "%name%"? Le nuove richieste usano di nuovo questa versione invece del modello della piattaforma.'
+  structure_locked: 'Stati e transizioni seguono il modello della piattaforma: si possono modificare solo guardie e condizioni.'
 
 table:
   name: Nome
@@ -134,6 +140,7 @@ form:
     general: 'Nome, slug, soggetto associato e priorità del workflow.'
     guard_permission: 'Solo un attore con questo permesso nel contesto del soggetto può applicare la transizione (es. leave.approve).'
     guard_expression: 'Confronta variabili con valori, es. days <= 2 and type == ''vacation''. Variabili: %variables%.'
+    label_key: 'Chiave di traduzione facoltativa dell''etichetta (es. workflow.leave.approved); se non ha traduzione viene mostrata l''etichetta.'
     automatic: 'Applicata appena è abilitata e le sue guardie passano (es. approvazione automatica).'
   field:
     name: Nome
@@ -156,6 +163,8 @@ form:
     to_places: 'Stati di destinazione'
     guard_permission: 'Permesso richiesto'
     guard_expression: 'Condizione'
+    label_key: 'Chiave di traduzione dell''etichetta'
+    label_domain: 'Dominio di traduzione'
     automatic: 'Applica automaticamente'
   placeholder:
     select_places: 'Cerca e seleziona stati…'
@@ -188,6 +197,8 @@ flash:
   deleted: 'Definizione di workflow eliminata.'
   published: 'Definizione di workflow pubblicata.'
   cloned: 'Modello copiato in questa organizzazione come bozza.'
+  retired: 'Workflow ritirato: le nuove richieste usano il modello della piattaforma.'
+  reinstated: 'Workflow ripristinato: le nuove richieste lo usano di nuovo.'
   published_read_only: 'Una versione pubblicata non si può modificare: crea una nuova bozza.'
 
 error:
@@ -197,6 +208,8 @@ error:
   already_customized: 'Questa organizzazione ha già la sua versione di quel workflow.'
   subject_class_not_allowed: 'Questa organizzazione non può creare workflow per questa classe di soggetto.'
   definition_in_use: 'Questo workflow non può essere eliminato: %count% richiesta/e in corso usano ancora una sua versione. Disattivalo invece.'
+  cannot_retire: 'Questo workflow non può essere ritirato: le nuove richieste hanno bisogno di un modello della piattaforma abilitato.'
+  structure_locked: 'Stati e transizioni seguono il modello della piattaforma e non possono essere modificati qui.'
 
 kpi:
   definitions: 'Definizioni'
@@ -249,6 +262,11 @@ workflow_place:
   label:
     placeholder: 'Inviato'
     help: 'Etichetta visualizzata facoltativa.'
+  label_key:
+    placeholder: 'workflow.leave.approved'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Dominio della chiave di traduzione (vuoto = messages).'
   sort_order:
     placeholder: '0'
     help: 'Posizione negli elenchi e nel diagramma.'
@@ -260,6 +278,11 @@ workflow_transition:
   label:
     placeholder: 'Invia per approvazione'
     help: 'Etichetta visualizzata facoltativa.'
+  label_key:
+    placeholder: 'workflow.leave.approve'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Dominio della chiave di traduzione (vuoto = messages).'
 
 scope:
   global: 'Modello globale'

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Support\Tenancy;
 
+use LogicException;
 use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
+use Nowo\WorkflowBundle\Enum\WorkflowPinMode;
 use Nowo\WorkflowBundle\Model\WorkflowMarkingView;
+use Nowo\WorkflowBundle\Model\WorkflowPinResult;
 use Nowo\WorkflowBundle\Model\WorkflowTransitionResult;
 
 /**
@@ -31,5 +34,10 @@ final class HostRuntime implements WorkflowRuntimeInterface
     public function marking(object $subject, string $workflowSlug): WorkflowMarkingView
     {
         return new WorkflowMarkingView($workflowSlug, 0, null, []);
+    }
+
+    public function pin(object $subject, string $workflowSlug, WorkflowPinMode $mode = WorkflowPinMode::KeepExisting): WorkflowPinResult
+    {
+        throw new LogicException('The host runtime does not pin.');
     }
 }

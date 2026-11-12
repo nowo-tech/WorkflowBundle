@@ -432,7 +432,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
      */
     private function registerTenancy(ContainerBuilder $container, array $config): void
     {
-        /** @var array{tenant_resolver: string|null, subject_reference_resolver: string|null, actor_provider: string|null, subject_classes: array<string, string>, ui: array{tenant_resolver: string|null, action_checker: string|null}} $tenancy */
+        /** @var array{tenant_resolver: string|null, subject_reference_resolver: string|null, actor_provider: string|null, subject_classes: array<string, string>, lock_clone_structure: bool, ui: array{tenant_resolver: string|null, action_checker: string|null}} $tenancy */
         $tenancy = $config['tenancy'];
         /** @var array{permission_checker: string|null, variables_provider: string|null, max_automatic_transitions: int} $guards */
         $guards = $config['guards'];
@@ -455,7 +455,8 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ]);
         $container->register(SubjectPinStore::class, SubjectPinStore::class)->setAutowired(true);
         $container->register(WorkflowDefinitionLocator::class, WorkflowDefinitionLocator::class)->setAutowired(true);
-        $container->register(WorkflowVersioning::class, WorkflowVersioning::class)->setAutowired(true)->setPublic(false);
+        $container->register(WorkflowVersioning::class, WorkflowVersioning::class)->setAutowired(true)->setPublic(false)
+            ->setArgument('$lockCloneStructure', $enabled && $tenancy['lock_clone_structure']);
 
         $container->getDefinition(WorkflowResolver::class)->setArgument('$tenancy', new Reference(TenancyContext::class));
         $container->getDefinition(DatabaseWorkflowRegistry::class)->setArgument('$locator', new Reference(WorkflowDefinitionLocator::class));

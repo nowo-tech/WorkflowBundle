@@ -25,6 +25,7 @@ nowo_workflow:
         subject_reference_resolver: null   # WorkflowSubjectReferenceResolverInterface: version pins, guards, audit
         subject_classes: {}                # {Subject\Class: marking_property} tenants may create workflows for
         actor_provider: null               # WorkflowActorProviderInterface (null = security token user identifier)
+        lock_clone_structure: false        # 1.16: tenant clones keep the template's places / transitions
         ui:
             tenant_resolver: null          # WorkflowUiTenantResolverInterface (required with tenancy + UI)
             action_checker: null           # WorkflowUiActionCheckerInterface (required with tenancy + UI)
@@ -60,6 +61,7 @@ nowo_workflow:
 | `tenancy.subject_reference_resolver` | `null` | Since 1.15. `WorkflowSubjectReferenceResolverInterface`: a stable id of a subject. Without it nothing is pinned (subjects follow the current version). |
 | `tenancy.subject_classes` | `{}` | Since 1.15. `{Subject\Class: marking_property}`: the subject classes a tenant scope may create workflows for (the marking property is forced from here). In a tenant scope the type, subject class and marking property of a definition cannot be changed. Empty = tenants can only clone templates. |
 | `tenancy.actor_provider` | `null` | Since 1.15. `WorkflowActorProviderInterface`; `null` = the user identifier of the Symfony security token. |
+| `tenancy.lock_clone_structure` | `false` | Since 1.16. Tenant clones of a global template keep its places, transitions and initial place: tenants only edit guards (permission, condition, automatic) and the general and match-rule fields. Enforced by the editor (read-only fields, no add / remove) and by `WorkflowVersioning::publish()` (the structure must match the template version it was cloned from). Applies to every tenant definition whose slug has a global template. See [MULTITENANCY.md](MULTITENANCY.md#locked-clones). |
 | `tenancy.ui.tenant_resolver` / `tenancy.ui.action_checker` | `null` | Since 1.15. `WorkflowUiTenantResolverInterface` (scope of a UI request, e.g. the `{uuid}` of `web_ui.path_prefix`) and `WorkflowUiActionCheckerInterface` (view / edit / publish). Both are **required** with tenancy while `web_ui.enabled` is true (the build fails otherwise). The action checker can be set without tenancy too (asked on top of the access policy). |
 | `guards.permission_checker` | `null` | Since 1.15. `WorkflowTransitionPermissionCheckerInterface`: enables the "permission" guard field of transitions. A stored permission guard without this port blocks the transition. |
 | `guards.variables_provider` | `null` | Since 1.15. `WorkflowSubjectVariablesProviderInterface`: the whitelist of scalar variables of the "condition" field. A stored condition without this port blocks the transition. |

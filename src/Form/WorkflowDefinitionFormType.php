@@ -37,8 +37,10 @@ final class WorkflowDefinitionFormType extends AbstractType
     {
         $section = $options['section'];
 
+        $structureLocked = $options['structure_locked'];
+
         if ($section === WorkflowDefinitionFormSection::General) {
-            $this->addGeneralFields($builder, $options['slug_locked'], $options['binding_locked'], $options['strict_names']);
+            $this->addGeneralFields($builder, $options['slug_locked'], $options['binding_locked'], $options['strict_names'], $structureLocked);
         }
 
         if ($section === WorkflowDefinitionFormSection::MatchRules) {
@@ -46,18 +48,18 @@ final class WorkflowDefinitionFormType extends AbstractType
         }
 
         if ($section === WorkflowDefinitionFormSection::Places) {
-            $this->addPlacesFields($builder, $options['strict_names']);
+            $this->addPlacesFields($builder, $options['strict_names'], $structureLocked);
         }
 
         if ($section === WorkflowDefinitionFormSection::Transitions) {
-            $this->addTransitionsFields($builder, $options['guards'], $options['strict_names']);
+            $this->addTransitionsFields($builder, $options['guards'], $options['strict_names'], $structureLocked);
         }
     }
 
     /**
      * @param FormBuilderInterface<WorkflowDefinition|null> $builder
      */
-    private function addGeneralFields(FormBuilderInterface $builder, bool $slugLocked, bool $bindingLocked = false, bool $strictNames = false): void
+    private function addGeneralFields(FormBuilderInterface $builder, bool $slugLocked, bool $bindingLocked = false, bool $strictNames = false, bool $structureLocked = false): void
     {
         $this->addText($builder, 'name', ['label' => 'form.field.name']);
         // With tenancy the slug ties the versions of a definition together: set once, when it is created.
@@ -68,7 +70,8 @@ final class WorkflowDefinitionFormType extends AbstractType
             'choice_label' => static fn (WorkflowType $type): string => 'workflow_type.' . $type->value,
             'disabled'     => $bindingLocked,
         ]);
-        $this->addText($builder, 'initialPlace', ['label' => 'form.field.initial_place']);
+        // Since 1.16: the initial place is part of a locked clone's structure (tenancy.lock_clone_structure).
+        $this->addText($builder, 'initialPlace', ['label' => 'form.field.initial_place', 'disabled' => $structureLocked]);
         // Audit NO M2: in a tenant scope the runtime binding comes from the template or tenancy.subject_classes.
         $this->addText($builder, 'subjectClass', ['label' => 'form.field.subject_class', 'disabled' => $bindingLocked]);
         $this->addText($builder, 'markingProperty', ['label' => 'form.field.marking_property', 'disabled' => $bindingLocked]);
@@ -96,13 +99,15 @@ final class WorkflowDefinitionFormType extends AbstractType
     /**
      * @param FormBuilderInterface<WorkflowDefinition|null> $builder
      */
-    private function addPlacesFields(FormBuilderInterface $builder, bool $strictNames = false): void
+    private function addPlacesFields(FormBuilderInterface $builder, bool $strictNames = false, bool $structureLocked = false): void
     {
+        // Since 1.16: a locked clone's places are read-only (no add, no remove, no change).
         $this->addWithDefaults($builder, 'places', CollectionType::class, [
             'entry_type'     => WorkflowPlaceType::class,
             'entry_options'  => ['strict_names' => $strictNames],
-            'allow_add'      => true,
-            'allow_delete'   => true,
+            'allow_add'      => !$structureLocked,
+            'allow_delete'   => !$structureLocked,
+            'disabled'       => $structureLocked,
             'by_reference'   => false,
             'label'          => false,
             'prototype'      => true,
@@ -114,16 +119,16 @@ final class WorkflowDefinitionFormType extends AbstractType
      * @param FormBuilderInterface<WorkflowDefinition|null> $builder
      * @param array{permission: bool, variables: list<string>|null, automatic: bool} $guards
      */
-    private function addTransitionsFields(FormBuilderInterface $builder, array $guards, bool $strictNames = false): void
+    private function addTransitionsFields(FormBuilderInterface $builder, array $guards, bool $strictNames = false, bool $structureLocked = false): void
     {
-        $builder->addEventListener(FormEvents::PRE_SET_DATA, static function (FormEvent $event) use ($guards, $strictNames): void {
+        $builder->addEventListener(FormEvents::PRE_SET_DATA, static function (FormEvent $event) use ($guards, $strictNames, $structureLocked): void {
             $definition = $event->getData();
             $placeNames = $definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : [];
 
-            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, self::isStateMachine($definition));
+            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, self::isStateMachine($definition), $structureLocked);
         });
 
-        $builder->addEventListener(FormEvents::PRE_SUBMIT, static function (FormEvent $event) use ($guards, $strictNames): void {
+        $builder->addEventListener(FormEvents::PRE_SUBMIT, static function (FormEvent $event) use ($guards, $strictNames, $structureLocked): void {
             $definition = $event->getForm()->getData();
             $submitted  = $event->getData();
 
@@ -131,7 +136,7 @@ final class WorkflowDefinitionFormType extends AbstractType
                 ? PlaceChoiceHelper::extractNamesFromSubmittedPlaces($submitted['places'])
                 : ($definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : []);
 
-            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, self::isStateMachine($definition));
+            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, self::isStateMachine($definition), $structureLocked);
         });
     }
 
@@ -145,17 +150,18 @@ final class WorkflowDefinitionFormType extends AbstractType
      * @param list<string> $placeNames
      * @param array{permission: bool, variables: list<string>|null, automatic: bool} $guards
      */
-    private static function configureTransitionsField(FormInterface $form, array $placeNames, array $guards, bool $strictNames = false, bool $singleTarget = false): void
+    private static function configureTransitionsField(FormInterface $form, array $placeNames, array $guards, bool $strictNames = false, bool $singleTarget = false, bool $structureLocked = false): void
     {
         if ($form->has('transitions')) {
             $form->remove('transitions');
         }
 
         $form->add('transitions', CollectionType::class, [
-            'entry_type'     => WorkflowTransitionType::class,
-            'entry_options'  => ['place_choices' => $placeNames, 'guards' => $guards, 'strict_names' => $strictNames, 'single_target' => $singleTarget],
-            'allow_add'      => true,
-            'allow_delete'   => true,
+            'entry_type'    => WorkflowTransitionType::class,
+            'entry_options' => ['place_choices' => $placeNames, 'guards' => $guards, 'strict_names' => $strictNames, 'single_target' => $singleTarget, 'structure_locked' => $structureLocked],
+            // Since 1.16: a locked clone keeps its transitions (only their guards and conditions are edited).
+            'allow_add'      => !$structureLocked,
+            'allow_delete'   => !$structureLocked,
             'by_reference'   => false,
             'label'          => false,
             'prototype'      => true,
@@ -178,7 +184,10 @@ final class WorkflowDefinitionFormType extends AbstractType
             // Since 1.15 (audit NO M2): tenant scopes cannot change the runtime binding; strict place / transition names.
             'binding_locked' => false,
             'strict_names'   => false,
+            // Since 1.16 (tenancy.lock_clone_structure): places, transitions and the initial place are read-only.
+            'structure_locked' => false,
         ]);
+        $resolver->setAllowedTypes('structure_locked', 'bool');
         $resolver->setAllowedTypes('section', WorkflowDefinitionFormSection::class);
         $resolver->setAllowedTypes('guards', 'array');
         $resolver->setAllowedTypes('slug_locked', 'bool');

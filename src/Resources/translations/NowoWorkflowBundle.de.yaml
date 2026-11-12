@@ -31,6 +31,8 @@ action:
   new_draft: 'Neuer Entwurf'
   publish: 'Veröffentlichen'
   clone_template: 'Für diese Organisation anpassen'
+  retire: 'Außer Betrieb nehmen'
+  reinstate: 'Wieder aktivieren'
 
 status:
   enabled: Aktiv
@@ -38,6 +40,7 @@ status:
   default: Standard
   initial: Ausgangszustand
   draft: 'Entwurf'
+  retired: 'Außer Betrieb'
 
 workflow_type:
   state_machine: Zustandsautomat
@@ -89,6 +92,9 @@ definition:
   confirm_draft: 'Einen Entwurf von „%name%“ anlegen? Subjekte laufen mit der veröffentlichten Version weiter, bis du den Entwurf veröffentlichst.'
   confirm_publish: '„%name%“ veröffentlichen? Neue Subjekte starten mit dieser Version; laufende behalten ihre.'
   confirm_clone: 'Die Vorlage „%name%“ als Entwurf in diese Organisation kopieren?'
+  confirm_retire: '„%name%“ außer Betrieb nehmen? Neue Anträge verwenden wieder die Plattformvorlage; laufende Anträge behalten diese Version.'
+  confirm_reinstate: '„%name%“ wieder aktivieren? Neue Anträge verwenden wieder diese Version statt der Plattformvorlage.'
+  structure_locked: 'Stellen und Übergänge folgen der Plattformvorlage: nur Guards und Bedingungen können geändert werden.'
 
 table:
   name: Bezeichnung
@@ -134,6 +140,7 @@ form:
     general: 'Bezeichnung, Slug, Subjekt-Bindung und Priorität des Workflows.'
     guard_permission: 'Nur ein Akteur mit dieser Berechtigung im Kontext des Subjekts darf den Übergang ausführen (z. B. leave.approve).'
     guard_expression: 'Variablen mit Werten vergleichen, z. B. days <= 2 and type == ''vacation''. Variablen: %variables%.'
+    label_key: 'Optionaler Übersetzungsschlüssel der Bezeichnung (z. B. workflow.leave.approved); ohne Übersetzung wird die Bezeichnung angezeigt.'
     automatic: 'Wird angewendet, sobald er möglich ist und seine Guards erfüllt sind (z. B. automatische Genehmigung).'
   field:
     name: Bezeichnung
@@ -156,6 +163,8 @@ form:
     to_places: 'Zielzustände'
     guard_permission: 'Erforderliche Berechtigung'
     guard_expression: 'Bedingung'
+    label_key: 'Übersetzungsschlüssel der Bezeichnung'
+    label_domain: 'Übersetzungsdomäne'
     automatic: 'Automatisch anwenden'
   placeholder:
     select_places: 'Zustände suchen und auswählen…'
@@ -188,6 +197,8 @@ flash:
   deleted: 'Workflow-Definition gelöscht.'
   published: 'Workflow-Definition veröffentlicht.'
   cloned: 'Vorlage als Entwurf in diese Organisation kopiert.'
+  retired: 'Workflow außer Betrieb: neue Anträge verwenden die Plattformvorlage.'
+  reinstated: 'Workflow wieder aktiv: neue Anträge verwenden ihn wieder.'
   published_read_only: 'Eine veröffentlichte Version kann nicht bearbeitet werden: lege einen neuen Entwurf an.'
 
 error:
@@ -197,6 +208,8 @@ error:
   already_customized: 'Diese Organisation hat bereits eine eigene Version dieses Workflows.'
   subject_class_not_allowed: 'Diese Organisation kann keine Workflows für diese Subjektklasse anlegen.'
   definition_in_use: 'Dieser Workflow kann nicht gelöscht werden: %count% laufende Vorgänge nutzen noch eine seiner Versionen. Deaktiviere ihn stattdessen.'
+  cannot_retire: 'Dieser Workflow kann nicht außer Betrieb genommen werden: neue Anträge brauchen eine aktivierte Plattformvorlage.'
+  structure_locked: 'Stellen und Übergänge folgen der Plattformvorlage und können hier nicht geändert werden.'
 
 kpi:
   definitions: 'Definitionen'
@@ -249,6 +262,11 @@ workflow_place:
   label:
     placeholder: 'Eingereicht'
     help: 'Optionale Anzeigebezeichnung.'
+  label_key:
+    placeholder: 'workflow.leave.approved'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domäne des Übersetzungsschlüssels (leer = messages).'
   sort_order:
     placeholder: '0'
     help: 'Position in Listen und im Diagramm.'
@@ -260,6 +278,11 @@ workflow_transition:
   label:
     placeholder: 'Zur Freigabe einreichen'
     help: 'Optionale Anzeigebezeichnung.'
+  label_key:
+    placeholder: 'workflow.leave.approve'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domäne des Übersetzungsschlüssels (leer = messages).'
 
 scope:
   global: 'Globale Vorlage'

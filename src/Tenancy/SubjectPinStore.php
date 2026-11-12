@@ -109,6 +109,27 @@ final readonly class SubjectPinStore
     }
 
     /**
+     * Moves the subject's existing pin of that workflow to another definition version (since 1.16,
+     * `WorkflowPinMode::Repin`) and returns the id of the version it was pinned to, or null when it was not pinned (then
+     * nothing is written: use {@see pin()}). A plain DBAL update by pin id, like every write of this store.
+     */
+    public function repin(?WorkflowTenant $tenant, string $workflowSlug, WorkflowSubjectRef $subject, WorkflowDefinition $definition): ?int
+    {
+        $m = $this->metadata();
+        foreach ($this->rows($tenant, $subject, $workflowSlug) as $row) {
+            $this->repository->connection()->executeStatement(
+                'UPDATE ' . $m['table'] . ' SET ' . $m['definition'] . ' = ? WHERE ' . $m['id'] . ' = ?',
+                [$definition->getId(), $row['id']],
+                [Types::INTEGER, Types::INTEGER],
+            );
+
+            return $row['definition'];
+        }
+
+        return null;
+    }
+
+    /**
      * The pin read with a locking read (MySQL / MariaDB `LOCK IN SHARE MODE`, PostgreSQL `FOR SHARE`; a plain read on
      * other platforms, which have no older snapshot here).
      */
