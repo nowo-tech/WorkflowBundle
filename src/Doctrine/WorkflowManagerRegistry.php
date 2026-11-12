@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Doctrine;
 use Doctrine\Persistence\ManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use Doctrine\Persistence\ObjectRepository;
+use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 
 use function str_starts_with;
 use function strrpos;
@@ -85,6 +86,12 @@ final readonly class WorkflowManagerRegistry implements ManagerRegistry
     public function getRepository(string $persistentObject, ?string $persistentManagerName = null): ObjectRepository
     {
         if ($persistentManagerName === null && self::isBundleEntity($persistentObject)) {
+            // The private manager has its own DefaultRepositoryFactory (audit NX), which cannot build a service
+            // repository (it takes a registry, not a manager): this registry is the one it must see.
+            if ($this->entityManager->getClassMetadata($persistentObject)->customRepositoryClassName === WorkflowDefinitionRepository::class) {
+                return new WorkflowDefinitionRepository($this); // @phpstan-ignore return.type (the repository of that class)
+            }
+
             return $this->entityManager->getRepository($persistentObject); // @phpstan-ignore return.type (the repository of that class)
         }
 

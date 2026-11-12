@@ -53,6 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Private manager repository factory (audit NX):** `WorkflowEntityManager` now gives its private entity manager its own
+  `Doctrine\ORM\Repository\DefaultRepositoryFactory` on a clone of the source configuration. The shared factory
+  (DoctrineBundle's `ContainerRepositoryFactory`) kept one repository per manager instance for the life of the process,
+  so every replaced private manager (after a failed flush or rollback) stayed in memory, about 58 KB each, in
+  FrankenPHP worker mode (kernel reset false). Regression test `PrivateManagerRepositoryFactoryTest`.
+
 ## [1.15.0] - 2026-11-12
 
 Multitenant workflows (owner request D-20261112-10, Beacon): tenant-scoped definitions with global templates,
