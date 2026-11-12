@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.14.1] - 2026-11-12](#1141---2026-11-12)
 - [[1.14.0] - 2026-11-12](#1140---2026-11-12)
 - [[1.13.0] - 2026-11-10](#1130---2026-11-10)
 - [[1.12.0] - 2026-10-30](#1120---2026-10-30)
@@ -51,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-11-12
+
 Fixes for three Low findings of the 1.14.0 audit (NF3). Nothing to change in your application. See
 [UPGRADING](UPGRADING.md#to-1141).
 
@@ -70,6 +73,8 @@ Fixes for three Low findings of the 1.14.0 audit (NF3). Nothing to change in you
   `WorkflowUiAccessCheckerInterface` registered with `on_invalid: ignore` (`IGNORE_ON_INVALID_REFERENCE`) made
   `WorkflowUiSecurityPass` fail the build. Such a decorator asked to be dropped when there is nothing to decorate, so it
   is now skipped and Symfony removes it; a decorator without that flag still fails the build (audit NF2-4b).
+
+[1.14.1]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.14.1
 
 ## [1.14.0] - 2026-11-12
 
