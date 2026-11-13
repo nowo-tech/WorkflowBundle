@@ -121,6 +121,9 @@ services:
     # Since 1.15: the framework-free runtime port hosts call (REQ-ARCH-001 rule 3).
     Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface: '@Nowo\WorkflowBundle\Service\WorkflowRuntime'
 
+    # Since 1.17: which slug a subject or context runs (REQ-ARCH-001 rule 1); hosts may alias it to their own service.
+    Nowo\WorkflowBundle\Contract\WorkflowSlugResolverInterface: '@Nowo\WorkflowBundle\Service\WorkflowResolver'
+
     # Form Kit injects FormOptionsMerger into tagged form types (FormOptionsMergerInjectorCompilerPass).
     Nowo\WorkflowBundle\Form\:
         resource: '../../Form/'

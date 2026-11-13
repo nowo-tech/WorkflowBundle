@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Service;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use LogicException;
+use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
 use Nowo\WorkflowBundle\Exception\WorkflowInvalidShapeException;
@@ -29,8 +30,10 @@ use function sprintf;
  * next version number of the same tenant and slug); publishing the draft makes it the version new subjects start
  * with, while subjects already running keep the version they are pinned to. Writes go through the bundle's private
  * entity manager (the repository), never through an application manager.
+ *
+ * Since 1.17 it implements {@see WorkflowVersioningInterface}, the port hosts and the admin UI type-hint.
  */
-final readonly class WorkflowVersioning
+final readonly class WorkflowVersioning implements WorkflowVersioningInterface
 {
     /**
      * @param bool $lockCloneStructure `tenancy.lock_clone_structure` (since 1.16): tenant clones keep the places and

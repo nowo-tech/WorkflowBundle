@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.17.0](#to-1170)
 - [To 1.16.0](#to-1160)
   - [To 1.16.0](#to-1160-1)
 - [To 1.15.2](#to-1152)
@@ -77,6 +78,32 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.17.0
+
+From **1.16.x** (next minor, unreleased): no migration, no configuration change, nothing to do.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+- **New ports (REQ-ARCH-001 rule 1).** Type-hint `Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface` instead
+  of `Service\WorkflowVersioning`, and `Contract\WorkflowSlugResolverInterface` when you only need the slug a subject
+  runs (`resolveSlugForSubject()`), instead of `Service\WorkflowResolver`. The class ids keep working and return the
+  same objects.
+- **Decorators.** The admin UI controller now receives `WorkflowVersioningInterface`. If you decorate or replace it,
+  the UI actions (clone, publish, retire, reinstate, delete) go through your service; keep refusing `delete()` while
+  subjects are pinned (`WorkflowDefinitionInUseException`).
+- **Deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#deferred-to-20)): the
+  `runtime.flush_after_apply` default becomes `false` (REQ-ARCH-001 rule 6; set it explicitly now to silence the 1.14
+  deprecation), and the deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` ports are removed.
+- **2.0 work on `WorkflowVersioningInterface` (REQ-ARCH-001 rule 1 stays ⚠️ until then).** In 1.17 it takes and
+  returns the bundle's `WorkflowDefinition` entity, through which Doctrine `Collection`s are reachable. 2.0 adds or
+  switches to id / slug-based forms that return VOs, e.g. `publishById(int $definitionId)`, `retireById()`,
+  `reinstateById()`, `deleteById()`, `createDraftOfId()`, and `cloneTemplate()` / `createDraft()` / `publishDraft()`
+  returning a definition VO (id, slug, version, tenant, status) instead of the entity.
+- **Slug resolver scope.** Replacing `WorkflowSlugResolverInterface` changes only what your own callers get: the
+  bundle's applicator, runtime and admin UI still use `Service\WorkflowResolver` directly.
 
 ## To 1.16.0
 

@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\DependencyInjection;
 use Nowo\UiKitBundle\Theme\ThemeSlots;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
+use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Controller\DashboardController;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
@@ -461,6 +462,8 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArgument('$logger', new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE));
         $container->register(WorkflowVersioning::class, WorkflowVersioning::class)->setAutowired(true)->setPublic(false)
             ->setArgument('$lockCloneStructure', $enabled && $tenancy['lock_clone_structure']);
+        // Since 1.17: the versioning port (REQ-ARCH-001 rule 1) the admin UI type-hints; hosts may decorate or replace it.
+        $container->setAlias(WorkflowVersioningInterface::class, WorkflowVersioning::class);
 
         $container->getDefinition(WorkflowResolver::class)->setArgument('$tenancy', new Reference(TenancyContext::class));
         $container->getDefinition(DatabaseWorkflowRegistry::class)->setArgument('$locator', new Reference(WorkflowDefinitionLocator::class));

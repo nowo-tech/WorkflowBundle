@@ -89,6 +89,8 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Contract/WorkflowContextAwareInterface.php` | Public contract | FR-API-001 |
 | `Contract/WorkflowRegistryInterface.php` | Public contract | FR-API-001 |
 | `Contract/WorkflowUiAccessCheckerInterface.php` | Public contract | FR-API-001 |
+| `Contract/WorkflowSlugResolverInterface.php` | Public port: slug a subject or context runs (1.17, REQ-ARCH-001 rule 1) | FR-API-001 |
+| `Contract/WorkflowVersioningInterface.php` | Public port: tenant versions, clones, retire, delete (1.17, REQ-ARCH-001 rule 1) | FR-API-001 |
 
 ## Twig PHP
 
