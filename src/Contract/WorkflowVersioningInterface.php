@@ -21,9 +21,11 @@ use Nowo\WorkflowBundle\Tenancy\CloneStructureLock;
  * the port hosts call (e.g. to give a new organization its own copy of a global template) and may decorate or
  * replace; {@see WorkflowVersioning} is the built-in implementation and the admin UI calls this interface.
  *
- * No Symfony, Doctrine or HTTP type: the methods take slugs, bundle VOs ({@see WorkflowTenant},
- * {@see WorkflowSubjectRef}) or the bundle's own definition aggregate ({@see WorkflowDefinition}, a bundle-owned
- * entity the host references by id or slug, never a host entity). A replacement must keep the owner rule of
+ * No Symfony, Doctrine or HTTP type in the signatures: the methods take slugs, bundle VOs ({@see WorkflowTenant},
+ * {@see WorkflowSubjectRef}) or the bundle's own definition aggregate ({@see WorkflowDefinition}). That aggregate is a
+ * bundle-owned entity, never a host entity, but it exposes Doctrine `Collection`s (places, transitions, match rules),
+ * so a framework type is reachable through this port (REQ-ARCH-001 rule 1 ⚠️): id / slug-based forms returning VOs
+ * are 2.0 work (UPGRADING "To 1.17.0"). A replacement must keep the owner rule of
  * {@see self::delete()}: a published definition is not deleted while subjects are pinned to it (the pin foreign key is
  * ON DELETE RESTRICT, so the database refuses it as well). See {@see CloneStructureLock} and
  * {@see WorkflowShapeValidator} for the checks of {@see self::publish()}.

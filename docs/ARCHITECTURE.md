@@ -37,8 +37,8 @@ class ids keep working, and you may alias the interface to your own service or d
 | Port | Built-in service | Since | Notes |
 |------|------------------|-------|-------|
 | `Contract\WorkflowRuntimeInterface` | `Service\WorkflowRuntime` | 1.15 | `can()`, `apply()`, `enabledTransitions()`, `marking()`, `pin()`. Scalars and bundle VOs only (`Model\WorkflowTransitionResult`, `WorkflowMarkingView`, `WorkflowPinResult`). |
-| `Contract\WorkflowSlugResolverInterface` | `Service\WorkflowResolver` | 1.17 | `resolveSlug(WorkflowContext)`, `resolveSlugForSubject(object)`: the slug to pass to the runtime port. |
-| `Contract\WorkflowVersioningInterface` | `Service\WorkflowVersioning` | 1.17 | Drafts, publishing, retiring, template clones, `forgetSubject()`, `delete()`. The admin UI calls it too. |
+| `Contract\WorkflowSlugResolverInterface` | `Service\WorkflowResolver` | 1.17 | `resolveSlug(WorkflowContext)`, `resolveSlugForSubject(object)`: the slug to pass to the runtime port. The bundle's own applicator, runtime and UI still use `WorkflowResolver` directly, so replacing this port only changes what host callers get. |
+| `Contract\WorkflowVersioningInterface` | `Service\WorkflowVersioning` | 1.17 | Drafts, publishing, retiring, template clones, `forgetSubject()`, `delete()`. The admin UI calls it too. Takes and returns the `WorkflowDefinition` entity (Doctrine `Collection`s reachable through it): id / slug-based forms are 2.0 work. |
 
 `Service\WorkflowApplicator` and `Service\WorkflowResolver`'s entity-returning methods stay public for standard hosts
 (final classes, no interface): the applicator works with Symfony Workflow types, so the runtime port is its
@@ -155,7 +155,7 @@ so the database refuses such a delete even when a replacement forgets the check.
 
 | Rule | Status | Where |
 |------|--------|-------|
-| 1. Interfaces + VOs | ✅ since 1.17 | runtime, slug resolver and versioning ports; VOs in `Model\` |
+| 1. Interfaces + VOs | ⚠️ until 2.0 | runtime and slug-resolver ports are framework-free (VOs in `Model\`); `WorkflowVersioningInterface` (1.17) is an interface but takes and returns the bundle's `WorkflowDefinition` entity, which exposes Doctrine `Collection`s, and has no id / VO counterpart yet |
 | 2. No forced base class / trait | ✅ | bundle-owned entities, XML mapping (1.14), subjects referenced by class and reference |
 | 3. No framework types in ports, events, VOs | ✅ since 1.15 | deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` kept for BC until 2.0 |
 | 4. Events carry ids | ✅ | `WorkflowTransitionAppliedEvent` |
@@ -174,7 +174,8 @@ These need a major release (they change a default or remove a public API); they 
   1.14) and the recipe sets `false`.
 - **Removal of the deprecated ports.** `WorkflowRegistryInterface` as a host port and
   `WorkflowUiAccessCheckerInterface::isGranted(Request)` go away.
-- **Versioning by id.** `WorkflowVersioningInterface` takes the bundle's own `WorkflowDefinition` aggregate for the
-  actions on an already authorised version (`publish()`, `retire()`, `reinstate()`, `delete()`, …). It is a
-  bundle-owned entity, not a host entity or a framework type; id-based signatures would change the interface, so they
-  wait for 2.0.
+- **Versioning by id (rule 1, ⚠️ until then).** `WorkflowVersioningInterface` takes and returns the bundle's own
+  `WorkflowDefinition` aggregate (`cloneTemplate()`, `createDraft*()`, `publish*()`, `retire()`, `reinstate()`,
+  `delete()`, …). It is a bundle-owned entity, not a host entity, but it exposes Doctrine `Collection`s (places,
+  transitions, match rules), so a framework type is reachable through the port. 2.0 gives it id / slug-based forms
+  that return VOs; changing the signatures would break implementers and decorators, so it waits for the major.

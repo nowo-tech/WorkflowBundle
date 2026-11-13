@@ -14,7 +14,8 @@ use Nowo\WorkflowBundle\Service\WorkflowResolver;
  * {@see WorkflowRuntimeInterface}. Scalars and bundle VOs only (no entity, no Symfony or Doctrine type).
  * {@see WorkflowResolver} is the built-in implementation (class distance, rule specificity, priority; with tenancy the
  * subject's tenant version wins over the global template); a host may decorate or replace it by aliasing this
- * interface.
+ * interface. The bundle's own applicator, runtime and admin UI still call {@see WorkflowResolver} directly, so a
+ * replacement only changes what host callers of this port get, not which definition the bundle runs.
  */
 interface WorkflowSlugResolverInterface
 {

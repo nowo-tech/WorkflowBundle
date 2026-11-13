@@ -96,8 +96,14 @@ composer update nowo-tech/workflow-bundle
   subjects are pinned (`WorkflowDefinitionInUseException`).
 - **Deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#deferred-to-20)): the
   `runtime.flush_after_apply` default becomes `false` (REQ-ARCH-001 rule 6; set it explicitly now to silence the 1.14
-  deprecation), the deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` ports are removed, and
-  the versioning actions may take ids instead of the bundle's `WorkflowDefinition` aggregate.
+  deprecation), and the deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` ports are removed.
+- **2.0 work on `WorkflowVersioningInterface` (REQ-ARCH-001 rule 1 stays ⚠️ until then).** In 1.17 it takes and
+  returns the bundle's `WorkflowDefinition` entity, through which Doctrine `Collection`s are reachable. 2.0 adds or
+  switches to id / slug-based forms that return VOs, e.g. `publishById(int $definitionId)`, `retireById()`,
+  `reinstateById()`, `deleteById()`, `createDraftOfId()`, and `cloneTemplate()` / `createDraft()` / `publishDraft()`
+  returning a definition VO (id, slug, version, tenant, status) instead of the entity.
+- **Slug resolver scope.** Replacing `WorkflowSlugResolverInterface` changes only what your own callers get: the
+  bundle's applicator, runtime and admin UI still use `Service\WorkflowResolver` directly.
 
 ## To 1.16.0
 
