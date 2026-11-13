@@ -57,6 +57,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Identity key columns declared for the REQ-SEC-006 gate.** `Collation\WorkflowExactKeyColumns` declares
+  `tenant_key` / `slug` of the definition table and `tenant_key` / `workflow_slug` / `subject_ref` of the subject pin
+  table as identity keys, with the configured `table_prefix` applied, so they are named as the host's schema really
+  names them. The contract comes from the dependency-free
+  `nowo-tech/migrations-kit-contracts`; the service is tagged by autoconfiguration, so a host that also installs
+  MigrationsKitBundle gets `nowo:migrations:check-key-collations` failing on any of those columns that is not in a
+  binary NO PAD collation — including a table created before 1.15.2, converted by hand, or a column added later and
+  never collated, which the schema listener cannot see. A host without MigrationsKitBundle simply never reads the
+  tag.
+- **New CI gate.** The `mysql-schema` job (MySQL 8.4 and MariaDB 11.4) also runs
+  `tests/Integration/Collation/WorkflowExactKeyColumnsTest`, which creates the schema from the bundle's own mapping
+  under a non-default table prefix and asserts every declared column. A key column added to the mapping and left on
+  the server default now fails this bundle's own pipeline.
+
 ## [1.17.0] - 2026-11-13
 
 ### Added

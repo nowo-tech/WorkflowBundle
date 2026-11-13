@@ -7,11 +7,13 @@ namespace Nowo\WorkflowBundle\DependencyInjection;
 use Nowo\UiKitBundle\Theme\ThemeSlots;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
+use Nowo\WorkflowBundle\Collation\WorkflowExactKeyColumns;
 use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Controller\DashboardController;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
 use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
+use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Doctrine\WorkflowManagerRegistry;
 use Nowo\WorkflowBundle\EventListener\TenantIsolationGuardSubscriber;
@@ -367,6 +369,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.ui.required_roles', $config['security']['access_roles']);
 
         $this->registerTenancy($container, $config);
+        $this->registerExactKeyColumns($container);
 
         $container->setParameter(Configuration::ALIAS . '.security.access_roles', $config['security']['access_roles']);
         $container->setParameter(Configuration::ALIAS . '.security.access_checker', $config['security']['access_checker']);
@@ -528,6 +531,19 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArguments([new Reference(AfterCommitDispatcher::class), new Reference(TenancyContext::class)])
             ->addTag('kernel.event_subscriber');
         $container->getDefinition(WorkflowApplicator::class)->setArgument('$audit', new Reference(AfterCommitDispatcher::class));
+    }
+
+    /**
+     * REQ-SEC-006: declare the bundle's identity key columns, so a host's nowo:migrations:check-key-collations
+     * asserts them against its real schema. The contract comes from nowo-tech/migrations-kit-contracts (interfaces
+     * and value objects, no dependencies beyond PHP); the check itself lives in MigrationsKitBundle, which only the
+     * host needs. A host without it simply never reads the tag.
+     */
+    private function registerExactKeyColumns(ContainerBuilder $container): void
+    {
+        $container->register(WorkflowExactKeyColumns::class, WorkflowExactKeyColumns::class)
+            ->setArguments([new Reference(TableNamePrefixer::class)])
+            ->addTag('nowo_migrations_kit.exact_key_columns');
     }
 
     /**
