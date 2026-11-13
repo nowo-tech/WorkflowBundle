@@ -25,6 +25,8 @@
         {% set form = section.form %}
         {% set _locked = structure_locked|default(false) %}
         {{ form_start(form, {attr: {id: 'workflow-definition-form', class: nowo_ui_class('form', _b), 'data-nowo-ui-region': 'form'}|merge(nowo_ui_theme.attributesFor('form', _b, {}, nowo_ui_page_type))}) }}
+            {# Since 1.15.2: form-level errors (transition shapes). #}
+            {{ form_errors(form) }}
             {% if _locked and section.id in ['general', 'places', 'transitions'] %}
                 <p class="{{ nowo_ui_class('flash_info', _b) }}" data-testid="workflow-structure-locked">{{ 'definition.structure_locked'|trans({}, 'NowoWorkflowBundle') }}</p>
             {% endif %}

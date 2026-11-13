@@ -23,6 +23,7 @@ use function ceil;
 use function count;
 use function in_array;
 use function is_array;
+use function is_numeric;
 use function is_string;
 use function max;
 use function mb_strtolower;
@@ -99,6 +100,40 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
         $this->getEntityManager()->remove($definition);
         if ($flush) {
             $this->getEntityManager()->flush();
+        }
+    }
+
+    /**
+     * The ids of every stored definition (all tenants, versions and statuses), ascending (since 1.15.2, lint).
+     *
+     * @return list<int>
+     */
+    public function findAllIds(): array
+    {
+        $ids = [];
+        foreach ($this->createQueryBuilder('d')->select('d.id')->orderBy('d.id', 'ASC')->getQuery()->getScalarResult() as $row) {
+            if (is_array($row) && is_numeric($row['id'] ?? null)) {
+                $ids[] = (int) $row['id'];
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Detaches read-only definitions and their places, transitions and match rules from the manager (since 1.15.2, so
+     * a scan over every version keeps a bounded memory; nothing is flushed or cleared).
+     *
+     * @param iterable<WorkflowDefinition> $definitions
+     */
+    public function release(iterable $definitions): void
+    {
+        $manager = $this->getEntityManager();
+        foreach ($definitions as $definition) {
+            foreach ([...$definition->getPlaces(), ...$definition->getTransitions(), ...$definition->getMatchRules()] as $child) {
+                $manager->detach($child);
+            }
+            $manager->detach($definition);
         }
     }
 

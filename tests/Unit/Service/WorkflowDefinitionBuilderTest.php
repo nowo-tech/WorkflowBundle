@@ -76,6 +76,7 @@ final class WorkflowDefinitionBuilderTest extends TestCase
         yield 'state machine, no source' => [WorkflowType::StateMachine, [], ['done']];
         yield 'workflow, no target' => [WorkflowType::Workflow, ['review'], []];
         yield 'workflow, no source' => [WorkflowType::Workflow, [], ['done']];
+        yield 'duplicate source' => [WorkflowType::StateMachine, ['review', 'review'], ['done']];
     }
 
     /**

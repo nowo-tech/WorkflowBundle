@@ -47,6 +47,17 @@ final class ShapeAndLintKernelTest extends TestCase
         self::assertStringContainsString('1 definition(s) checked: every transition is valid.', $lint->getDisplay());
 
         $draft = self::versioning($kernel)->cloneTemplate('leave', new WorkflowTenant('org-a'));
+
+        // The transitions editor refuses a second target on a state machine and says why (form-level error).
+        $transitions = [];
+        foreach ($draft->getTransitions() as $index => $transition) {
+            $transitions[$index] = ['name' => $transition->getName(), 'label' => '', 'fromPlaces' => $transition->getFromPlaces(), 'toPlaces' => $transition->getName() === 'submit' ? ['submitted', 'approved'] : $transition->getToPlaces(), 'guardExpression' => $transition->getGuardExpression() ?? '', 'guardPermission' => $transition->getGuardPermission() ?? ''];
+        }
+        $editor = self::send($kernel, self::ui('org-a', '/definitions/' . $draft->getId() . '/edit/transitions'), 'admin-org-a', 'POST', ['workflow_definition_form' => ['transitions' => $transitions, '_token' => self::csrf($kernel, 'workflow_definition_form')]]);
+        self::assertSame(422, $editor->getStatusCode());
+        self::assertStringContainsString('Transition &quot;submit&quot;: a state machine transition has exactly one target place.', (string) $editor->getContent());
+        $draft = self::repository($kernel)->findDraft('leave', new WorkflowTenant('org-a'));
+        self::assertNotNull($draft);
         $draft->addTransition(new WorkflowTransition('fork', ['submitted'], ['approved', 'rejected']));
         self::repository($kernel)->save($draft);
         $id = (int) $draft->getId();
