@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.17.0] - 2026-11-13](#1170---2026-11-13)
 - [[1.16.0] - 2026-11-13](#1160---2026-11-13)
 - [[1.15.2] - 2026-11-13](#1152---2026-11-13)
 - [[1.15.1] - 2026-11-12](#1151---2026-11-12)
@@ -56,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-13
+
 ### Added
 
 - **Versioning and slug-resolver ports (REQ-ARCH-001 rule 1):** `Contract\WorkflowVersioningInterface` (drafts,
@@ -70,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`docs/ARCHITECTURE.md`:** ports, SPI, events, persistence, the standard Symfony and DDD host paths, the
   REQ-ARCH-001 status per rule, and what waits for 2.0 (`runtime.flush_after_apply` default, removal of the deprecated
   ports, id-based versioning signatures).
+
+[1.17.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.17.0
 
 ## [1.16.0] - 2026-11-13
 

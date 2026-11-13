@@ -4,6 +4,7 @@
 
 - [Unreleased](#unreleased)
 - [To 1.17.0](#to-1170)
+- [To 1.17.0](#to-1170-1)
 - [To 1.16.0](#to-1160)
   - [To 1.16.0](#to-1160-1)
 - [To 1.15.2](#to-1152)
@@ -78,6 +79,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.17.0
+
+From **1.16.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 ## To 1.17.0
 
