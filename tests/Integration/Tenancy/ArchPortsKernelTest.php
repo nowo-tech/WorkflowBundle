@@ -6,12 +6,16 @@ namespace Nowo\WorkflowBundle\Tests\Integration\Tenancy;
 
 use Nowo\WorkflowBundle\Contract\WorkflowSlugResolverInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
+use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
+use Nowo\WorkflowBundle\Model\WorkflowDefinitionRef;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use Nowo\WorkflowBundle\Service\WorkflowVersioning;
+use Nowo\WorkflowBundle\Service\WorkflowVersionManager;
 use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\FixedSlugResolver;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\RecordingVersioningDecorator;
@@ -28,6 +32,9 @@ use function sys_get_temp_dir;
  * 1.17 (REQ-ARCH-001 rule 1): the versioning and slug-resolver ports. The interfaces resolve to the built-in services
  * (same objects, same answers as 1.16), a host can decorate or replace them, and the admin UI goes through the
  * versioning port. The owner rule on deletes (no delete while subjects are pinned) holds behind a decorator.
+ *
+ * 1.19 (REQ-ARCH-001 rule 1): the framework-free versioning twin {@see WorkflowVersionManagerInterface} runs the same
+ * flows with references and views only, and a host decorator of the deprecated SPI is honoured through it.
  */
 final class ArchPortsKernelTest extends TestCase
 {
@@ -144,5 +151,93 @@ final class ArchPortsKernelTest extends TestCase
         $port->delete($current);
         self::assertNull(self::repository($kernel)->findCurrent('leave', $orgA));
         self::assertSame(['reinstate', 'delete', 'forgetSubject', 'delete'], $decorator->calls);
+    }
+
+    #[Test]
+    #[DataProvider('builtInShapes')]
+    public function theVersioningTwinIsTheBuiltInFacade(string $variant): void
+    {
+        $this->kernel = $kernel = self::boot($variant);
+
+        self::assertInstanceOf(WorkflowVersionManager::class, self::versionManager($kernel));
+        self::assertSame(
+            self::service($kernel, WorkflowVersionManagerInterface::class, 'test.' . WorkflowVersionManagerInterface::class),
+            self::versionManager($kernel),
+        );
+    }
+
+    #[Test]
+    public function theVersioningTwinRunsEveryFlowWithReferencesAndViews(): void
+    {
+        $this->kernel = $kernel = self::boot('tenancy');
+        self::seedLeaveTemplate($kernel);
+        $manager = self::versionManager($kernel);
+        $orgA    = new WorkflowTenant('org-a');
+
+        self::assertSame([], $manager->versions('leave', $orgA), 'the tenant has no version of its own yet');
+        self::assertFalse($manager->isLockEnabled());
+        self::assertFalse($manager->isRetiredScope('leave', $orgA));
+
+        $clone = $manager->cloneTemplate('leave', $orgA, publish: true);
+        self::assertTrue($clone->isPublished());
+        self::assertSame(1, $clone->ref->version);
+        self::assertEquals($orgA, $clone->ref->tenant);
+        self::assertEqualsCanonicalizing(['requested', 'submitted', 'approved', 'rejected'], $clone->placeNames);
+        self::assertEqualsCanonicalizing(['approve', 'auto_approve', 'reject', 'submit'], $clone->transitionNames);
+        self::assertFalse($manager->isStructureLocked($clone->ref));
+        $manager->assertStructureAllowed($clone->ref);
+
+        $draft = $manager->createDraftOf($clone->ref);
+        self::assertTrue($draft->isDraft());
+        self::assertSame(2, $draft->ref->version);
+        $open = $manager->draftVersion('leave', $orgA);
+        self::assertNotNull($open);
+        self::assertSame($draft->ref->id, $open->ref->id);
+        self::assertSame($draft->ref->id, $manager->createDraft('leave', $orgA)->ref->id, 'the open draft is reused');
+        self::assertTrue($manager->publish($draft->ref)->isPublished());
+        $published = $manager->currentVersion('leave', $orgA);
+        self::assertNotNull($published);
+        self::assertSame($draft->ref->id, $published->ref->id);
+
+        $second = $manager->createDraft('leave', $orgA);
+        self::assertTrue($manager->publishDraft('leave', $orgA)->isPublished());
+        $republished = $manager->currentVersion('leave', $orgA);
+        self::assertNotNull($republished);
+        self::assertSame($second->ref->id, $republished->ref->id);
+        self::assertCount(3, $manager->versions('leave', $orgA));
+
+        self::assertTrue($manager->retire($second->ref)->isRetired());
+        self::assertTrue($manager->isRetiredScope('leave', $orgA));
+        self::assertTrue($manager->reinstate($second->ref)->isPublished());
+
+        // Owner decision 2026-11-12, unchanged through the twin: pinned subjects block the deletion.
+        $leave = self::persistLeave($kernel, new LeaveRequest('leave-1', 'org-a', 5));
+        self::applicator($kernel)->apply($leave, 'leave', 'submit');
+        $current = $manager->versions('leave', $orgA)[0];
+        try {
+            $manager->delete($current->ref);
+            self::fail('Pinned subjects block the deletion.');
+        } catch (WorkflowDefinitionInUseException $exception) {
+            self::assertSame(1, $exception->pinnedSubjects);
+        }
+        self::assertSame(1, $manager->forgetSubject(new WorkflowSubjectRef('leave-1'), $orgA));
+        $manager->delete($current->ref);
+        self::assertSame([], $manager->versions('leave', $orgA), 'every version of the scope is gone');
+    }
+
+    #[Test]
+    public function theVersioningTwinNeverReachesAnotherTenantAndGoesThroughAHostDecorator(): void
+    {
+        $this->kernel = $kernel = self::boot('tenancy-host-ports');
+        self::seedLeaveTemplate($kernel);
+        $manager   = self::versionManager($kernel);
+        $decorator = self::service($kernel, RecordingVersioningDecorator::class, 'app.workflow_versioning_audit');
+
+        $clone = $manager->cloneTemplate('leave', new WorkflowTenant('org-a'), publish: true);
+        self::assertSame(['cloneTemplate'], $decorator->calls, 'the twin asks the decorated SPI');
+
+        // Same row id and version number, another tenant: the scope lookup finds nothing.
+        $this->expectException(WorkflowNotFoundException::class);
+        $manager->delete(new WorkflowDefinitionRef($clone->ref->id, 'leave', new WorkflowTenant('org-b'), $clone->ref->version));
     }
 }

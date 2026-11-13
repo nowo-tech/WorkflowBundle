@@ -97,11 +97,25 @@ Pinning rules:
 - no automatic marking migration: a subject moves to a newer version only when you remove its pin
   (`WorkflowVersioning::forgetSubject()`), and then the "follow latest" rule above applies.
 
-The versioning operations are also a port for hosts: `Contract\WorkflowVersioningInterface` (since 1.17; the
-built-in `Service\WorkflowVersioning` implements it, and a host may decorate it) (`cloneTemplate()`,
-`createDraft()` / `createDraftOf()`, `publishDraft()` / `publish()`, `delete()`, `forgetSubject()`; the UI acts on the
-already authorised entity, never on a new lookup by slug and tenant), e.g. to give each new organization a published copy
-of a template: `$versioning->cloneTemplate('leave', new WorkflowTenant($uuid), publish: true)`.
+The versioning operations are also a port for hosts (`cloneTemplate()`, `createDraft()` / `createDraftOf()`,
+`publishDraft()` / `publish()`, `retire()` / `reinstate()`, `delete()`, `forgetSubject()`), e.g. to give each new
+organization a published copy of a template:
+
+```php
+// Since 1.19: Contract\WorkflowVersionManagerInterface — value objects only, nothing Doctrine.
+$clone = $workflows->cloneTemplate('leave', new WorkflowTenant($uuid), publish: true); // WorkflowDefinitionView
+$workflows->publish($workflows->createDraftOf($clone->ref)->ref);                      // WorkflowDefinitionRef in
+```
+
+It takes a `Model\WorkflowDefinitionRef` (row id, slug, tenant, version number) and returns a
+`Model\WorkflowDefinitionView`; `currentVersion()`, `draftVersion()` and `versions()` are the entity-free reads that
+give you a reference. A reference is looked up in its own scope (slug and tenant, byte for byte) and then matched on
+the row id, so it can never reach another tenant's version (`WorkflowNotFoundException`).
+
+`Contract\WorkflowVersioningInterface` (since 1.17, the same flows with the `WorkflowDefinition` entity; built-in
+`Service\WorkflowVersioning`) is **deprecated as a calling port since 1.19** and removed in 2.0, but it stays the SPI:
+the admin UI acts on the already authorised entity, never on a new lookup by slug and tenant, the twin above delegates
+every write to it, and a host decorator or replacement of it keeps running and is honoured through the twin.
 
 ## Retiring a clone
 
