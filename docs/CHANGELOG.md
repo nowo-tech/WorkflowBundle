@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.18.0] - 2026-11-13](#1180---2026-11-13)
 - [[1.17.0] - 2026-11-13](#1170---2026-11-13)
 - [[1.16.0] - 2026-11-13](#1160---2026-11-13)
 - [[1.15.2] - 2026-11-13](#1152---2026-11-13)
@@ -57,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-11-13
+
 ### Added
 
 - **Identity key columns declared for the REQ-SEC-006 gate.** `Collation\WorkflowExactKeyColumns` declares
@@ -72,6 +75,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tests/Integration/Collation/WorkflowExactKeyColumnsTest`, which creates the schema from the bundle's own mapping
   under a non-default table prefix and asserts every declared column. A key column added to the mapping and left on
   the server default now fails this bundle's own pipeline.
+
+[1.18.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.18.0
 
 ## [1.17.0] - 2026-11-13
 
