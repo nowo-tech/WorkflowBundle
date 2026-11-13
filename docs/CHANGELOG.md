@@ -58,6 +58,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Tooling: `rector.php` now skips two Rector rules in one file each, with the reason written beside each skip, so
+  `composer rector-dry` (and with it `make release-check`) passes on `main` again. `LocallyCalledStaticMethodToNonStaticRector`
+  is skipped in `src/Doctrine/UnprefixedTablesGuard.php` (`renameSql()` is a pure function and intentionally `static`) and
+  `RemoveNullArgOnNullDefaultParamRector` in `tests/Unit/Doctrine/BinaryKeyCollationSubscriberTest.php` (the explicit `null`
+  documents the case under test). Do not apply those hunks; no production or test code changed.
+
 ### Tests
 
 - CI: the coverage step of the `test` job (PHP 8.2 + Symfony 7.4) runs `composer test-coverage-100`, so a pull request that drops statement
