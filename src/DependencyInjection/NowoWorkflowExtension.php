@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
+use Nowo\MigrationsKitBundle\Collation\ExactKeyColumnsInterface;
 use Nowo\UiKitBundle\Theme\ThemeSlots;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
+use Nowo\WorkflowBundle\Collation\WorkflowExactKeyColumns;
 use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Controller\DashboardController;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
 use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
+use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Doctrine\WorkflowManagerRegistry;
 use Nowo\WorkflowBundle\EventListener\TenantIsolationGuardSubscriber;
@@ -44,6 +47,7 @@ use Symfony\Component\DependencyInjection\Reference;
 
 use function array_key_exists;
 use function in_array;
+use function interface_exists;
 use function is_array;
 use function is_bool;
 use function is_string;
@@ -367,6 +371,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.ui.required_roles', $config['security']['access_roles']);
 
         $this->registerTenancy($container, $config);
+        $this->registerExactKeyColumns($container);
 
         $container->setParameter(Configuration::ALIAS . '.security.access_roles', $config['security']['access_roles']);
         $container->setParameter(Configuration::ALIAS . '.security.access_checker', $config['security']['access_checker']);
@@ -528,6 +533,22 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArguments([new Reference(AfterCommitDispatcher::class), new Reference(TenancyContext::class)])
             ->addTag('kernel.event_subscriber');
         $container->getDefinition(WorkflowApplicator::class)->setArgument('$audit', new Reference(AfterCommitDispatcher::class));
+    }
+
+    /**
+     * REQ-SEC-006: declare the bundle's identity key columns when MigrationsKitBundle is installed, so
+     * nowo:migrations:check-key-collations asserts them against the host's real schema. Optional: the bundle does not
+     * require MigrationsKitBundle, and nothing is registered when the interface is absent.
+     */
+    private function registerExactKeyColumns(ContainerBuilder $container): void
+    {
+        if (!interface_exists(ExactKeyColumnsInterface::class)) {
+            return;
+        }
+
+        $container->register(WorkflowExactKeyColumns::class, WorkflowExactKeyColumns::class)
+            ->setArguments([new Reference(TableNamePrefixer::class)])
+            ->addTag('nowo_migrations_kit.exact_key_columns');
     }
 
     /**

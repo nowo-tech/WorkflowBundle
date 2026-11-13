@@ -88,6 +88,10 @@ services:
         arguments:
             $tablePrefix: '%nowo_workflow.table_prefix%'
 
+    # REQ-SEC-006: the bundle declares its own identity key columns, with the configured table prefix applied, so a
+    # host's nowo:migrations:check-key-collations asserts them against the real schema. Registered by
+    # NowoWorkflowExtension only when MigrationsKitBundle is installed (optional dependency).
+
     # Since 1.15.2: listeners with explicit events (DoctrineBundle 2.x and 3.x; 3.x ignores doctrine.event_subscriber).
     Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber:
         tags:

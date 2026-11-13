@@ -159,6 +159,11 @@ jobs:
           NOWO_WORKFLOW_TEST_MYSQL_URL: pdo-mysql://root:root@127.0.0.1:3306/workflow
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/MySqlNoPadCollationTest.php
 
+      - name: Identity key collation gate (REQ-SEC-006)
+        env:
+          NOWO_WORKFLOW_TEST_MYSQL_URL: pdo-mysql://root:root@127.0.0.1:3306/workflow
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Collation/WorkflowExactKeyColumnsTest.php
+
   cs-check:
     name: Code Style Check
     runs-on: ubuntu-latest
