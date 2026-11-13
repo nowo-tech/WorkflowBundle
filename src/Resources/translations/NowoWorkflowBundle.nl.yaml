@@ -211,6 +211,7 @@ error:
   cannot_retire: 'Deze workflow kan niet buiten gebruik worden gesteld: nieuwe aanvragen hebben een ingeschakeld platformsjabloon nodig.'
   structure_locked: 'Plaatsen en overgangen volgen het platformsjabloon en kunnen hier niet worden gewijzigd.'
   invalid_shape: 'Deze workflow kan niet worden gepubliceerd: %violations%'
+  slug_used_by_tenant: 'Een organisatie gebruikt deze slug al: met vergrendelde klonen kan een globaal sjabloon hem niet gebruiken.'
 
 kpi:
   definitions: 'Definities'

@@ -45,8 +45,8 @@ final class WorkflowTransitionType extends AbstractType
         $this->addText($builder, 'name', ['label' => 'form.field.name', 'disabled' => $locked] + ($options['strict_names'] ? ['constraints' => [new Regex(self::STRICT_NAME_PATTERN, 'Use 1 to 64 lower-case letters, digits or underscores.')]] : []));
         $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false, 'disabled' => $locked]);
         // Since 1.16: translatable label (key + domain), the plain label is the fallback.
-        $this->addText($builder, 'labelKey', ['label' => 'form.field.label_key', 'required' => false, 'help' => 'form.help.label_key', 'disabled' => $locked]);
-        $this->addText($builder, 'labelDomain', ['label' => 'form.field.label_domain', 'required' => false, 'disabled' => $locked]);
+        $this->addText($builder, 'labelKey', ['label' => 'form.field.label_key', 'required' => false, 'help' => 'form.help.label_key', 'disabled' => $locked, 'constraints' => LabelTranslationConstraints::key()]);
+        $this->addText($builder, 'labelDomain', ['label' => 'form.field.label_domain', 'required' => false, 'disabled' => $locked, 'constraints' => LabelTranslationConstraints::domain($options['label_domains'])]);
 
         // Since 1.15: guards an editor configures per transition, shown only when the host configured their port.
         /** @var array{permission: bool, variables: list<string>|null, automatic: bool} $guards */
@@ -104,6 +104,9 @@ final class WorkflowTransitionType extends AbstractType
         ]);
         $resolver->setAllowedTypes('structure_locked', 'bool');
         $resolver->setAllowedTypes('strict_names', 'bool');
+        // Since 1.16 (tenancy.label_domains): the translation domains a label key may use.
+        $resolver->setDefault('label_domains', LabelTranslationConstraints::DEFAULT_DOMAINS);
+        $resolver->setAllowedTypes('label_domains', 'string[]');
         $resolver->setAllowedTypes('place_choices', 'array');
         $resolver->setAllowedTypes('guards', 'array');
     }

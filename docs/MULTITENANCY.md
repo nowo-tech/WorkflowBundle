@@ -127,20 +127,28 @@ the template, so their place must exist there.
 
 ## Locked clones
 
-With `tenancy.lock_clone_structure: true` a tenant cannot change the **structure** of a clone: places, transitions
-(name, `from` and `to` places, label) and the initial place stay those of the template; the tenant edits **guards and
-conditions** (permission, condition, automatic) and the general fields (name, description, enabled, priority) and match
-rules. So a tenant can never add a place the host's code does not know.
+With `tenancy.lock_clone_structure: true` a tenant cannot change the **structure** of a clone. The structure
+(`WorkflowDefinition::structure()`, what the lock compares) is: the initial place, the place names, and each transition
+with its name and its `from` / `to` places. **Labels, label translation keys, guards, conditions and the automatic flag
+are not part of it.** The editor keeps labels read-only on a locked clone too (only guards and conditions are edited
+there, plus the general fields and match rules), but a label changed by host code does not break the lock. So a tenant
+can never add a place the host's code does not know.
 
 - **Editor (server side):** the locked fields are disabled form fields (Symfony ignores whatever the browser sends for
   them) and the place / transition collections accept no added or removed entry; the page shows a notice and no add or
   remove button.
-- **Service:** `WorkflowVersioning::publish()` compares the draft's structure (`WorkflowDefinition::structure()`) with
-  the template version it was cloned from (else the current template) and throws `WorkflowStructureLockedException`
-  when they differ, whoever changed the draft (host code, an older draft). The UI shows an error and keeps the draft.
-- A tenant cannot create its own definition under a template's slug (the "New definition" form refuses the slug).
-- Enable the lock before tenants customize: a clone that already diverged can no longer be published; retire or delete
-  it and customize the template again.
+- **Publishing:** `WorkflowVersioning::publish()`, `reinstate()` and `cloneTemplate(..., publish: true)` compare the
+  version's structure with the template version it was cloned from (else the current template) and throw
+  `WorkflowStructureLockedException` when they differ. The UI shows an error and keeps the draft (or the retired clone).
+- **Running (audit OD M3):** every time a tenant version is resolved, a version whose structure differs from its
+  template (published before the lock was turned on, or before the global template of that slug existed) is **not used
+  for new subjects**: they run the global template, and a warning is logged. Subjects already **pinned** to such a
+  version keep running it (moving them could strand their marking); a warning is logged. A tenant version with no
+  global template at all is left alone (there is nothing to fall back to).
+- A tenant cannot create its own definition under a template's slug, and a new **global template cannot take a slug a
+  tenant already uses** (both "New definition" forms refuse the slug).
+- Turn the lock on before tenants customize when you can; a clone that already diverged stops running new subjects and
+  can no longer be published or reinstated: retire or delete it and customize the template again.
 
 It is one switch for the whole host (one policy per platform, no schema change), not a per-template setting.
 
@@ -150,7 +158,9 @@ Since 1.16 a place and a transition have, next to the plain label, an optional *
 (`label_key`, `label_domain`; editor fields "Label translation key" / "Translation domain"; `setLabelTranslation($key,
 $domain)` in code). The bundle's pages (flow diagram) show the translation of the key in the current locale, falling
 back to the plain label, then the name, when no key is set or the key has no translation. The domain defaults to
-`messages`. Templates seeded in code can ship keys of the host's catalogue:
+`messages`. The editor accepts a key of at most 255 and a domain of at most 128 letters, digits, `_`, `.` or `-`, and
+only the domains of `tenancy.label_domains` (default `[messages, workflows]`). Templates seeded in code can ship keys
+of the host's catalogue:
 
 ```php
 $place = (new WorkflowPlace('approved', 'Approved', 2))->setLabelTranslation('workflow.leave.approved', 'workflows');
@@ -183,7 +193,9 @@ open). Use it when the host creates a subject and wants it bound to today's vers
 
 - Idempotent: a subject already pinned keeps its pin (`created: false`).
 - `WorkflowPinMode::Repin` moves an existing pin to that version (`replaced: true`, `previousDefinitionVersion`), and
-  is refused (`InvalidArgumentException`) when the subject's current places do not exist in it.
+  is refused (`InvalidArgumentException`) when the subject's current places do not exist in it. The pin is read with
+  `FOR UPDATE` and updated in one transaction (a savepoint inside yours); if it vanished meanwhile the subject is pinned
+  like a new one (`created: true`).
 - Tenant-checked: an existing pin that names another tenant's version (or a draft, another slug) is refused
   (`WorkflowNotFoundException`), as in every other call.
 - It needs tenancy (`LogicException` otherwise) and a subject reference (`InvalidArgumentException` when the reference

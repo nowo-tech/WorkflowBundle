@@ -17,12 +17,14 @@ use Nowo\WorkflowBundle\Form\WorkflowPlaceType;
 use Nowo\WorkflowBundle\Form\WorkflowTransitionType;
 use Nowo\WorkflowBundle\View\WorkflowPageFactory;
 use ReflectionProperty;
+use Symfony\Component\Form\Extension\Validator\ValidatorExtension;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\Forms;
 use Symfony\Component\Form\FormView;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Symfony\Component\Validator\Validation;
 
 use function count;
 
@@ -155,6 +157,8 @@ final class WorkflowPageFixtures
             ->addType(FormKitTestSupport::withMerger(new WorkflowTransitionType()))
             ->addType(FormKitTestSupport::withMerger(new WorkflowMatchRuleType()))
             ->addType(FormKitTestSupport::withMerger(new PlaceMultiSelectType()))
+            // Since 1.16 the label fields carry constraints (audit OD L2).
+            ->addExtension(new ValidatorExtension(Validation::createValidator()))
             ->getFormFactory();
     }
 

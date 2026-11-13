@@ -87,6 +87,16 @@ php bin/console cache:clear
 php bin/console doctrine:migrations:diff   # four nullable columns
 ```
 
+- **⚠ Invalid transition shapes are now a hard failure.** Run `php bin/console nowo:workflow:lint` on 1.15.2 first:
+  every definition it lists (a transition without `from` or `to` places, a `state_machine` transition with several
+  `to` places) **fails to build in 1.16.0** with an `InvalidArgumentException`, as FrameworkBundle refuses such a
+  `framework.workflows` entry. Split such a transition into one transition per target (publish a new draft for a tenant
+  version; a version subjects are pinned to keeps failing until they move or are forgotten).
+- **Locked clones at runtime:** with `tenancy.lock_clone_structure`, a tenant version whose structure differs from its
+  template is no longer used for new subjects (they run the template; pinned subjects keep it). A new global template
+  cannot take a slug a tenant already uses.
+- **Label fields:** the editor accepts identifier keys / domains only, and the domains of `tenancy.label_domains`
+  (default `[messages, workflows]`): add your own domains there.
 - **Schema:** `workflow_place` and `workflow_transition` get `label_key` (string 255, nullable) and `label_domain`
   (string 128, nullable). Generate and run a migration (or `nowo:workflow:sync-schema`). Hosts mapping the bundle
   entities from the shipped XML get them too; a host with its own mapping of `WorkflowPlace` / `WorkflowTransition`

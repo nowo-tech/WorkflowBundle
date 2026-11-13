@@ -211,6 +211,7 @@ error:
   cannot_retire: 'Este workflow no se puede retirar: las solicitudes nuevas necesitan una plantilla de la plataforma habilitada.'
   structure_locked: 'Los lugares y las transiciones siguen la plantilla de la plataforma y no se pueden cambiar aquí.'
   invalid_shape: 'Este workflow no se puede publicar: %violations%'
+  slug_used_by_tenant: 'Una organización ya usa este identificador: con los clones bloqueados una plantilla global no puede usarlo.'
 
 kpi:
   definitions: 'Definiciones'

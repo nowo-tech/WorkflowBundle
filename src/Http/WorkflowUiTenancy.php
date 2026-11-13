@@ -10,6 +10,7 @@ use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiActionCheckerInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiTenantResolverInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Form\LabelTranslationConstraints;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
 use Nowo\WorkflowBundle\Model\WorkflowUiAction;
@@ -38,6 +39,7 @@ final readonly class WorkflowUiTenancy
 {
     /**
      * @param array<string, string> $subjectClasses `tenancy.subject_classes`: subject class => marking property
+     * @param list<string> $labelDomains `tenancy.label_domains` (since 1.16)
      */
     public function __construct(
         private bool $tenancy = false,
@@ -47,7 +49,18 @@ final readonly class WorkflowUiTenancy
         private ?WorkflowTransitionPermissionCheckerInterface $permissionChecker = null,
         private ?WorkflowSubjectVariablesProviderInterface $variablesProvider = null,
         private array $subjectClasses = [],
+        private array $labelDomains = LabelTranslationConstraints::DEFAULT_DOMAINS,
     ) {
+    }
+
+    /**
+     * The translation domains the editor accepts for label keys (since 1.16, `tenancy.label_domains`).
+     *
+     * @return list<string>
+     */
+    public function labelDomains(): array
+    {
+        return $this->labelDomains;
     }
 
     /**

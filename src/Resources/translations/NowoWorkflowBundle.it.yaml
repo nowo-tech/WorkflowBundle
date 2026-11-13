@@ -211,6 +211,7 @@ error:
   cannot_retire: 'Questo workflow non può essere ritirato: le nuove richieste hanno bisogno di un modello della piattaforma abilitato.'
   structure_locked: 'Stati e transizioni seguono il modello della piattaforma e non possono essere modificati qui.'
   invalid_shape: 'Questo workflow non può essere pubblicato: %violations%'
+  slug_used_by_tenant: 'Un''organizzazione usa già questo identificativo: con i cloni bloccati un modello globale non può usarlo.'
 
 kpi:
   definitions: 'Definizioni'

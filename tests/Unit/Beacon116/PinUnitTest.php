@@ -77,6 +77,50 @@ final class PinUnitTest extends TestCase
     }
 
     #[Test]
+    public function aRepinWhosePinVanishedPinsLikeANewSubject(): void
+    {
+        $pinned = $this->definition(1);
+        $target = $this->definition(2);
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('getDatabasePlatform')->willReturn(new SQLitePlatform());
+        $connection->method('isTransactionActive')->willReturn(false);
+        // Locator read (pinned to 1), the locked read of the re-pin (gone), the pin's own read (none).
+        $connection->method('fetchAllAssociative')->willReturnOnConsecutiveCalls(
+            [['pin_id' => 7, 'pin_definition' => 1, 'pin_tenant' => '', 'pin_slug' => 'leave', 'pin_ref' => 'leave-1']],
+            [],
+            [],
+        );
+        $connection->expects(self::once())->method('insert')->willReturn(1);
+
+        $repository = $this->repository($connection);
+        $repository->method('find')->with(1)->willReturn($pinned);
+        $repository->method('findForTenant')->willReturn($target);
+
+        $result = $this->locator($repository)->pinSubject(new stdClass(), 'leave', WorkflowPinMode::Repin, static function (): void {
+        }, static fn (): array => []);
+
+        self::assertTrue($result->created);
+        self::assertFalse($result->replaced);
+        self::assertSame(2, $result->definitionVersion);
+    }
+
+    #[Test]
+    public function aFailedRepinRollsBack(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('getDatabasePlatform')->willReturn(new SQLitePlatform());
+        $connection->method('fetchAllAssociative')->willReturn([['pin_id' => 7, 'pin_definition' => 1, 'pin_tenant' => 'org-a', 'pin_slug' => 'leave', 'pin_ref' => 'leave-1']]);
+        $connection->method('executeStatement')->willThrowException(new LogicException('lost'));
+        $connection->expects(self::once())->method('beginTransaction');
+        $connection->expects(self::once())->method('rollBack');
+        $connection->expects(self::never())->method('commit');
+
+        $this->expectExceptionMessage('lost');
+        (new SubjectPinStore($this->repository($connection)))->repin(new WorkflowTenant('org-a'), 'leave', new WorkflowSubjectRef('leave-1'), $this->definition(2));
+    }
+
+    #[Test]
     public function anApplicatorWithoutLocatorCannotPin(): void
     {
         $applicator = new WorkflowApplicator(

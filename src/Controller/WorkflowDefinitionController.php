@@ -109,6 +109,10 @@ final class WorkflowDefinitionController extends AbstractController
 
         if ($form->isSubmitted() && $this->tenancy->enabled() && $this->repository->existsInScope($definition->getSlug(), $tenant)) {
             $form->get('slug')->addError(new FormError($this->translator->trans('error.slug_taken', [], WorkflowPageFactory::DOMAIN)));
+        } elseif ($form->isSubmitted() && !$tenant instanceof WorkflowTenant && $this->versioning?->isLockEnabled() === true && $this->repository->existsForAnyTenant($definition->getSlug())) {
+            // Audit OD M3: with locked clones, a new global template cannot take a slug a tenant already uses (its
+            // version would never match the template).
+            $form->get('slug')->addError(new FormError($this->translator->trans('error.slug_used_by_tenant', [], WorkflowPageFactory::DOMAIN)));
         } elseif ($form->isSubmitted() && $tenant instanceof WorkflowTenant && $this->versioning?->isStructureLocked($definition) === true) {
             // Since 1.16 (tenancy.lock_clone_structure): a tenant customizes a template by cloning it, never by creating
             // its own definition under the template's slug.
@@ -315,7 +319,13 @@ final class WorkflowDefinitionController extends AbstractController
             throw $this->createNotFoundException('Only a retired version of a tenant workflow can be reinstated.');
         }
 
-        $reinstated = $this->versioning()->reinstate($definition);
+        try {
+            $reinstated = $this->versioning()->reinstate($definition);
+        } catch (WorkflowStructureLockedException) {
+            $this->addFlash('error', $this->translator->trans('error.structure_locked', [], WorkflowPageFactory::DOMAIN));
+
+            return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
+        }
         $this->logger->info('Workflow definition reinstated.', ['bundle' => 'NowoWorkflowBundle', 'action' => 'reinstate_definition', 'id' => $reinstated->getId(), 'slug' => $reinstated->getSlug(), 'version' => $reinstated->getVersion(), 'tenant' => $reinstated->getTenantKey()]);
         $this->flash('flash.reinstated');
 
@@ -396,6 +406,7 @@ final class WorkflowDefinitionController extends AbstractController
             'binding_locked'   => $tenant instanceof WorkflowTenant,
             'strict_names'     => $this->tenancy->enabled(),
             'structure_locked' => $locked,
+            'label_domains'    => $this->tenancy->labelDomains(),
         ]);
         $form->handleRequest($request);
 

@@ -16,6 +16,7 @@ use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
+use Psr\Log\LoggerInterface;
 
 use function array_diff;
 use function implode;
@@ -45,6 +46,8 @@ final readonly class WorkflowDefinitionLocator
         private WorkflowResolver $resolver,
         private TenancyContext $tenancy,
         private SubjectPinStore $pins,
+        private ?CloneStructureLock $lock = null,
+        private ?LoggerInterface $logger = null,
     ) {
     }
 
@@ -67,7 +70,7 @@ final readonly class WorkflowDefinitionLocator
         $tenant = $this->tenancy->tenantOf($subject, $slug);
         $pinned = $this->pinned($subject, $slug, $tenant);
 
-        return $this->enabledOrFail($pinned ?? $this->repository->findForTenant($slug, $tenant), $slug);
+        return $this->enabledOrFail($pinned ?? $this->unlocked($this->repository->findForTenant($slug, $tenant)), $slug);
     }
 
     /**
@@ -85,7 +88,7 @@ final readonly class WorkflowDefinitionLocator
 
         $pinned = $this->pinned($subject, $definition->getSlug(), $this->tenancy->tenantOf($subject, $definition->getSlug()));
 
-        return $pinned instanceof WorkflowDefinition ? $this->enabledOrFail($pinned, $definition->getSlug()) : $definition;
+        return $pinned instanceof WorkflowDefinition ? $this->enabledOrFail($pinned, $definition->getSlug()) : $this->enabledOrFail($this->unlocked($definition), $definition->getSlug());
     }
 
     /**
@@ -103,7 +106,7 @@ final readonly class WorkflowDefinitionLocator
         $definition = $this->resolver->resolveForTenant($context, $tenant);
         $pinned     = $this->pinned($subject, $definition->getSlug(), $tenant);
 
-        return $pinned instanceof WorkflowDefinition ? $this->enabledOrFail($pinned, $definition->getSlug()) : $definition;
+        return $pinned instanceof WorkflowDefinition ? $this->enabledOrFail($pinned, $definition->getSlug()) : $this->enabledOrFail($this->unlocked($definition), $definition->getSlug());
     }
 
     /**
@@ -159,7 +162,7 @@ final readonly class WorkflowDefinitionLocator
         }
 
         // The version a new subject of the tenant starts with now: never a draft, a retired clone or another tenant's.
-        $target = $this->enabledOrFail($this->repository->findForTenant($slug, $tenant), $slug);
+        $target = $this->enabledOrFail($this->unlocked($this->repository->findForTenant($slug, $tenant)), $slug);
         $assertSupported($target);
         if (!$pinned instanceof WorkflowDefinition) {
             $winner = $this->pins->pin($tenant, $slug, $reference, $target);
@@ -174,14 +177,36 @@ final readonly class WorkflowDefinitionLocator
         if ($missing !== []) {
             throw new InvalidArgumentException(sprintf('The subject cannot be moved to version %d of workflow "%s": its place(s) "%s" do not exist there.', $target->getVersion(), $slug, implode('", "', $missing)));
         }
-        $this->pins->repin($tenant, $slug, $reference, $target);
+        $previous = $this->pins->repin($tenant, $slug, $reference, $target);
+        if ($previous === null) {
+            // The pin went away meanwhile (a concurrent forgetSubject()): pin it like a new subject (audit OD L3).
+            $winner = $this->pins->pin($tenant, $slug, $reference, $target);
 
-        return $this->pinResult($target, $reference, false, true, $pinned->getVersion());
+            return $winner === $target->getId() ? $this->pinResult($target, $reference, true) : $this->pinResult($this->forSubject($subject, $slug), $reference, false);
+        }
+        $before = $previous === $pinned->getId() ? $pinned : $this->repository->find($previous);
+
+        return $this->pinResult($target, $reference, false, $previous !== $target->getId(), $before instanceof WorkflowDefinition ? $before->getVersion() : null);
     }
 
     private function pinResult(WorkflowDefinition $definition, WorkflowSubjectRef $subject, bool $created, bool $replaced = false, ?int $previousVersion = null): WorkflowPinResult
     {
         return new WorkflowPinResult($definition->getSlug(), $definition->getVersion(), $definition->getTenantKey() === '' ? null : $definition->getTenantKey(), $subject, $created, $replaced, $previousVersion);
+    }
+
+    /**
+     * Audit OD M3 (`tenancy.lock_clone_structure`): a tenant version whose structure differs from its template (it was
+     * published before the lock was turned on, or before the template existed) is not used for new subjects: they run
+     * the global template, with a warning. Fail closed towards the structure the host's code knows.
+     */
+    private function unlocked(?WorkflowDefinition $definition): ?WorkflowDefinition
+    {
+        if (!$definition instanceof WorkflowDefinition || $this->lock?->violates($definition) !== true) {
+            return $definition;
+        }
+        $this->logger?->warning('Workflow "{workflow}": version {version} of tenant "{tenant}" does not match its global template (tenancy.lock_clone_structure); new subjects run the template.', ['bundle' => 'NowoWorkflowBundle', 'workflow' => $definition->getSlug(), 'version' => $definition->getVersion(), 'tenant' => $definition->getTenantKey()]);
+
+        return $this->repository->findCurrent($definition->getSlug(), null);
     }
 
     private function pinned(object $subject, string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition
@@ -205,6 +230,10 @@ final readonly class WorkflowDefinitionLocator
         if ($definition->getSlug() !== $slug || $definition->isDraft()
             || $definition->getTenantKey() !== '' && !$definition->belongsTo($tenant)) {
             throw WorkflowNotFoundException::forSlug($slug);
+        }
+        if ($this->lock?->violates($definition) === true) {
+            // A subject already running keeps its pinned version (moving it could strand its marking): logged only.
+            $this->logger?->warning('Workflow "{workflow}": a subject is pinned to version {version} of tenant "{tenant}", which does not match its global template (tenancy.lock_clone_structure); it keeps running it.', ['bundle' => 'NowoWorkflowBundle', 'workflow' => $slug, 'version' => $definition->getVersion(), 'tenant' => $definition->getTenantKey()]);
         }
 
         return $definition;

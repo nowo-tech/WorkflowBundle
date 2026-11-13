@@ -211,6 +211,7 @@ error:
   cannot_retire: 'Dieser Workflow kann nicht außer Betrieb genommen werden: neue Anträge brauchen eine aktivierte Plattformvorlage.'
   structure_locked: 'Stellen und Übergänge folgen der Plattformvorlage und können hier nicht geändert werden.'
   invalid_shape: 'Dieser Workflow kann nicht veröffentlicht werden: %violations%'
+  slug_used_by_tenant: 'Eine Organisation verwendet diese Kennung bereits: bei gesperrten Klonen kann eine globale Vorlage sie nicht übernehmen.'
 
 kpi:
   definitions: 'Definitionen'

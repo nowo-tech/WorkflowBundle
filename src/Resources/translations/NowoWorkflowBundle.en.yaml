@@ -211,6 +211,7 @@ error:
   cannot_retire: 'This workflow cannot be retired: new requests need an enabled platform template to fall back to.'
   structure_locked: 'Places and transitions follow the platform template and cannot be changed here.'
   invalid_shape: 'This workflow cannot be published: %violations%'
+  slug_used_by_tenant: 'A tenant already uses this slug: with locked clones a global template cannot take it.'
 
 kpi:
   definitions: 'Definitions'

@@ -66,15 +66,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Locked clone structure (Beacon):** `nowo_workflow.tenancy.lock_clone_structure` (default `false`). Tenant clones keep
   the template's places, transitions and initial place; only guards and conditions are edited. Enforced by the editor
   (disabled fields, no add / remove, notice) and by `WorkflowVersioning::publish()` (`WorkflowStructureLockedException`
-  when the structure differs from the template version it was cloned from). A tenant cannot shadow a template slug with
-  its own definition. `WorkflowDefinition::structure()`.
+  when the structure differs from the template version it was cloned from; also `reinstate()` and
+  `cloneTemplate(publish: true)`). At runtime a tenant version that diverged (published before the lock, or before
+  the template existed) is not used for new subjects (they run the template, warning logged); pinned subjects keep
+  it (warning logged). A tenant cannot shadow a template slug with its own definition, and a new global template cannot
+  take a slug a tenant uses. The structure (`WorkflowDefinition::structure()`) is the initial place, place names and
+  transitions with their places; labels are not part of it (the editor keeps them read-only on a locked clone).
 - **Translatable labels (Beacon):** places and transitions get `label_key` / `label_domain` (nullable columns,
   `setLabelTranslation()`, editor fields). The flow diagram shows the translation with a fallback to the plain label;
-  the workflow metadata adds `label_key` / `label_domain`. New `Service\WorkflowLabelTranslator`.
+  the workflow metadata adds `label_key` / `label_domain`. New `Service\WorkflowLabelTranslator`. The editor accepts
+  identifiers only (`[A-Za-z0-9_.-]`, key ≤ 255, domain ≤ 128) and the domains of the new
+  `tenancy.label_domains` (default `[messages, workflows]`).
 - **`WorkflowRuntimeInterface::pin()` (Beacon):** pins a subject to the version it would start with, without any
   transition, event, initial marking or flush. Idempotent (`WorkflowPinMode::KeepExisting`), explicit re-pin
-  (`WorkflowPinMode::Repin`, refused when the subject's places do not exist in the new version), tenant-checked. Returns
-  `Model\WorkflowPinResult`.
+  (`WorkflowPinMode::Repin`, refused when the subject's places do not exist in the new version; the pin is read
+  `FOR UPDATE` and updated in one transaction), tenant-checked. Returns `Model\WorkflowPinResult`.
+
+### Changed
+
+- **Invalid transition shapes are refused (owner decision, audit OD M1):** building a workflow with a transition
+  without `from` or `to` places, or a `state_machine` transition with several `to` places, now throws an
+  `InvalidArgumentException` naming the workflow and the transition, as FrameworkBundle does for `framework.workflows`.
+  1.15.2 only warned (deprecation); run `nowo:workflow:lint` before upgrading.
 
 ### Fixed
 

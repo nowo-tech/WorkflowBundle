@@ -14,7 +14,11 @@ use Nowo\WorkflowBundle\Form\WorkflowTransitionType;
 use Nowo\WorkflowBundle\Tests\Support\FormKitTestSupport;
 use ReflectionMethod;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\Extension\Validator\ValidatorExtension;
 use Symfony\Component\Form\Test\TypeTestCase;
+use Symfony\Component\Validator\Validation;
+
+use function json_encode;
 
 final class WorkflowFormTypesTest extends TypeTestCase
 {
@@ -29,6 +33,34 @@ final class WorkflowFormTypesTest extends TypeTestCase
             FormKitTestSupport::withMerger(new WorkflowTransitionType()),
             FormKitTestSupport::withMerger(new PlaceMultiSelectType()),
         ];
+    }
+
+    protected function getExtensions(): array
+    {
+        return [new ValidatorExtension(Validation::createValidator())];
+    }
+
+    /**
+     * 1.16 (audit OD L2): label key and domain are identifiers; the domain is one of tenancy.label_domains.
+     */
+    public function testLabelTranslationFieldsAreIdentifiersAndTheDomainIsAllowListed(): void
+    {
+        $cases = [
+            [['labelKey' => 'workflow.leave.approved', 'labelDomain' => 'workflows'], true],
+            [['labelKey' => 'workflow.leave.approved', 'labelDomain' => ''], true],
+            [['labelKey' => 'bad key<script>', 'labelDomain' => 'messages'], false],
+            [['labelKey' => 'ok', 'labelDomain' => 'security'], false],
+            [['labelKey' => 'ok', 'labelDomain' => 'bad domain'], false],
+        ];
+        foreach ($cases as [$fields, $valid]) {
+            $form = $this->factory->create(WorkflowPlaceType::class, new WorkflowPlace('initial'));
+            $form->submit(['name' => 'draft', 'label' => 'Draft', 'sortOrder' => 0] + $fields);
+            self::assertSame($valid, $form->isValid(), (string) json_encode($fields));
+        }
+
+        $form = $this->factory->create(WorkflowTransitionType::class, new WorkflowTransition('t', [], []), ['label_domains' => ['security']]);
+        $form->submit(['name' => 't', 'labelKey' => 'ok', 'labelDomain' => 'security']);
+        self::assertTrue($form->get('labelDomain')->isValid(), 'a host allow-list');
     }
 
     public function testWorkflowPlaceTypeSubmit(): void

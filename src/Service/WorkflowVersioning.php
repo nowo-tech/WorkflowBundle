@@ -15,6 +15,7 @@ use Nowo\WorkflowBundle\Exception\WorkflowStructureLockedException;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Tenancy\CloneStructureLock;
 use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
 
 use function max;
@@ -35,12 +36,15 @@ final readonly class WorkflowVersioning
      * @param bool $lockCloneStructure `tenancy.lock_clone_structure` (since 1.16): tenant clones keep the places and
      *                                 transitions of their global template, only guards and conditions are edited
      */
+    private CloneStructureLock $lock;
+
     public function __construct(
         private WorkflowDefinitionRepository $repository,
         private ?DatabaseWorkflowRegistry $registry = null,
         private ?SubjectPinStore $pins = null,
-        private bool $lockCloneStructure = false,
+        bool $lockCloneStructure = false,
     ) {
+        $this->lock = new CloneStructureLock($repository, $lockCloneStructure);
     }
 
     /**
@@ -70,6 +74,8 @@ final readonly class WorkflowVersioning
 
         $copy = $template->copyAsDraft($tenant, $version, $template->getVersion());
         if ($publish) {
+            // Audit OD M3: a published clone passes the lock like any other publish.
+            $this->lock->assertAllowed($copy);
             $copy->publish();
         }
         try {
@@ -170,40 +176,32 @@ final readonly class WorkflowVersioning
     }
 
     /**
-     * Whether the places and transitions of this definition are locked to its global template (since 1.16): with
-     * `tenancy.lock_clone_structure`, for a tenant definition of a slug that has a global template (a clone, or a
-     * tenant definition that would shadow the template). Global definitions are never locked.
+     * Whether `tenancy.lock_clone_structure` is on (since 1.16).
      */
-    public function isStructureLocked(WorkflowDefinition $definition): bool
+    public function isLockEnabled(): bool
     {
-        if (!$this->lockCloneStructure || $definition->getTenantKey() === '') {
-            return false;
-        }
-
-        return $definition->isTemplateClone() || $this->repository->existsInScope($definition->getSlug(), null);
+        return $this->lock->enabled();
     }
 
     /**
-     * Refuses a locked definition whose structure (initial place, places, transitions and their places) differs from
-     * the template version it was cloned from (the current template when that version is gone or it is not a clone).
-     * Labels, guards, conditions and the automatic flag may differ.
+     * Whether the places and transitions of this definition are locked to its global template (since 1.16), see
+     * {@see CloneStructureLock}. Global definitions are never locked.
+     */
+    public function isStructureLocked(WorkflowDefinition $definition): bool
+    {
+        return $this->lock->isLocked($definition);
+    }
+
+    /**
+     * Refuses a locked definition whose structure (initial place, place names, transitions with their `from` / `to`
+     * places) differs from the template version it was cloned from (the current template when that version is gone
+     * or it is not a clone). Labels, guards, conditions and the automatic flag may differ.
      *
      * @throws WorkflowStructureLockedException
      */
     public function assertStructureAllowed(WorkflowDefinition $definition): void
     {
-        if (!$this->isStructureLocked($definition)) {
-            return;
-        }
-        $slug     = $definition->getSlug();
-        $version  = $definition->getTemplateVersion();
-        $template = ($version !== null ? $this->repository->findVersion($slug, null, $version) : null) ?? $this->repository->findCurrent($slug, null);
-        if (!$template instanceof WorkflowDefinition) {
-            throw new WorkflowStructureLockedException($slug, 'its global template is gone');
-        }
-        if ($template->structure() !== $definition->structure()) {
-            throw new WorkflowStructureLockedException($slug);
-        }
+        $this->lock->assertAllowed($definition);
     }
 
     /**
@@ -239,12 +237,18 @@ final readonly class WorkflowVersioning
      * newest one is the version new subjects start with.
      *
      * @throws LogicException when the scope has no retired version
+     * @throws WorkflowStructureLockedException when the lock is on and the newest retired version breaks it
      *
      * @return WorkflowDefinition the newest reinstated version
      */
     public function reinstate(WorkflowDefinition $definition): WorkflowDefinition
     {
-        $slug    = $definition->getSlug();
+        $slug = $definition->getSlug();
+        // Audit OD M3: the version that runs again passes the lock (it may predate it).
+        $retired = $this->repository->findRetired($slug, $definition->getTenant());
+        if ($retired instanceof WorkflowDefinition) {
+            $this->lock->assertAllowed($retired);
+        }
         $version = $this->changeStatus($slug, $definition->getTenant(), static fn (WorkflowDefinition $version): bool => $version->isRetired(), static fn (WorkflowDefinition $version): WorkflowDefinition => $version->reinstate());
 
         return $version ?? throw new LogicException(sprintf('Workflow "%s" has no retired version.', $slug));

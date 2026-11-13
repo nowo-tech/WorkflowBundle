@@ -50,11 +50,11 @@ final class WorkflowDefinitionFormType extends AbstractType
         }
 
         if ($section === WorkflowDefinitionFormSection::Places) {
-            $this->addPlacesFields($builder, $options['strict_names'], $structureLocked);
+            $this->addPlacesFields($builder, $options['strict_names'], $structureLocked, $options['label_domains']);
         }
 
         if ($section === WorkflowDefinitionFormSection::Transitions) {
-            $this->addTransitionsFields($builder, $options['guards'], $options['strict_names'], $structureLocked);
+            $this->addTransitionsFields($builder, $options['guards'], $options['strict_names'], $structureLocked, $options['label_domains']);
         }
 
         if ($section === WorkflowDefinitionFormSection::General || $section === WorkflowDefinitionFormSection::Transitions) {
@@ -113,13 +113,14 @@ final class WorkflowDefinitionFormType extends AbstractType
 
     /**
      * @param FormBuilderInterface<WorkflowDefinition|null> $builder
+     * @param list<string> $labelDomains
      */
-    private function addPlacesFields(FormBuilderInterface $builder, bool $strictNames = false, bool $structureLocked = false): void
+    private function addPlacesFields(FormBuilderInterface $builder, bool $strictNames = false, bool $structureLocked = false, array $labelDomains = LabelTranslationConstraints::DEFAULT_DOMAINS): void
     {
         // Since 1.16: a locked clone's places are read-only (no add, no remove, no change).
         $this->addWithDefaults($builder, 'places', CollectionType::class, [
             'entry_type'     => WorkflowPlaceType::class,
-            'entry_options'  => ['strict_names' => $strictNames],
+            'entry_options'  => ['strict_names' => $strictNames, 'label_domains' => $labelDomains],
             'allow_add'      => !$structureLocked,
             'allow_delete'   => !$structureLocked,
             'disabled'       => $structureLocked,
@@ -133,17 +134,18 @@ final class WorkflowDefinitionFormType extends AbstractType
     /**
      * @param FormBuilderInterface<WorkflowDefinition|null> $builder
      * @param array{permission: bool, variables: list<string>|null, automatic: bool} $guards
+     * @param list<string> $labelDomains
      */
-    private function addTransitionsFields(FormBuilderInterface $builder, array $guards, bool $strictNames = false, bool $structureLocked = false): void
+    private function addTransitionsFields(FormBuilderInterface $builder, array $guards, bool $strictNames = false, bool $structureLocked = false, array $labelDomains = LabelTranslationConstraints::DEFAULT_DOMAINS): void
     {
-        $builder->addEventListener(FormEvents::PRE_SET_DATA, static function (FormEvent $event) use ($guards, $strictNames, $structureLocked): void {
+        $builder->addEventListener(FormEvents::PRE_SET_DATA, static function (FormEvent $event) use ($guards, $strictNames, $structureLocked, $labelDomains): void {
             $definition = $event->getData();
             $placeNames = $definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : [];
 
-            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, $structureLocked);
+            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, $structureLocked, $labelDomains);
         });
 
-        $builder->addEventListener(FormEvents::PRE_SUBMIT, static function (FormEvent $event) use ($guards, $strictNames, $structureLocked): void {
+        $builder->addEventListener(FormEvents::PRE_SUBMIT, static function (FormEvent $event) use ($guards, $strictNames, $structureLocked, $labelDomains): void {
             $definition = $event->getForm()->getData();
             $submitted  = $event->getData();
 
@@ -151,7 +153,7 @@ final class WorkflowDefinitionFormType extends AbstractType
                 ? PlaceChoiceHelper::extractNamesFromSubmittedPlaces($submitted['places'])
                 : ($definition instanceof WorkflowDefinition ? $definition->getPlaceNames() : []);
 
-            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, $structureLocked);
+            self::configureTransitionsField($event->getForm(), $placeNames, $guards, $strictNames, $structureLocked, $labelDomains);
         });
     }
 
@@ -159,16 +161,17 @@ final class WorkflowDefinitionFormType extends AbstractType
      * @param FormInterface<WorkflowDefinition|null> $form
      * @param list<string> $placeNames
      * @param array{permission: bool, variables: list<string>|null, automatic: bool} $guards
+     * @param list<string> $labelDomains
      */
-    private static function configureTransitionsField(FormInterface $form, array $placeNames, array $guards, bool $strictNames = false, bool $structureLocked = false): void
+    private static function configureTransitionsField(FormInterface $form, array $placeNames, array $guards, bool $strictNames = false, bool $structureLocked = false, array $labelDomains = LabelTranslationConstraints::DEFAULT_DOMAINS): void
     {
         if ($form->has('transitions')) {
             $form->remove('transitions');
         }
 
         $form->add('transitions', CollectionType::class, [
-            'entry_type'     => WorkflowTransitionType::class,
-            'entry_options'  => ['place_choices' => $placeNames, 'guards' => $guards, 'strict_names' => $strictNames, 'structure_locked' => $structureLocked],
+            'entry_type'    => WorkflowTransitionType::class,
+            'entry_options' => ['place_choices' => $placeNames, 'guards' => $guards, 'strict_names' => $strictNames, 'structure_locked' => $structureLocked, 'label_domains' => $labelDomains],
             // Since 1.16: a locked clone keeps its transitions (only their guards and conditions are edited).
             'allow_add'      => !$structureLocked,
             'allow_delete'   => !$structureLocked,
@@ -198,6 +201,9 @@ final class WorkflowDefinitionFormType extends AbstractType
             'structure_locked' => false,
         ]);
         $resolver->setAllowedTypes('structure_locked', 'bool');
+        // Since 1.16 (tenancy.label_domains): translation domains of place / transition label keys.
+        $resolver->setDefault('label_domains', LabelTranslationConstraints::DEFAULT_DOMAINS);
+        $resolver->setAllowedTypes('label_domains', 'string[]');
         $resolver->setAllowedTypes('section', WorkflowDefinitionFormSection::class);
         $resolver->setAllowedTypes('guards', 'array');
         $resolver->setAllowedTypes('slug_locked', 'bool');

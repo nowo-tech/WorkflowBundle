@@ -141,6 +141,27 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Whether any tenant has a definition with this slug (since 1.16; the slug is re-checked byte for byte).
+     */
+    public function existsForAnyTenant(string $slug): bool
+    {
+        $rows = $this->createQueryBuilder('d')
+            ->select('d.slug', 'd.tenantKey')
+            ->where('d.slug = :slug')
+            ->andWhere("d.tenantKey <> ''")
+            ->setParameter('slug', $slug)
+            ->getQuery()
+            ->getScalarResult();
+        foreach ($rows as $row) {
+            if (is_array($row) && ($row['slug'] ?? null) === $slug && ($row['tenantKey'] ?? '') !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * One version of a definition of exactly this scope (since 1.16), any status.
      */
     public function findVersion(string $slug, ?WorkflowTenant $tenant, int $version): ?WorkflowDefinition

@@ -17,6 +17,7 @@ use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Exception\WorkflowStructureLockedException;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
+use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\LeaveRequestWithoutReference;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -284,6 +285,58 @@ final class TenantClonesKernelTest extends TestCase
         $expenses = self::repository($kernel)->findDraft('expenses', new WorkflowTenant('org-b'));
         self::assertInstanceOf(WorkflowDefinition::class, $expenses);
         self::assertStringNotContainsString('workflow-structure-locked', (string) self::send($kernel, self::ui('org-b', '/definitions/' . $expenses->getId() . '/edit/places'), 'admin-org-b')->getContent());
+    }
+
+    #[Test]
+    public function aTenantVersionThatPredatesTheLockOrTheTemplateIsNotUsedForNewSubjects(): void
+    {
+        $this->kernel = $kernel = self::boot('tenancy-locked');
+        $orgX         = new WorkflowTenant('org-x');
+        // Published by the tenant before the platform template of that slug existed, with a place the host does not know.
+        $squat = self::seedLeaveTemplate($kernel, 'days <= 2', $orgX);
+        $squat->addPlace(new WorkflowPlace('escalated', null, 9));
+        self::repository($kernel)->save($squat);
+        $runtime = $this->runtime($kernel);
+        $logger  = self::service($kernel, RecordingLogger::class, 'logger');
+
+        $early = self::persistLeave($kernel, new LeaveRequest('leave-early', 'org-x', 5));
+        self::assertSame('org-x', $runtime->marking($early, 'leave')->definitionTenant, 'no template yet: nothing to compare with');
+        $runtime->pin($early, 'leave');
+
+        $template        = self::seedLeaveTemplate($kernel);
+        $logger->records = [];
+        $fresh           = self::persistLeave($kernel, new LeaveRequest('leave-fresh', 'org-x', 5));
+        self::assertNull($runtime->marking($fresh, 'leave')->definitionTenant, 'new subjects run the template');
+        self::assertSame($template->getId(), self::applicator($kernel)->resolveForSubject($fresh)->getId());
+        self::assertStringContainsString('does not match its global template', $logger->lines()[0] ?? '');
+
+        $logger->records = [];
+        self::assertSame('org-x', $runtime->marking($early, 'leave')->definitionTenant, 'a pinned subject keeps its version');
+        self::assertStringContainsString('it keeps running it', $logger->lines()[0] ?? '');
+
+        // Reinstating a diverged version re-asserts the lock.
+        $retired = self::versioning($kernel)->retire($squat);
+        try {
+            self::versioning($kernel)->reinstate($retired);
+            self::fail('Locked.');
+        } catch (WorkflowStructureLockedException) {
+        }
+        $id        = (int) $retired->getId();
+        $reinstate = self::send($kernel, self::ui('org-x', '/definitions/' . $id . '/reinstate'), 'admin-org-x', 'POST', ['_token' => self::csrf($kernel, 'reinstate' . $id)]);
+        self::assertSame(302, $reinstate->getStatusCode());
+        self::assertTrue(self::repository($kernel)->find($id)?->isRetired());
+
+        // With the lock, a new global template cannot take a slug a tenant already uses.
+        $form = static fn (string $slug): array => ['workflow_definition_form' => [
+            'name'            => 'Expenses', 'slug' => $slug, 'type' => 'state_machine', 'initialPlace' => 'draft', 'subjectClass' => LeaveRequest::class,
+            'markingProperty' => 'status', 'enabled' => '1', 'priority' => '0', '_token' => self::csrf($kernel, 'workflow_definition_form'),
+        ]];
+        self::assertSame(302, self::send($kernel, self::ui('org-x', '/definitions/new'), 'admin-org-x', 'POST', $form('expenses'))->getStatusCode());
+        self::assertSame(422, self::send($kernel, self::ui('global', '/definitions/new'), 'root', 'POST', $form('expenses'))->getStatusCode());
+        self::assertSame(302, self::send($kernel, self::ui('global', '/definitions/new'), 'root', 'POST', $form('travel'))->getStatusCode());
+
+        // A published clone passes the lock.
+        self::assertTrue(self::versioning($kernel)->cloneTemplate('leave', new WorkflowTenant('org-y'), publish: true)->isPublished());
     }
 
     #[Test]
