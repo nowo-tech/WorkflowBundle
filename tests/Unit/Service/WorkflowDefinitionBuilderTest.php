@@ -80,6 +80,7 @@ final class WorkflowDefinitionBuilderTest extends TestCase
         yield 'two targets' => [['draft', 'review'], ['done', 'cancelled'], [[['draft'], ['done', 'cancelled']], [['review'], ['done', 'cancelled']]]];
         yield 'no target' => [['review'], [], [[['review'], []]]];
         yield 'no source' => [[], ['done'], [[[], ['done']]]];
+        yield 'duplicate source' => [['review', 'review'], ['done'], [[['review'], ['done']]]];
     }
 
     /**

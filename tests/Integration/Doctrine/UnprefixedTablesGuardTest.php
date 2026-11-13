@@ -99,6 +99,22 @@ final class UnprefixedTablesGuardTest extends TestCase
         (new UnprefixedTablesGuard(new TableNamePrefixer('acme_')))->postGenerateSchema(new GenerateSchemaEventArgs($mysqlEm, $schema));
     }
 
+    #[Test]
+    public function bothTheDefaultAndThePrefixedTablesStopSchemaGeneration(): void
+    {
+        $sqlite = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $sqlite->executeStatement('CREATE TABLE workflow_definition (id INTEGER)');
+        $sqlite->executeStatement('CREATE TABLE acme_definition (id INTEGER)');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getConnection')->willReturn($sqlite);
+        $schema = new Schema();
+        $schema->createTable('acme_definition');
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('both the default and the prefixed Workflow tables exist: workflow_definition / acme_definition');
+        (new UnprefixedTablesGuard(new TableNamePrefixer('acme_')))->postGenerateSchema(new GenerateSchemaEventArgs($em, $schema));
+    }
+
     private function manager(Connection $connection, string $prefix): EntityManagerInterface
     {
         $config = ORMSetup::createAttributeMetadataConfiguration([dirname(__DIR__, 3) . '/src/Entity'], true);

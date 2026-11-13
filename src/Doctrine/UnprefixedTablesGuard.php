@@ -20,7 +20,8 @@ use function strtolower;
  * `nowo:workflow:sync-schema`) when `nowo_workflow.table_prefix` is set but the bundle tables still have their default
  * names and the prefixed ones do not exist yet: DoctrineBundle 3 hosts on 1.15.0 / 1.15.1 created them unprefixed
  * (the prefix listener was ignored there). A generated diff would drop the existing tables and create empty ones; the
- * error lists the RENAME statements to run first.
+ * error lists the RENAME statements to run first. When both the default and the prefixed tables exist, it stops too
+ * (no rename is safe then).
  *
  * Nothing happens with the default prefix, or when the database cannot be read (no connection while generating SQL
  * offline): there is then nothing to compare.
@@ -65,10 +66,20 @@ final readonly class UnprefixedTablesGuard
         }
 
         $renames = [];
+        $both    = [];
         foreach ($pairs as $table => $prefixed) {
-            if (in_array($table, $existing, true) && !in_array(strtolower($prefixed), $existing, true)) {
+            if (!in_array($table, $existing, true)) {
+                continue;
+            }
+            if (in_array(strtolower($prefixed), $existing, true)) {
+                $both[] = $table . ' / ' . $prefixed;
+            } else {
                 $renames[] = self::renameSql($connection->getDatabasePlatform(), $table, $prefixed);
             }
+        }
+        if ($both !== []) {
+            // A rename is not safe while the target exists, and a generated diff would drop the default-named table.
+            throw new RuntimeException(sprintf('nowo_workflow.table_prefix is "%s", and both the default and the prefixed Workflow tables exist: %s. A generated migration would DROP the default-named ones. Back up the database, keep the table that holds your data (rename it to the prefixed name), drop the other by hand, then generate the migration again.', $this->prefixer->getTablePrefix(), implode(', ', $both)));
         }
         if ($renames === []) {
             return;

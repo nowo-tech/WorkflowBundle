@@ -13,6 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
+use function array_chunk;
 use function count;
 use function sprintf;
 
@@ -28,6 +29,9 @@ use function sprintf;
 )]
 final class LintCommand extends Command
 {
+    /** Definitions loaded at a time. */
+    public const BATCH = 50;
+
     public function __construct(
         private readonly WorkflowDefinitionRepository $repository,
     ) {
@@ -38,17 +42,21 @@ final class LintCommand extends Command
     {
         $io   = new SymfonyStyle($input, $output);
         $rows = [];
-        /** @var list<WorkflowDefinition> $definitions */
-        $definitions = $this->repository->findBy([], ['slug' => 'ASC', 'tenantKey' => 'ASC', 'version' => 'ASC']);
-        foreach ($definitions as $definition) {
-            foreach (WorkflowShapeValidator::violations($definition) as $violation) {
-                $rows[] = [(string) $definition->getId(), $definition->getSlug(), $definition->getTenantKey() === '' ? '(template)' : $definition->getTenantKey(), (string) $definition->getVersion(), $definition->getStatus()->value, $violation];
+        $ids  = $this->repository->findAllIds();
+        // Bounded memory on a long history: BATCH definitions at a time, detached once checked (read-only scan).
+        foreach (array_chunk($ids, self::BATCH) as $chunk) {
+            /** @var list<WorkflowDefinition> $definitions */
+            $definitions = $this->repository->findBy(['id' => $chunk], ['id' => 'ASC']);
+            foreach ($definitions as $definition) {
+                foreach (WorkflowShapeValidator::violations($definition) as $violation) {
+                    $rows[] = [(string) $definition->getId(), $definition->getSlug(), $definition->getTenantKey() === '' ? '(template)' : $definition->getTenantKey(), (string) $definition->getVersion(), $definition->getStatus()->value, $violation];
+                }
             }
+            $this->repository->release($definitions);
         }
-        // The private entity manager keeps nothing between commands (worker boundary); nothing was changed.
 
         if ($rows === []) {
-            $io->success(sprintf('%d definition(s) checked: every transition is valid.', count($definitions)));
+            $io->success(sprintf('%d definition(s) checked: every transition is valid.', count($ids)));
 
             return Command::SUCCESS;
         }

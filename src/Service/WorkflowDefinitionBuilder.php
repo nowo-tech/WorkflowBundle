@@ -12,6 +12,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Transition;
 
+use function array_unique;
+use function array_values;
 use function sprintf;
 use function trigger_deprecation;
 
@@ -52,7 +54,8 @@ final class WorkflowDefinitionBuilder
 
                 continue;
             }
-            foreach ($from as $place) {
+            // A place listed twice would give two enabled transitions of the same name from it (both applied).
+            foreach (array_values(array_unique($from)) as $place) {
                 // Several `to` places keep the 1.15.1 behaviour (the subject lands on the first one) until 1.16.0.
                 $transitions[] = new Transition($transition->getName(), [$place], $to);
             }
