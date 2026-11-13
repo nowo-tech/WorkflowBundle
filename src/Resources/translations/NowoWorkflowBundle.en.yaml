@@ -31,6 +31,8 @@ action:
   new_draft: 'New draft'
   publish: 'Publish'
   clone_template: 'Customize for this organization'
+  retire: 'Retire'
+  reinstate: 'Reinstate'
 
 status:
   enabled: Enabled
@@ -38,6 +40,7 @@ status:
   default: Default
   initial: Initial
   draft: 'Draft'
+  retired: 'Retired'
 
 workflow_type:
   state_machine: State machine
@@ -89,6 +92,9 @@ definition:
   confirm_draft: 'Create a draft of "%name%"? Subjects keep running the published version until you publish the draft.'
   confirm_publish: 'Publish "%name%"? New subjects start with this version; subjects already running keep theirs.'
   confirm_clone: 'Copy the template "%name%" into this organization as a draft?'
+  confirm_retire: 'Retire "%name%"? New requests use the platform template again; requests already running keep this version.'
+  confirm_reinstate: 'Reinstate "%name%"? New requests use this version again instead of the platform template.'
+  structure_locked: 'Places and transitions follow the platform template: only guards and conditions can be changed.'
 
 table:
   name: Name
@@ -134,6 +140,7 @@ form:
     general: 'Name, slug, subject binding and priority of the workflow.'
     guard_permission: 'Only an actor with this permission in the subject''s context may apply the transition (e.g. leave.approve).'
     guard_expression: 'Compare variables with values, e.g. days <= 2 and type == ''vacation''. Variables: %variables%.'
+    label_key: 'Optional translation key of the label (e.g. workflow.leave.approved); the label is shown when it has no translation.'
     automatic: 'Applied as soon as it is enabled and its guards pass (e.g. auto-approve).'
   field:
     name: Name
@@ -156,6 +163,8 @@ form:
     to_places: 'To places'
     guard_permission: 'Required permission'
     guard_expression: 'Condition'
+    label_key: 'Label translation key'
+    label_domain: 'Translation domain'
     automatic: 'Apply automatically'
   placeholder:
     select_places: 'Search and select places…'
@@ -188,6 +197,8 @@ flash:
   deleted: 'Workflow definition deleted.'
   published: 'Workflow definition published.'
   cloned: 'Template copied into this organization as a draft.'
+  retired: 'Workflow retired: new requests use the platform template.'
+  reinstated: 'Workflow reinstated: new requests use it again.'
   published_read_only: 'A published version cannot be edited: create a new draft.'
 
 error:
@@ -197,7 +208,10 @@ error:
   already_customized: 'This organization already has its own version of that workflow.'
   subject_class_not_allowed: 'This organization cannot create workflows for this subject class.'
   definition_in_use: 'This workflow cannot be deleted: %count% running request(s) still use one of its versions. Disable it instead.'
+  cannot_retire: 'This workflow cannot be retired: new requests need an enabled platform template to fall back to.'
+  structure_locked: 'Places and transitions follow the platform template and cannot be changed here.'
   invalid_shape: 'This workflow cannot be published: %violations%'
+  slug_used_by_tenant: 'A tenant already uses this slug: with locked clones a global template cannot take it.'
 
 kpi:
   definitions: 'Definitions'
@@ -250,6 +264,11 @@ workflow_place:
   label:
     placeholder: 'Submitted'
     help: 'Optional display label.'
+  label_key:
+    placeholder: 'workflow.leave.approved'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domain of the translation key (empty = messages).'
   sort_order:
     placeholder: '0'
     help: 'Position in lists and in the diagram.'
@@ -261,6 +280,11 @@ workflow_transition:
   label:
     placeholder: 'Submit for approval'
     help: 'Optional display label.'
+  label_key:
+    placeholder: 'workflow.leave.approve'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domain of the translation key (empty = messages).'
 
 scope:
   global: 'Global template'

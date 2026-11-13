@@ -13,6 +13,8 @@
         </id>
         <field name="name" type="string" length="128"/>
         <field name="label" type="string" length="255" nullable="true"/>
+        <field name="labelKey" column="label_key" type="string" length="255" nullable="true"/>
+        <field name="labelDomain" column="label_domain" type="string" length="128" nullable="true"/>
         <field name="fromPlaces" column="from_places" type="json"/>
         <field name="toPlaces" column="to_places" type="json"/>
         <field name="guardPermission" column="guard_permission" type="string" length="128" nullable="true"/>

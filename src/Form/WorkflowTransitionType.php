@@ -16,7 +16,6 @@ use Symfony\Component\Form\FormEvents;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Validator\Constraints\Callback;
-use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\Regex;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
@@ -41,14 +40,19 @@ final class WorkflowTransitionType extends AbstractType
      */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $this->addText($builder, 'name', ['label' => 'form.field.name'] + ($options['strict_names'] ? ['constraints' => [new Regex(self::STRICT_NAME_PATTERN, 'Use 1 to 64 lower-case letters, digits or underscores.')]] : []));
-        $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false]);
+        // Since 1.16 (tenancy.lock_clone_structure): a locked clone's transition keeps its name, label and places.
+        $locked = $options['structure_locked'];
+        $this->addText($builder, 'name', ['label' => 'form.field.name', 'disabled' => $locked] + ($options['strict_names'] ? ['constraints' => [new Regex(self::STRICT_NAME_PATTERN, 'Use 1 to 64 lower-case letters, digits or underscores.')]] : []));
+        $this->addText($builder, 'label', ['label' => 'form.field.label', 'required' => false, 'disabled' => $locked]);
+        // Since 1.16: translatable label (key + domain), the plain label is the fallback.
+        $this->addText($builder, 'labelKey', ['label' => 'form.field.label_key', 'required' => false, 'help' => 'form.help.label_key', 'disabled' => $locked, 'constraints' => LabelTranslationConstraints::key()]);
+        $this->addText($builder, 'labelDomain', ['label' => 'form.field.label_domain', 'required' => false, 'disabled' => $locked, 'constraints' => LabelTranslationConstraints::domain($options['label_domains'])]);
 
         // Since 1.15: guards an editor configures per transition, shown only when the host configured their port.
         /** @var array{permission: bool, variables: list<string>|null, automatic: bool} $guards */
         $guards = $options['guards'];
         if ($guards['permission']) {
-            $this->addText($builder, 'guardPermission', ['label' => 'form.field.guard_permission', 'required' => false, 'help' => 'form.help.guard_permission', 'constraints' => [new Length(max: 128)]]);
+            $this->addText($builder, 'guardPermission', ['label' => 'form.field.guard_permission', 'required' => false, 'help' => 'form.help.guard_permission']);
         }
         if ($guards['variables'] !== null) {
             $variables = $guards['variables'];
@@ -78,8 +82,8 @@ final class WorkflowTransitionType extends AbstractType
             $transition = $event->getData();
             $form       = $event->getForm();
 
-            $this->configurePlaceField($form, 'fromPlaces', 'form.field.from_places', $options['place_choices'], $transition?->getFromPlaces() ?? []);
-            $this->configurePlaceField($form, 'toPlaces', 'form.field.to_places', $options['place_choices'], $transition?->getToPlaces() ?? []);
+            $this->configurePlaceField($form, 'fromPlaces', 'form.field.from_places', $options['place_choices'], $transition?->getFromPlaces() ?? [], $options['structure_locked']);
+            $this->configurePlaceField($form, 'toPlaces', 'form.field.to_places', $options['place_choices'], $transition?->getToPlaces() ?? [], $options['structure_locked']);
         });
     }
 
@@ -95,8 +99,14 @@ final class WorkflowTransitionType extends AbstractType
             'place_choices'      => [],
             'guards'             => ['permission' => false, 'variables' => null, 'automatic' => false],
             'strict_names'       => false,
+            // Since 1.16: structure of a locked clone (only guards stay editable).
+            'structure_locked' => false,
         ]);
+        $resolver->setAllowedTypes('structure_locked', 'bool');
         $resolver->setAllowedTypes('strict_names', 'bool');
+        // Since 1.16 (tenancy.label_domains): the translation domains a label key may use.
+        $resolver->setDefault('label_domains', LabelTranslationConstraints::DEFAULT_DOMAINS);
+        $resolver->setAllowedTypes('label_domains', 'string[]');
         $resolver->setAllowedTypes('place_choices', 'array');
         $resolver->setAllowedTypes('guards', 'array');
     }
@@ -112,6 +122,7 @@ final class WorkflowTransitionType extends AbstractType
         string $label,
         array $placeChoices,
         array $selected,
+        bool $disabled = false,
     ): void {
         if ($form->has($field)) {
             $form->remove($field);
@@ -126,6 +137,6 @@ final class WorkflowTransitionType extends AbstractType
             'translation_domain' => 'NowoWorkflowBundle',
             'attr'               => ['class' => PlaceMultiSelectType::widgetClass()],
             'choices'            => PlaceChoiceHelper::buildChoices($placeChoices, $selected),
-        ]));
+        ] + ($disabled ? ['disabled' => true] : [])));
     }
 }

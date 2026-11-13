@@ -147,12 +147,62 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
 
     /**
      * The current published version of a definition of exactly this scope (null tenant = global template), enabled
-     * or not (since 1.15). Never another tenant's definition.
+     * or not (since 1.15). Never another tenant's definition. Since 1.16 a retired version is not current: a retired
+     * tenant clone has no current version (its subjects without a pin run the template).
      */
     public function findCurrent(string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition
     {
         foreach ($this->scopeRows($slug, $tenant) as $row) {
-            if (!$row->isDraft()) {
+            if ($row->isPublished()) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The newest retired version of a definition of exactly this scope, if any (since 1.16).
+     */
+    public function findRetired(string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinition
+    {
+        foreach ($this->scopeRows($slug, $tenant) as $row) {
+            if ($row->isRetired()) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether any tenant has a definition with this slug (since 1.16; the slug is re-checked byte for byte).
+     */
+    public function existsForAnyTenant(string $slug): bool
+    {
+        $rows = $this->createQueryBuilder('d')
+            ->select('d.slug', 'd.tenantKey')
+            ->where('d.slug = :slug')
+            ->andWhere("d.tenantKey <> ''")
+            ->setParameter('slug', $slug)
+            ->getQuery()
+            ->getScalarResult();
+        foreach ($rows as $row) {
+            if (is_array($row) && ($row['slug'] ?? null) === $slug && ($row['tenantKey'] ?? '') !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * One version of a definition of exactly this scope (since 1.16), any status.
+     */
+    public function findVersion(string $slug, ?WorkflowTenant $tenant, int $version): ?WorkflowDefinition
+    {
+        foreach ($this->scopeRows($slug, $tenant) as $row) {
+            if ($row->getVersion() === $version) {
                 return $row;
             }
         }
@@ -421,9 +471,9 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
      * The definitions a UI scope lists (since 1.15), one row per slug, ordered by name:
      *
      * - without tenancy: the current published version of each global definition (every 1.14 definition);
-     * - with tenancy: the latest version (draft or published) of each definition of the scope (null = the global
-     *   templates) and, for a tenant, the current published version of each global template the tenant has not
-     *   customized yet. Never another tenant's definition.
+     * - with tenancy: the latest version (draft, published or retired) of each definition of the scope (null = the
+     *   global templates) and, for a tenant, the current published version of each global template the tenant has not
+     *   customized yet or whose clone is retired (since 1.16). Never another tenant's definition.
      *
      * @return list<array{id: int, enabled: bool}>
      */
@@ -450,7 +500,8 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
             }
             $status    = $row['status'] ?? null;
             $published = ($status instanceof WorkflowDefinitionStatus ? $status->value : $status) === WorkflowDefinitionStatus::Published->value;
-            if ($key === $own && $own !== '') {
+            // Since 1.16: a clone whose versions are all retired does not hide the template (new subjects run it).
+            if ($key === $own && $own !== '' && ($status instanceof WorkflowDefinitionStatus ? $status : WorkflowDefinitionStatus::tryFrom((string) $status)) !== WorkflowDefinitionStatus::Retired) {
                 $customized[$slug] = true;
             }
             $draftsListed = $tenancy && $key === $own;

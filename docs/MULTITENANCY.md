@@ -12,6 +12,9 @@ Everything here is **opt-in**: without `nowo_workflow.tenancy.tenant_resolver` t
 
 - [Tenant model](#tenant-model)
 - [Versions](#versions)
+- [Retiring a clone](#retiring-a-clone)
+- [Locked clones](#locked-clones)
+- [Translatable labels](#translatable-labels)
 - [Runtime](#runtime)
 - [Embeddable UI](#embeddable-ui)
 - [Transition guards](#transition-guards)
@@ -64,6 +67,7 @@ A published version is **never edited**. The lifecycle of each `(tenant, slug)`:
 | Edit | Only drafts are edited (general, match rules, places, transitions and their guards). The slug is fixed once created. | Edit (`edit`) |
 | Publish | The draft becomes the version **new subjects** start with. | Publish (`publish`) |
 | Delete | A draft: only the draft. A published definition: every version of the slug in that scope, **refused while any subject is pinned to one of them** (owner decision 2026-11-12: `WorkflowDefinitionInUseException`, the UI shows the count and suggests disabling instead). | Delete (`publish`) |
+| Retire (1.16) | A tenant clone: its published versions become `retired`; new subjects run the global template, pinned subjects keep their version ([Retiring a clone](#retiring-a-clone)). Reinstate undoes it. | Retire / Reinstate (`publish`) |
 
 **In-flight subjects keep the version they started with.** When `WorkflowApplicator` (or the runtime port) applies a
 transition to a subject for the first time, the bundle stores a **pin**: `(subject's tenant, slug, subject reference)
@@ -98,6 +102,74 @@ The versioning operations are also a service for hosts: `Service\WorkflowVersion
 already authorised entity, never on a new lookup by slug and tenant), e.g. to give each new organization a published copy
 of a template: `$versioning->cloneTemplate('leave', new WorkflowTenant($uuid), publish: true)`.
 
+## Retiring a clone
+
+Since 1.16 a tenant can **retire** its customized copy of a template (UI action "Retire" on a published version of its
+own definition, permission `publish`; or `WorkflowVersioning::retire($definition)`):
+
+- every published version of the clone becomes `retired` (`WorkflowDefinitionStatus::Retired`);
+- **new subjects** of the tenant run the **global template** again (resolution step 2 skips a retired clone);
+- **subjects already pinned** to a retired version keep running it (pins are not touched; the isolation guard accepts
+  them);
+- the clone is still **not deletable while pins exist** (owner decision 2026-11-12); delete it once those subjects
+  finished and their pins are gone (`forgetSubject()`);
+- retiring is refused for a global template (disable it instead), for a clone without a published version, and when
+  there is no **enabled** global template of that slug (new subjects would have no workflow).
+
+To put the clone back into service: "Reinstate" (`WorkflowVersioning::reinstate()`: its retired versions are published
+again), publish a new draft of it ("New draft" works on a retired version), or customize the template again
+("Customize for this organization" / `cloneTemplate()`: the copy becomes the clone's next version). Retiring and
+reinstating are logged (`action: retire_definition` / `reinstate_definition`, with id, slug, version and tenant), like
+publishing and deleting.
+
+Subjects that are **not** pinned (no subject reference resolver) follow the current resolution: after a retire they run
+the template, so their place must exist there.
+
+## Locked clones
+
+With `tenancy.lock_clone_structure: true` a tenant cannot change the **structure** of a clone. The structure
+(`WorkflowDefinition::structure()`, what the lock compares) is: the initial place, the place names, and each transition
+with its name and its `from` / `to` places. **Labels, label translation keys, guards, conditions and the automatic flag
+are not part of it.** The editor keeps labels read-only on a locked clone too (only guards and conditions are edited
+there, plus the general fields and match rules), but a label changed by host code does not break the lock. So a tenant
+can never add a place the host's code does not know.
+
+- **Editor (server side):** the locked fields are disabled form fields (Symfony ignores whatever the browser sends for
+  them) and the place / transition collections accept no added or removed entry; the page shows a notice and no add or
+  remove button.
+- **Publishing:** `WorkflowVersioning::publish()`, `reinstate()` and `cloneTemplate(..., publish: true)` compare the
+  version's structure with the template version it was cloned from (else the current template) and throw
+  `WorkflowStructureLockedException` when they differ. The UI shows an error and keeps the draft (or the retired clone).
+- **Running (audit OD M3):** every time a tenant version is resolved, a version whose structure differs from its
+  template (published before the lock was turned on, or before the global template of that slug existed) is **not used
+  for new subjects**: they run the global template, and a warning is logged. Subjects already **pinned** to such a
+  version keep running it (moving them could strand their marking); a warning is logged. A tenant version with no
+  global template at all is left alone (there is nothing to fall back to).
+- A tenant cannot create its own definition under a template's slug, and a new **global template cannot take a slug a
+  tenant already uses** (both "New definition" forms refuse the slug).
+- Turn the lock on before tenants customize when you can; a clone that already diverged stops running new subjects and
+  can no longer be published or reinstated: retire or delete it and customize the template again.
+
+It is one switch for the whole host (one policy per platform, no schema change), not a per-template setting.
+
+## Translatable labels
+
+Since 1.16 a place and a transition have, next to the plain label, an optional **translation key** and **domain**
+(`label_key`, `label_domain`; editor fields "Label translation key" / "Translation domain"; `setLabelTranslation($key,
+$domain)` in code). The bundle's pages (flow diagram) show the translation of the key in the current locale, falling
+back to the plain label, then the name, when no key is set or the key has no translation. The domain defaults to
+`messages`. The editor accepts a key of at most 255 and a domain of at most 128 letters, digits, `_`, `.` or `-`, and
+only the domains of `tenancy.label_domains` (default `[messages, workflows]`). Templates seeded in code can ship keys
+of the host's catalogue:
+
+```php
+$place = (new WorkflowPlace('approved', 'Approved', 2))->setLabelTranslation('workflow.leave.approved', 'workflows');
+```
+
+The Symfony workflow metadata of a place / transition keeps the plain `label` and adds `label_key` / `label_domain`
+when a key is set, e.g. `{{ workflow_metadata(leave, 'label_key', 'approved')|trans({}, workflow_metadata(leave,
+'label_domain', 'approved')) }}`. Clones, drafts and new versions copy them; on a locked clone they are read-only.
+
 ## Runtime
 
 Call the framework-free runtime port `Contract\WorkflowRuntimeInterface` (1.15):
@@ -110,6 +182,29 @@ $result->marking->places;        // ['approved']
 $runtime->can($leaveRequest, 'leave', 'approve');
 $runtime->enabledTransitions($leaveRequest, 'leave');
 $runtime->marking($leaveRequest, 'leave');   // WorkflowMarkingView (version and tenant of the definition that runs)
+$runtime->pin($leaveRequest, 'leave');       // 1.16: WorkflowPinResult, see below
+```
+
+**Explicit pin (1.16).** `pin($subject, $slug, WorkflowPinMode $mode = WorkflowPinMode::KeepExisting)` pins a subject
+to the version it would start with now (its tenant's current published version, else the global template; never
+another tenant's, a draft or a retired clone) **without applying anything**: no initial marking, no workflow event, no
+automatic transition, no flush (a plain DBAL insert on the definitions' connection, inside your transaction when one is
+open). Use it when the host creates a subject and wants it bound to today's version before its first transition.
+
+- Idempotent: a subject already pinned keeps its pin (`created: false`).
+- `WorkflowPinMode::Repin` moves an existing pin to that version (`replaced: true`, `previousDefinitionVersion`), and
+  is refused (`InvalidArgumentException`) when the subject's current places do not exist in it. The pin is read with
+  `FOR UPDATE` and updated in one transaction (a savepoint inside yours); if it vanished meanwhile the subject is pinned
+  like a new one (`created: true`).
+- Tenant-checked: an existing pin that names another tenant's version (or a draft, another slug) is refused
+  (`WorkflowNotFoundException`), as in every other call.
+- It needs tenancy (`LogicException` otherwise) and a subject reference (`InvalidArgumentException` when the reference
+  resolver returns null).
+
+```php
+$result = $runtime->pin($leave, 'leave');            // WorkflowPinResult
+$result->definitionVersion; $result->definitionTenant; $result->created;
+$runtime->pin($leave, 'leave', WorkflowPinMode::Repin);
 ```
 
 `WorkflowApplicator` keeps its 1.14 API and resolves the same way. `DatabaseWorkflowRegistry::forSubject($subject,

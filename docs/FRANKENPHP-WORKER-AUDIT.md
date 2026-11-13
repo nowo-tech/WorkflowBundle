@@ -58,6 +58,7 @@ A bundle that is safe under **B** is safe under **A** and under classic mode / P
 | `Service\WorkflowResolver` | yes | none | ✅ | ✅ |
 | `Service\WorkflowDefinitionBuilder` | yes | none | ✅ | ✅ |
 | `Service\WorkflowGraphPresenter` | yes | none (pure functions over the entity passed in) | ✅ | ✅ |
+| `Service\WorkflowLabelTranslator` (1.16) | yes | none (`readonly`; the locale is the translator's, set per request by Symfony) | ✅ | ✅ |
 | `Service\LocaleManager` | yes | none; reads session through `RequestStack` per call | ✅ | ✅ |
 | `Service\AllowAllWorkflowUiAccessChecker` / `Service\RoleBasedWorkflowUiAccessChecker` | yes | none (`final readonly`, roles from config) | ✅ | ✅ |
 | `Service\SchemaSyncService`, `Service\DemoSeedService` | yes | none | ✅ | ✅ |

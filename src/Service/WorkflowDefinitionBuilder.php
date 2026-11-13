@@ -5,17 +5,12 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Service;
 
 use InvalidArgumentException;
-use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\Workflow\Definition;
 use Symfony\Component\Workflow\Transition;
 
-use function array_unique;
-use function array_values;
 use function sprintf;
-use function trigger_deprecation;
 
 /**
  * Builds Symfony Workflow Definition objects from persisted entities, the way FrameworkBundle builds them from
@@ -23,11 +18,6 @@ use function trigger_deprecation;
  */
 final class WorkflowDefinitionBuilder
 {
-    public function __construct(
-        private readonly ?LoggerInterface $logger = null,
-    ) {
-    }
-
     /**
      * Builds the Symfony workflow Definition (places, transitions, initial place, metadata) of a definition entity.
      */
@@ -48,15 +38,13 @@ final class WorkflowDefinitionBuilder
         foreach ($definition->getTransitions() as $transition) {
             $from = $transition->getFromPlaces();
             $to   = $transition->getToPlaces();
-            $this->warnAboutShape($definition, $transition->getName(), WorkflowShapeValidator::transitionViolation($definition->getType(), $from, $to));
-            if (!$stateMachine || $from === []) {
+            $this->refuseShape($definition, $transition->getName(), WorkflowShapeValidator::transitionViolation($definition->getType(), $from, $to));
+            if (!$stateMachine) {
                 $transitions[] = new Transition($transition->getName(), $from, $to);
 
                 continue;
             }
-            // A place listed twice would give two enabled transitions of the same name from it (both applied).
-            foreach (array_values(array_unique($from)) as $place) {
-                // Several `to` places keep the 1.15.1 behaviour (the subject lands on the first one) until 1.16.0.
+            foreach ($from as $place) {
                 $transitions[] = new Transition($transition->getName(), [$place], $to);
             }
         }
@@ -70,16 +58,16 @@ final class WorkflowDefinitionBuilder
     }
 
     /**
-     * 1.15.2 (owner decision): a stored transition with an invalid shape still runs as in 1.15.1, with a deprecation
-     * and a warning; 1.16.0 refuses it. `nowo:workflow:lint` lists them.
+     * Since 1.16.0 (owner decision, audit OD M1): a stored transition FrameworkBundle would refuse (no `from` / `to`
+     * place, several `to` places on a state machine) stops the build, as `framework.workflows` does at compile time.
+     * 1.15.2 only warned; `nowo:workflow:lint` lists them.
+     *
+     * @throws InvalidArgumentException
      */
-    private function warnAboutShape(WorkflowDefinition $definition, string $transition, ?string $violation): void
+    private function refuseShape(WorkflowDefinition $definition, string $transition, ?string $violation): void
     {
-        if ($violation === null) {
-            return;
+        if ($violation !== null) {
+            throw new InvalidArgumentException(sprintf('Workflow "%s", transition "%s": %s Fix it (see nowo:workflow:lint).', $definition->getSlug(), $transition, $violation));
         }
-        $message = sprintf('Workflow "%s", transition "%s": %s Fix it (see nowo:workflow:lint); 1.16.0 refuses to build it.', $definition->getSlug(), $transition, $violation);
-        trigger_deprecation(Configuration::PACKAGE, '1.15.2', $message);
-        $this->logger?->warning($message, ['bundle' => 'NowoWorkflowBundle', 'workflow' => $definition->getSlug(), 'transition' => $transition]);
     }
 }

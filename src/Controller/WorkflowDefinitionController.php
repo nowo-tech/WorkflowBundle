@@ -13,6 +13,7 @@ use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
 use Nowo\WorkflowBundle\Exception\WorkflowInvalidShapeException;
+use Nowo\WorkflowBundle\Exception\WorkflowStructureLockedException;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormType;
 use Nowo\WorkflowBundle\Http\WorkflowUiTenancy;
@@ -108,6 +109,14 @@ final class WorkflowDefinitionController extends AbstractController
 
         if ($form->isSubmitted() && $this->tenancy->enabled() && $this->repository->existsInScope($definition->getSlug(), $tenant)) {
             $form->get('slug')->addError(new FormError($this->translator->trans('error.slug_taken', [], WorkflowPageFactory::DOMAIN)));
+        } elseif ($form->isSubmitted() && !$tenant instanceof WorkflowTenant && $this->versioning?->isLockEnabled() === true && $this->repository->existsForAnyTenant($definition->getSlug())) {
+            // Audit OD M3: with locked clones, a new global template cannot take a slug a tenant already uses (its
+            // version would never match the template).
+            $form->get('slug')->addError(new FormError($this->translator->trans('error.slug_used_by_tenant', [], WorkflowPageFactory::DOMAIN)));
+        } elseif ($form->isSubmitted() && $tenant instanceof WorkflowTenant && $this->versioning?->isStructureLocked($definition) === true) {
+            // Since 1.16 (tenancy.lock_clone_structure): a tenant customizes a template by cloning it, never by creating
+            // its own definition under the template's slug.
+            $form->get('slug')->addError(new FormError($this->translator->trans('error.structure_locked', [], WorkflowPageFactory::DOMAIN)));
         }
         if ($form->isSubmitted() && !$this->tenancy->bindTenantSubject($definition, $tenant)) {
             // Audit NO M2: a tenant only creates workflows for the subject classes the host allows (tenancy.subject_classes).
@@ -234,6 +243,11 @@ final class WorkflowDefinitionController extends AbstractController
         }
         try {
             $published = $this->versioning()->publish($definition);
+        } catch (WorkflowStructureLockedException) {
+            // Since 1.16 (tenancy.lock_clone_structure): the clone's places and transitions must match its template.
+            $this->addFlash('error', $this->translator->trans('error.structure_locked', [], WorkflowPageFactory::DOMAIN));
+
+            return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
         } catch (WorkflowInvalidShapeException $exception) {
             // Since 1.15.2: transitions FrameworkBundle would refuse (no source / target, several targets on a state machine).
             $this->addFlash('error', $this->translator->trans('error.invalid_shape', ['%violations%' => implode(' ', $exception->violations)], WorkflowPageFactory::DOMAIN));
@@ -267,6 +281,55 @@ final class WorkflowDefinitionController extends AbstractController
         $this->flash('flash.cloned');
 
         return $this->redirectToRoute('nowo_workflow_definition_edit_general', ['id' => $copy->getId()]);
+    }
+
+    /**
+     * Retires a tenant clone (tenancy, tenant scope only, since 1.16): new subjects run the global template again,
+     * subjects pinned to its versions keep running them. Needs the `publish` action, like publishing and deleting.
+     */
+    #[Route('/{id}/retire', name: 'retire', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function retire(Request $request, int $id): RedirectResponse
+    {
+        [$definition, $tenant] = $this->tenancyAction($request, $id, WorkflowUiAction::Publish, 'retire');
+        if (!$tenant instanceof WorkflowTenant || !$definition->isPublished()) {
+            throw $this->createNotFoundException('Only a published version of a tenant workflow can be retired.');
+        }
+
+        try {
+            $retired = $this->versioning()->retire($definition);
+        } catch (LogicException) {
+            $this->addFlash('error', $this->translator->trans('error.cannot_retire', [], WorkflowPageFactory::DOMAIN));
+
+            return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
+        }
+        $this->logger->info('Workflow definition retired.', ['bundle' => 'NowoWorkflowBundle', 'action' => 'retire_definition', 'id' => $retired->getId(), 'slug' => $retired->getSlug(), 'version' => $retired->getVersion(), 'tenant' => $retired->getTenantKey()]);
+        $this->flash('flash.retired');
+
+        return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $retired->getId()]);
+    }
+
+    /**
+     * Puts a retired tenant clone back into service (tenancy, tenant scope only, since 1.16).
+     */
+    #[Route('/{id}/reinstate', name: 'reinstate', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function reinstate(Request $request, int $id): RedirectResponse
+    {
+        [$definition, $tenant] = $this->tenancyAction($request, $id, WorkflowUiAction::Publish, 'reinstate');
+        if (!$tenant instanceof WorkflowTenant || !$definition->isRetired()) {
+            throw $this->createNotFoundException('Only a retired version of a tenant workflow can be reinstated.');
+        }
+
+        try {
+            $reinstated = $this->versioning()->reinstate($definition);
+        } catch (WorkflowStructureLockedException) {
+            $this->addFlash('error', $this->translator->trans('error.structure_locked', [], WorkflowPageFactory::DOMAIN));
+
+            return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
+        }
+        $this->logger->info('Workflow definition reinstated.', ['bundle' => 'NowoWorkflowBundle', 'action' => 'reinstate_definition', 'id' => $reinstated->getId(), 'slug' => $reinstated->getSlug(), 'version' => $reinstated->getVersion(), 'tenant' => $reinstated->getTenantKey()]);
+        $this->flash('flash.reinstated');
+
+        return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $reinstated->getId()]);
     }
 
     /**
@@ -330,14 +393,20 @@ final class WorkflowDefinitionController extends AbstractController
             return $this->redirectToRoute('nowo_workflow_definition_show', ['id' => $id]);
         }
         $previousSlug = $definition->getSlug();
-        $form         = $this->createForm(WorkflowDefinitionFormType::class, $definition, [
+        // Since 1.16 (tenancy.lock_clone_structure): a tenant clone keeps its template's places and transitions. The
+        // locked fields are disabled form fields (Symfony ignores what the browser sends for them) and collections
+        // without add / delete; WorkflowVersioning::publish() checks the structure against the template again.
+        $locked = $this->tenancy->enabled() && $this->versioning?->isStructureLocked($definition) === true;
+        $form   = $this->createForm(WorkflowDefinitionFormType::class, $definition, [
             'section'     => $section,
             'guards'      => $this->tenancy->guardFields($definition),
             'slug_locked' => $this->tenancy->enabled(),
             // Audit NO M2: in a tenant scope the runtime binding (type, subject class, marking property) is fixed and
             // place / transition names are identifiers.
-            'binding_locked' => $tenant instanceof WorkflowTenant,
-            'strict_names'   => $this->tenancy->enabled(),
+            'binding_locked'   => $tenant instanceof WorkflowTenant,
+            'strict_names'     => $this->tenancy->enabled(),
+            'structure_locked' => $locked,
+            'label_domains'    => $this->tenancy->labelDomains(),
         ]);
         $form->handleRequest($request);
 
@@ -352,9 +421,10 @@ final class WorkflowDefinitionController extends AbstractController
         }
 
         return $this->render($this->template('edit'), [
-            'page'       => $this->pages->edit($definition, $section, $form->createView(), $this->scope($tenant)),
-            'definition' => $definition,
-            'section'    => $section,
+            'page'             => $this->pages->edit($definition, $section, $form->createView(), $this->scope($tenant)),
+            'definition'       => $definition,
+            'section'          => $section,
+            'structure_locked' => $locked,
         ], $this->formResponse($form));
     }
 
@@ -456,7 +526,7 @@ final class WorkflowDefinitionController extends AbstractController
     {
         $definition = !$this->tenancy->enabled()
             ? $this->repository->findOneBySlug($slug)
-            : ($this->repository->findDraft($slug, $tenant) ?? $this->repository->findCurrent($slug, $tenant) ?? ($tenant instanceof WorkflowTenant ? $this->repository->findCurrent($slug, null) : null));
+            : ($this->repository->findDraft($slug, $tenant) ?? $this->repository->findCurrent($slug, $tenant) ?? $this->repository->findRetired($slug, $tenant) ?? ($tenant instanceof WorkflowTenant ? $this->repository->findCurrent($slug, null) : null));
         if (!$definition instanceof WorkflowDefinition) {
             throw $this->createNotFoundException($this->translator->trans('error.not_found_slug', ['%slug%' => $slug], 'NowoWorkflowBundle'));
         }

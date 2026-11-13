@@ -31,6 +31,8 @@ action:
   new_draft: 'Novo rascunho'
   publish: 'Publicar'
   clone_template: 'Personalizar para esta organização'
+  retire: 'Retirar'
+  reinstate: 'Reativar'
 
 status:
   enabled: Ativo
@@ -38,6 +40,7 @@ status:
   default: Predefinido
   initial: Inicial
   draft: 'Rascunho'
+  retired: 'Retirado'
 
 workflow_type:
   state_machine: 'Máquina de estados'
@@ -89,6 +92,9 @@ definition:
   confirm_draft: 'Criar um rascunho de "%name%"? Os sujeitos continuam com a versão publicada até publicares o rascunho.'
   confirm_publish: 'Publicar "%name%"? Os novos sujeitos começam com esta versão; os que já estão em curso mantêm a sua.'
   confirm_clone: 'Copiar o modelo "%name%" para esta organização como rascunho?'
+  confirm_retire: 'Retirar "%name%"? Os novos pedidos voltam a usar o modelo da plataforma; os que já estão em curso mantêm esta versão.'
+  confirm_reinstate: 'Reativar "%name%"? Os novos pedidos voltam a usar esta versão em vez do modelo da plataforma.'
+  structure_locked: 'Os estados e as transições seguem o modelo da plataforma: só é possível alterar as guardas e as condições.'
 
 table:
   name: Nome
@@ -134,6 +140,7 @@ form:
     general: 'Nome, slug, sujeito associado e prioridade do workflow.'
     guard_permission: 'Só um ator com esta permissão no contexto do sujeito pode aplicar a transição (ex. leave.approve).'
     guard_expression: 'Compara variáveis com valores, ex. days <= 2 and type == ''vacation''. Variáveis: %variables%.'
+    label_key: 'Chave de tradução opcional do rótulo (p. ex. workflow.leave.approved); se não tiver tradução é mostrado o rótulo.'
     automatic: 'Aplicada assim que está disponível e as suas guardas passam (ex. aprovação automática).'
   field:
     name: Nome
@@ -156,6 +163,8 @@ form:
     to_places: 'Estados de destino'
     guard_permission: 'Permissão necessária'
     guard_expression: 'Condição'
+    label_key: 'Chave de tradução do rótulo'
+    label_domain: 'Domínio de tradução'
     automatic: 'Aplicar automaticamente'
   placeholder:
     select_places: 'Pesquisar e selecionar estados…'
@@ -188,6 +197,8 @@ flash:
   deleted: 'Definição de workflow eliminada.'
   published: 'Definição de workflow publicada.'
   cloned: 'Modelo copiado para esta organização como rascunho.'
+  retired: 'Workflow retirado: os novos pedidos usam o modelo da plataforma.'
+  reinstated: 'Workflow reativado: os novos pedidos voltam a usá-lo.'
   published_read_only: 'Uma versão publicada não pode ser editada: cria um novo rascunho.'
 
 error:
@@ -197,7 +208,10 @@ error:
   already_customized: 'Esta organização já tem a sua própria versão desse workflow.'
   subject_class_not_allowed: 'Esta organização não pode criar workflows para esta classe de sujeito.'
   definition_in_use: 'Este workflow não pode ser eliminado: %count% pedido(s) em curso ainda usam uma das suas versões. Desativa-o em vez disso.'
+  cannot_retire: 'Este workflow não pode ser retirado: os novos pedidos precisam de um modelo da plataforma ativo.'
+  structure_locked: 'Os estados e as transições seguem o modelo da plataforma e não podem ser alterados aqui.'
   invalid_shape: 'Este workflow não pode ser publicado: %violations%'
+  slug_used_by_tenant: 'Uma organização já usa este identificador: com os clones bloqueados um modelo global não o pode usar.'
 
 kpi:
   definitions: 'Definições'
@@ -250,6 +264,11 @@ workflow_place:
   label:
     placeholder: 'Submetido'
     help: 'Etiqueta de apresentação opcional.'
+  label_key:
+    placeholder: 'workflow.leave.approved'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domínio da chave de tradução (vazio = messages).'
   sort_order:
     placeholder: '0'
     help: 'Posição nas listas e no diagrama.'
@@ -261,6 +280,11 @@ workflow_transition:
   label:
     placeholder: 'Submeter para aprovação'
     help: 'Etiqueta de apresentação opcional.'
+  label_key:
+    placeholder: 'workflow.leave.approve'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domínio da chave de tradução (vazio = messages).'
 
 scope:
   global: 'Modelo global'

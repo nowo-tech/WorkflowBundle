@@ -31,6 +31,8 @@ action:
   new_draft: 'Nouveau brouillon'
   publish: 'Publier'
   clone_template: 'Personnaliser pour cette organisation'
+  retire: 'Retirer'
+  reinstate: 'Rétablir'
 
 status:
   enabled: Activé
@@ -38,6 +40,7 @@ status:
   default: Par défaut
   initial: État initial
   draft: 'Brouillon'
+  retired: 'Retiré'
 
 workflow_type:
   state_machine: 'Machine à états'
@@ -89,6 +92,9 @@ definition:
   confirm_draft: 'Créer un brouillon de « %name% » ? Les sujets gardent la version publiée jusqu’à la publication du brouillon.'
   confirm_publish: 'Publier « %name% » ? Les nouveaux sujets démarrent avec cette version ; ceux en cours gardent la leur.'
   confirm_clone: 'Copier le modèle « %name% » dans cette organisation en brouillon ?'
+  confirm_retire: 'Retirer « %name% » ? Les nouvelles demandes utilisent à nouveau le modèle de la plateforme ; celles déjà en cours conservent cette version.'
+  confirm_reinstate: 'Rétablir « %name% » ? Les nouvelles demandes utilisent à nouveau cette version au lieu du modèle de la plateforme.'
+  structure_locked: 'Les états et les transitions suivent le modèle de la plateforme : seuls les gardes et les conditions peuvent être modifiés.'
 
 table:
   name: Nom
@@ -134,6 +140,7 @@ form:
     general: 'Nom, slug, sujet associé et priorité du workflow.'
     guard_permission: 'Seul un acteur ayant cette permission dans le contexte du sujet peut appliquer la transition (ex. leave.approve).'
     guard_expression: 'Comparez des variables à des valeurs, ex. days <= 2 and type == ''vacation''. Variables : %variables%.'
+    label_key: 'Clé de traduction facultative du libellé (p. ex. workflow.leave.approved) ; le libellé est affiché si elle n''a pas de traduction.'
     automatic: 'Appliquée dès qu’elle est possible et que ses gardes passent (ex. approbation automatique).'
   field:
     name: Nom
@@ -156,6 +163,8 @@ form:
     to_places: 'États cible'
     guard_permission: 'Permission requise'
     guard_expression: 'Condition'
+    label_key: 'Clé de traduction du libellé'
+    label_domain: 'Domaine de traduction'
     automatic: 'Appliquer automatiquement'
   placeholder:
     select_places: 'Rechercher et sélectionner des états…'
@@ -188,6 +197,8 @@ flash:
   deleted: 'Définition de workflow supprimée.'
   published: 'Définition de workflow publiée.'
   cloned: 'Modèle copié dans cette organisation en brouillon.'
+  retired: 'Workflow retiré : les nouvelles demandes utilisent le modèle de la plateforme.'
+  reinstated: 'Workflow rétabli : les nouvelles demandes l''utilisent à nouveau.'
   published_read_only: 'Une version publiée ne peut pas être modifiée : créez un nouveau brouillon.'
 
 error:
@@ -197,7 +208,10 @@ error:
   already_customized: 'Cette organisation a déjà sa propre version de ce workflow.'
   subject_class_not_allowed: 'Cette organisation ne peut pas créer de workflows pour cette classe de sujet.'
   definition_in_use: 'Ce workflow ne peut pas être supprimé : %count% demande(s) en cours utilisent encore une de ses versions. Désactivez-le plutôt.'
+  cannot_retire: 'Ce workflow ne peut pas être retiré : les nouvelles demandes ont besoin d''un modèle de plateforme activé.'
+  structure_locked: 'Les états et les transitions suivent le modèle de la plateforme et ne peuvent pas être modifiés ici.'
   invalid_shape: 'Ce workflow ne peut pas être publié : %violations%'
+  slug_used_by_tenant: 'Une organisation utilise déjà cet identifiant : avec les clones verrouillés, un modèle global ne peut pas le prendre.'
 
 kpi:
   definitions: 'Définitions'
@@ -250,6 +264,11 @@ workflow_place:
   label:
     placeholder: 'Soumis'
     help: 'Libellé d''affichage facultatif.'
+  label_key:
+    placeholder: 'workflow.leave.approved'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domaine de la clé de traduction (vide = messages).'
   sort_order:
     placeholder: '0'
     help: 'Position dans les listes et dans le diagramme.'
@@ -261,6 +280,11 @@ workflow_transition:
   label:
     placeholder: 'Soumettre pour approbation'
     help: 'Libellé d''affichage facultatif.'
+  label_key:
+    placeholder: 'workflow.leave.approve'
+  label_domain:
+    placeholder: 'messages'
+    help: 'Domaine de la clé de traduction (vide = messages).'
 
 scope:
   global: 'Modèle global'

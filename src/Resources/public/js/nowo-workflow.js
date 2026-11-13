@@ -278,7 +278,10 @@
                     row.insertBefore(cell, actionsCell);
                 });
                 row.querySelector('[data-row-edit]').setAttribute('data-row-edit', String(index));
-                row.querySelector('[data-row-delete]').setAttribute('data-row-delete', String(index));
+                var deleteButton = row.querySelector('[data-row-delete]');
+                if (deleteButton) {
+                    deleteButton.setAttribute('data-row-delete', String(index));
+                }
                 tbody.appendChild(row);
             });
             if (emptyState) {
@@ -324,7 +327,9 @@
             }
         }
 
-        root.querySelector('[data-collection-add]').addEventListener('click', function () {
+        // Since 1.16: a locked collection (tenancy.lock_clone_structure) has no add button.
+        var addButton = root.querySelector('[data-collection-add]');
+        addButton && addButton.addEventListener('click', function () {
             var index = root.getAttribute('data-index') || '0';
             var widget = prototype ? prototypeEntry(prototype, index) : null;
             if (!widget) {

@@ -15,6 +15,7 @@ use Nowo\WorkflowBundle\Exception\WorkflowPinConflictException;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Throwable;
 
 use function array_fill;
 use function count;
@@ -106,6 +107,43 @@ final readonly class SubjectPinStore
         }
 
         return $definition->getId();
+    }
+
+    /**
+     * Moves the subject's existing pin of that workflow to another definition version (since 1.16,
+     * `WorkflowPinMode::Repin`) and returns the id of the version it was pinned to, or null when it is not pinned (then
+     * nothing is written: use {@see pin()}). The pin is read with `FOR UPDATE` (MySQL / MariaDB / PostgreSQL) and
+     * updated in one transaction (a savepoint inside the application's), so a concurrent re-pin or forget waits and the
+     * result always names a pin that exists (audit OD L3).
+     */
+    public function repin(?WorkflowTenant $tenant, string $workflowSlug, WorkflowSubjectRef $subject, WorkflowDefinition $definition): ?int
+    {
+        $connection = $this->repository->connection();
+        $platform   = $connection->getDatabasePlatform();
+        $lock       = $platform instanceof AbstractMySQLPlatform || $platform instanceof PostgreSQLPlatform ? ' FOR UPDATE' : '';
+
+        $m = $this->metadata();
+        $connection->beginTransaction();
+        try {
+            $previous = null;
+            foreach ($this->rows($tenant, $subject, $workflowSlug, $lock) as $row) {
+                $updated = $connection->executeStatement(
+                    'UPDATE ' . $m['table'] . ' SET ' . $m['definition'] . ' = ? WHERE ' . $m['id'] . ' = ?',
+                    [$definition->getId(), $row['id']],
+                    [Types::INTEGER, Types::INTEGER],
+                );
+                $previous = $updated > 0 ? $row['definition'] : null;
+
+                break;
+            }
+            $connection->commit();
+        } catch (Throwable $exception) {
+            $connection->rollBack();
+
+            throw $exception;
+        }
+
+        return $previous;
     }
 
     /**

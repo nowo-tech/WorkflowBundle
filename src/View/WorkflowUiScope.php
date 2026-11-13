@@ -30,6 +30,22 @@ final readonly class WorkflowUiScope
     }
 
     /**
+     * A published version of this tenant's own definition: it can be retired (since 1.16).
+     */
+    public function canRetire(WorkflowDefinition $definition): bool
+    {
+        return $this->tenancy && $this->tenant instanceof WorkflowTenant && $definition->isPublished() && $definition->belongsTo($this->tenant);
+    }
+
+    /**
+     * A retired version of this tenant's own definition: it can be reinstated (since 1.16).
+     */
+    public function canReinstate(WorkflowDefinition $definition): bool
+    {
+        return $this->tenancy && $this->tenant instanceof WorkflowTenant && $definition->isRetired() && $definition->belongsTo($this->tenant);
+    }
+
+    /**
      * Whether the editor may open the definition in this scope (without tenancy: always).
      */
     public function isEditable(WorkflowDefinition $definition): bool

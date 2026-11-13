@@ -52,6 +52,7 @@ use const PHP_VERSION_ID;
  *
  * - `tenancy`: standard host, one SQLite connection, every tenancy / guard port and the audit event, the UI mounted
  *   under `/organizations/{uuid}/settings/workflow` (web_ui.path_prefix, Beacon's shape);
+ * - `tenancy-locked`: `tenancy` with `tenancy.lock_clone_structure` (1.16);
  * - `tenancy-ddd`: DDD host, the bundle's XML mapping on a dedicated `workflow` manager and connection, the host's
  *   subject on the default one;
  * - `plain`: no tenancy port at all (the 1.14 behaviour), UI at `/workflow`;
@@ -177,6 +178,10 @@ final class TenancyTestKernel extends Kernel
             ];
             $workflow['web_ui'] = ['path_prefix' => self::PREFIX . '/workflow'];
             $workflow['guards'] = ['permission_checker' => 'app.workflow_tenancy', 'variables_provider' => 'app.workflow_tenancy', 'max_automatic_transitions' => 5];
+            if ($this->variant === 'tenancy-locked') {
+                // 1.16: tenant clones keep the template's places and transitions.
+                $workflow['tenancy']['lock_clone_structure'] = true;
+            }
         }
 
         $container->extension('nowo_workflow', $workflow);

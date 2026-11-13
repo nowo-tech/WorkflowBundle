@@ -13,6 +13,8 @@
         </id>
         <field name="name" type="string" length="128"/>
         <field name="label" type="string" length="255" nullable="true"/>
+        <field name="labelKey" column="label_key" type="string" length="255" nullable="true"/>
+        <field name="labelDomain" column="label_domain" type="string" length="128" nullable="true"/>
         <field name="sortOrder" column="sort_order" type="integer"/>
         <many-to-one field="workflow" target-entity="Nowo\WorkflowBundle\Entity\WorkflowDefinition" inversed-by="places">
             <join-column nullable="false" on-delete="CASCADE"/>

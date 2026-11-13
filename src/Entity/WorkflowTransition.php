@@ -17,6 +17,8 @@ use function trim;
 #[ORM\UniqueConstraint(name: 'uniq_workflow_transition_name', columns: ['workflow_id', 'name'])]
 class WorkflowTransition
 {
+    use LabelTranslationTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: Types::INTEGER)]
