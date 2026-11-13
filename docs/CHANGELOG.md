@@ -58,6 +58,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Framework-free versioning port (REQ-ARCH-001 rule 1):** `Contract\WorkflowVersionManagerInterface`, the twin of
+  `Contract\WorkflowVersioningInterface`. It runs the same flows — `cloneTemplate()`, `createDraft()`,
+  `createDraftOf()`, `publishDraft()`, `publish()`, `isLockEnabled()`, `isStructureLocked()`,
+  `assertStructureAllowed()`, `retire()`, `reinstate()`, `isRetiredScope()`, `forgetSubject()`, `delete()` — with
+  bundle value objects only: it takes a `Model\WorkflowDefinitionRef` (row id, slug, tenant, version number) and
+  returns a `Model\WorkflowDefinitionView` (the scope plus name, type, status, initial place, subject class, marking
+  property, enabled flag, description, priority, template version, place and transition **names**, metadata,
+  timestamps) instead of the `WorkflowDefinition` aggregate, through which a Doctrine `Collection` was reachable. New
+  entity-free reads give a host its first reference: `currentVersion()`, `draftVersion()` and `versions()`.
+- `Service\WorkflowVersionManager` is the built-in implementation: a facade over `WorkflowVersioningInterface`, so a
+  host decorator or replacement of that SPI is honoured through the twin as well (the same split as
+  `WorkflowRuntimeInterface` over the deprecated workflow registry port since 1.15). A reference is resolved against
+  the store on every call — scope first (slug and tenant, byte for byte), then the row id — so it can never reach a
+  version of another tenant, and nothing is memoised between calls (REQ-RUNTIME-002).
+
+### Deprecated
+
+- `Contract\WorkflowVersioningInterface` **as the port hosts call** (docblock `@deprecated`, removed in 2.0): call
+  `WorkflowVersionManagerInterface` instead. Nothing changes for implementers and decorators — it stays the SPI the
+  admin UI and the new twin ask, with the entity the UI authorised (audit NO M1), and replacing versioning behaviour
+  is still done there. No signature, default, visibility or service changed.
+
 ### Tests
 
 - CI: the coverage step of the `test` job (PHP 8.2 + Symfony 7.4) runs `composer test-coverage-100`, so a pull request that drops statement
@@ -94,7 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (the class ids keep working); a host may alias them to its own service or decorate them. The admin UI now
   type-hints `WorkflowVersioningInterface`, so a decorator sees its actions too. The delete rule is unchanged: no
   delete while subjects are pinned. `WorkflowVersioningInterface` still takes and returns the `WorkflowDefinition`
-  entity (Doctrine `Collection`s reachable), so REQ-ARCH-001 rule 1 stays ⚠️ until its id / slug-based forms in 2.0;
+  entity (Doctrine `Collection`s reachable), so REQ-ARCH-001 rule 1 stayed ⚠️ until the twin port of [Unreleased](#unreleased);
   the bundle's own applicator, runtime and UI keep using `WorkflowResolver` directly.
 - **`docs/ARCHITECTURE.md`:** ports, SPI, events, persistence, the standard Symfony and DDD host paths, the
   REQ-ARCH-001 status per rule, and what waits for 2.0 (`runtime.flush_after_apply` default, removal of the deprecated

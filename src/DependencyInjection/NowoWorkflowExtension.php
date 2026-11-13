@@ -9,6 +9,7 @@ use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
 use Nowo\WorkflowBundle\Collation\WorkflowExactKeyColumns;
 use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\Controller\DashboardController;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
@@ -28,6 +29,7 @@ use Nowo\WorkflowBundle\Service\DemoSeedService;
 use Nowo\WorkflowBundle\Service\WorkflowApplicator;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use Nowo\WorkflowBundle\Service\WorkflowVersioning;
+use Nowo\WorkflowBundle\Service\WorkflowVersionManager;
 use Nowo\WorkflowBundle\Tenancy\CloneStructureLock;
 use Nowo\WorkflowBundle\Tenancy\SecurityTokenActorProvider;
 use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
@@ -467,6 +469,10 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArgument('$lockCloneStructure', $enabled && $tenancy['lock_clone_structure']);
         // Since 1.17: the versioning port (REQ-ARCH-001 rule 1) the admin UI type-hints; hosts may decorate or replace it.
         $container->setAlias(WorkflowVersioningInterface::class, WorkflowVersioning::class);
+        // Since 1.19: the framework-free twin of that port (REQ-ARCH-001 rule 1), a facade over it, so a host
+        // decorator or replacement of the SPI above is honoured here too. Hosts may decorate this one as well.
+        $container->register(WorkflowVersionManager::class, WorkflowVersionManager::class)->setAutowired(true)->setPublic(false);
+        $container->setAlias(WorkflowVersionManagerInterface::class, WorkflowVersionManager::class);
 
         $container->getDefinition(WorkflowResolver::class)->setArgument('$tenancy', new Reference(TenancyContext::class));
         $container->getDefinition(DatabaseWorkflowRegistry::class)->setArgument('$locator', new Reference(WorkflowDefinitionLocator::class));

@@ -15,6 +15,7 @@ standard Symfony application and a DDD / hexagonal one wire them (REQ-ARCH-001).
   - [Standard Symfony host](#standard-symfony-host)
   - [DDD / hexagonal host](#ddd--hexagonal-host)
   - [Replacing or decorating a port](#replacing-or-decorating-a-port)
+  - [Versioning without the aggregate](#versioning-without-the-aggregate)
 - [REQ-ARCH-001 status](#req-arch-001-status)
 - [Deferred to 2.0](#deferred-to-20)
 
@@ -38,7 +39,8 @@ class ids keep working, and you may alias the interface to your own service or d
 |------|------------------|-------|-------|
 | `Contract\WorkflowRuntimeInterface` | `Service\WorkflowRuntime` | 1.15 | `can()`, `apply()`, `enabledTransitions()`, `marking()`, `pin()`. Scalars and bundle VOs only (`Model\WorkflowTransitionResult`, `WorkflowMarkingView`, `WorkflowPinResult`). |
 | `Contract\WorkflowSlugResolverInterface` | `Service\WorkflowResolver` | 1.17 | `resolveSlug(WorkflowContext)`, `resolveSlugForSubject(object)`: the slug to pass to the runtime port. The bundle's own applicator, runtime and UI still use `WorkflowResolver` directly, so replacing this port only changes what host callers get. |
-| `Contract\WorkflowVersioningInterface` | `Service\WorkflowVersioning` | 1.17 | Drafts, publishing, retiring, template clones, `forgetSubject()`, `delete()`. The admin UI calls it too. Takes and returns the `WorkflowDefinition` entity (Doctrine `Collection`s reachable through it): id / slug-based forms are 2.0 work. |
+| `Contract\WorkflowVersionManagerInterface` | `Service\WorkflowVersionManager` | 1.19 | Drafts, publishing, retiring, template clones, `forgetSubject()`, `delete()`, plus the entity-free reads `currentVersion()`, `draftVersion()`, `versions()`. Takes `Model\WorkflowDefinitionRef`, returns `Model\WorkflowDefinitionView`: scalars, bundle enums and bundle VOs only. The port to call. |
+| `Contract\WorkflowVersioningInterface` | `Service\WorkflowVersioning` | 1.17 | The same flows taking and returning the `WorkflowDefinition` entity (Doctrine `Collection`s reachable through it). **Deprecated as a calling port since 1.19** (removed in 2.0), but it stays the SPI the admin UI and the twin above ask, so decorators and replacements keep running. |
 
 `Service\WorkflowApplicator` and `Service\WorkflowResolver`'s entity-returning methods stay public for standard hosts
 (final classes, no interface): the applicator works with Symfony Workflow types, so the runtime port is its
@@ -151,11 +153,43 @@ are pinned to one of its versions (`WorkflowDefinitionInUseException`). The pin 
 so the database refuses such a delete even when a replacement forgets the check.
 `tests/Integration/Tenancy/ArchPortsKernelTest.php` covers the aliases, a decorator, a replacement and that rule.
 
+### Versioning without the aggregate
+
+`Contract\WorkflowVersionManagerInterface` is the framework-free twin of `WorkflowVersioningInterface` (rule 1): the
+same flows with bundle value objects only — it takes a `Model\WorkflowDefinitionRef` (row id, slug, tenant, version
+number) and returns a `Model\WorkflowDefinitionView` (the scope plus the definition's own fields, with place and
+transition **names** instead of Doctrine collections). `currentVersion()`, `draftVersion()` and `versions()` are the
+entity-free reads that give a host its first reference.
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
+
+final readonly class OnboardOrganization
+{
+    public function __construct(private WorkflowVersionManagerInterface $workflows)
+    {
+    }
+
+    public function __invoke(WorkflowTenant $tenant): void
+    {
+        $clone = $this->workflows->cloneTemplate('leave', $tenant, publish: true);
+        $this->workflows->publish($this->workflows->createDraftOf($clone->ref)->ref);
+    }
+}
+```
+
+`Service\WorkflowVersionManager` is the built-in implementation and a facade over `WorkflowVersioningInterface`, the
+same split as `WorkflowRuntimeInterface` over the deprecated registry port: a host decorator or replacement of that
+SPI is honoured through the twin as well, so **behaviour is still replaced on `WorkflowVersioningInterface`** (which
+the admin UI keeps calling with the entity it authorised). Decorate the twin to change what your own callers see. A
+reference is resolved on every call — scope first, then the row id — so it can never reach another tenant's version and
+nothing is memoised between calls (REQ-RUNTIME-002).
+
 ## REQ-ARCH-001 status
 
 | Rule | Status | Where |
 |------|--------|-------|
-| 1. Interfaces + VOs | ⚠️ until 2.0 | runtime and slug-resolver ports are framework-free (VOs in `Model\`); `WorkflowVersioningInterface` (1.17) is an interface but takes and returns the bundle's `WorkflowDefinition` entity, which exposes Doctrine `Collection`s, and has no id / VO counterpart yet |
+| 1. Interfaces + VOs | ✅ | runtime, slug-resolver and versioning ports are framework-free (VOs in `Model\`): `WorkflowVersionManagerInterface` is the id / VO twin of `WorkflowVersioningInterface`, which stays as the SPI (deprecated as a calling port, removed in 2.0) |
 | 2. No forced base class / trait | ✅ | bundle-owned entities, XML mapping (1.14), subjects referenced by class and reference |
 | 3. No framework types in ports, events, VOs | ✅ since 1.15 | deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` kept for BC until 2.0 |
 | 4. Events carry ids | ✅ | `WorkflowTransitionAppliedEvent` |
@@ -174,8 +208,7 @@ These need a major release (they change a default or remove a public API); they 
   1.14) and the recipe sets `false`.
 - **Removal of the deprecated ports.** `WorkflowRegistryInterface` as a host port and
   `WorkflowUiAccessCheckerInterface::isGranted(Request)` go away.
-- **Versioning by id (rule 1, ⚠️ until then).** `WorkflowVersioningInterface` takes and returns the bundle's own
-  `WorkflowDefinition` aggregate (`cloneTemplate()`, `createDraft*()`, `publish*()`, `retire()`, `reinstate()`,
-  `delete()`, …). It is a bundle-owned entity, not a host entity, but it exposes Doctrine `Collection`s (places,
-  transitions, match rules), so a framework type is reachable through the port. 2.0 gives it id / slug-based forms
-  that return VOs; changing the signatures would break implementers and decorators, so it waits for the major.
+- **Removal of the aggregate from `WorkflowVersioningInterface`.** Its id / VO form exists since the twin
+  `WorkflowVersionManagerInterface` (see *Versioning without the aggregate*), which closes rule 1. Changing the
+  signatures of the deprecated interface itself would break every implementer and decorator, so the interface keeps
+  taking and returning `WorkflowDefinition` until 2.0 removes it.

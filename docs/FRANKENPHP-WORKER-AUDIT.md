@@ -56,6 +56,7 @@ A bundle that is safe under **B** is safe under **A** and under classic mode / P
 | `Service\DatabaseWorkflowRegistry` (also aliased as `Contract\WorkflowRegistryInterface`) | yes | `array $cache` of built workflows scoped to the current main request (`WeakReference` owner); `reset()` clears it | ✅ | ✅ |
 | `Service\WorkflowApplicator` | yes | none (`readonly` deps); resets a closed EM after a failed flush | ✅ | ✅ |
 | `Service\WorkflowResolver` | yes | none | ✅ | ✅ |
+| `Service\WorkflowVersionManager` (1.19, aliased as `Contract\WorkflowVersionManagerInterface`) | yes | none (`final readonly`); every reference is resolved against the store per call, and the views it returns are built per call | ✅ | ✅ |
 | `Service\WorkflowDefinitionBuilder` | yes | none | ✅ | ✅ |
 | `Service\WorkflowGraphPresenter` | yes | none (pure functions over the entity passed in) | ✅ | ✅ |
 | `Service\WorkflowLabelTranslator` (1.16) | yes | none (`readonly`; the locale is the translator's, set per request by Symfony) | ✅ | ✅ |
@@ -137,7 +138,7 @@ FrankenPHP worker ruleset pass.
 
 | Service | State | Cleared at |
 |---------|-------|------------|
-| `Tenancy\TenancyContext`, `Tenancy\WorkflowDefinitionLocator`, `Tenancy\SubjectPinStore`, `Http\WorkflowUiTenancy`, `Service\WorkflowRuntime`, `Service\WorkflowVersioning`, guard / isolation / audit subscribers | none (`readonly`): tenant, subject reference, actor and variables are asked to the host ports per call | — |
+| `Tenancy\TenancyContext`, `Tenancy\WorkflowDefinitionLocator`, `Tenancy\SubjectPinStore`, `Http\WorkflowUiTenancy`, `Service\WorkflowRuntime`, `Service\WorkflowVersioning`, `Service\WorkflowVersionManager` (1.19), guard / isolation / audit subscribers | none (`readonly`): tenant, subject reference, actor and variables are asked to the host ports per call | — |
 | `Audit\AfterCommitDispatcher` | audit events held per open transaction (`WeakMap` keyed by the driver connection), committed events, events of markings not persisted yet | committed events are dispatched after the applicator's flush or at the end of request / console command / Messenger message; everything not committed by then is dropped (warning), also when a transaction is still open (audit NO L1); everything on `kernel.reset` |
 | `EventListener\WorkflowUiRouteContextSubscriber` | router context parameters of a Workflow UI route prefix (`{uuid}`) and their names | removed at `kernel.finish_request` of the main request and, should it never finish, at the next main request (audit NO L2); `kernel.reset` |
 | `Expression\GuardExpression` | parser cursor | a new parser per `parse()` call; never a service |

@@ -31,6 +31,7 @@ services:
             - '../../EventListener/TransitionAuditSubscriber.php'
             - '../../EventListener/WorkflowUiRouteContextSubscriber.php'
             - '../../Service/WorkflowVersioning.php'
+            - '../../Service/WorkflowVersionManager.php'
 
     # Routes stay opt-in (REQ-SF-004 rule 7): controllers are not autoconfigured, so the #[Route] classes never get
     # the `routing.controller` tag and a host `routing.controllers` import does not mount them without the prefix.

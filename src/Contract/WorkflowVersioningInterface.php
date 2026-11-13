@@ -24,11 +24,18 @@ use Nowo\WorkflowBundle\Tenancy\CloneStructureLock;
  * No Symfony, Doctrine or HTTP type in the signatures: the methods take slugs, bundle VOs ({@see WorkflowTenant},
  * {@see WorkflowSubjectRef}) or the bundle's own definition aggregate ({@see WorkflowDefinition}). That aggregate is a
  * bundle-owned entity, never a host entity, but it exposes Doctrine `Collection`s (places, transitions, match rules),
- * so a framework type is reachable through this port (REQ-ARCH-001 rule 1 ⚠️): id / slug-based forms returning VOs
- * are 2.0 work (UPGRADING "To 1.17.0"). A replacement must keep the owner rule of
+ * so a framework type is reachable through this port. Since 1.19 the id / VO form of every method lives on the
+ * framework-free twin {@see WorkflowVersionManagerInterface} (REQ-ARCH-001 rule 1); dropping the aggregate from THIS
+ * interface is 2.0 work. A replacement must keep the owner rule of
  * {@see self::delete()}: a published definition is not deleted while subjects are pinned to it (the pin foreign key is
  * ON DELETE RESTRICT, so the database refuses it as well). See {@see CloneStructureLock} and
  * {@see WorkflowShapeValidator} for the checks of {@see self::publish()}.
+ *
+ * @deprecated since 1.19 as the port hosts CALL (REQ-ARCH-001 rule 1: it takes and returns the definition
+ *             aggregate, through which a Doctrine `Collection` is reachable), use
+ *             {@see WorkflowVersionManagerInterface}; removed in 2.0. Until then it stays the SPI the admin UI and
+ *             {@see WorkflowVersionManagerInterface} ask, so a host implementation or decorator of it keeps running
+ *             unchanged and is honoured through the twin as well. Replacing versioning behaviour is still done here.
  */
 interface WorkflowVersioningInterface
 {

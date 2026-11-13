@@ -344,7 +344,10 @@ final readonly class ApproveExpense
 - `WorkflowApplicator` is a final class without an interface (it works with Symfony Workflow types); since 1.15
   `WorkflowRuntimeInterface` is the framework-free, replaceable port (`WorkflowRegistryInterface` is deprecated for
   hosts). Since 1.17 `WorkflowSlugResolverInterface` (implemented by `WorkflowResolver`) gives the slug a subject runs
-  and `WorkflowVersioningInterface` (implemented by `WorkflowVersioning`) the tenant versions; see
+  and `WorkflowVersioningInterface` (implemented by `WorkflowVersioning`) the tenant versions. Since 1.19 call the
+  framework-free twin `WorkflowVersionManagerInterface` (implemented by `WorkflowVersionManager`) instead: it takes a
+  `Model\WorkflowDefinitionRef` and returns a `Model\WorkflowDefinitionView`, never the definition entity, and adds
+  the entity-free reads `currentVersion()`, `draftVersion()` and `versions()`. See
   [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## FrankenPHP / long-running workers
