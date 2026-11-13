@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.16.0] - 2026-11-13](#1160---2026-11-13)
 - [[1.15.2] - 2026-11-13](#1152---2026-11-13)
 - [[1.15.1] - 2026-11-12](#1151---2026-11-12)
 - [[1.15.0] - 2026-11-12](#1150---2026-11-12)
@@ -55,6 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-13
+
 ### Added
 
 - **Retire a tenant clone (Beacon, 1.16.0):** new status `WorkflowDefinitionStatus::Retired`. `WorkflowVersioning::retire()`
@@ -89,6 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without `from` or `to` places, or a `state_machine` transition with several `to` places, now throws an
   `InvalidArgumentException` naming the workflow and the transition, as FrameworkBundle does for `framework.workflows`.
   1.15.2 only warned (deprecation); run `nowo:workflow:lint` before upgrading.
+
+[1.16.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.16.0
 
 ## [1.15.2] - 2026-11-13
 
