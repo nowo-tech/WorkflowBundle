@@ -4,7 +4,7 @@
 
 - [Unreleased](#unreleased)
   - [To 1.16.0](#to-1160)
-  - [To 1.15.2](#to-1152)
+- [To 1.15.2](#to-1152)
 - [To 1.15.1](#to-1151)
 - [To 1.15.0](#to-1150)
 - [To 1.14.1](#to-1141)
@@ -113,7 +113,13 @@ php bin/console doctrine:migrations:diff   # four nullable columns
 - Templates: `edit.html.twig` receives `structure_locked` and
   `_collection_section.html.twig` an optional `locked`; overridden copies keep working (both default to false).
 
-### To 1.15.2
+## To 1.15.2
+
+From **1.15.1**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 From **1.15.1** (patch, no configuration change):
 

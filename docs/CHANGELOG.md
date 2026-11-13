@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.15.2] - 2026-11-13](#1152---2026-11-13)
 - [[1.15.1] - 2026-11-12](#1151---2026-11-12)
 - [[1.15.0] - 2026-11-12](#1150---2026-11-12)
 - [[1.14.1] - 2026-11-12](#1141---2026-11-12)
@@ -89,6 +90,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InvalidArgumentException` naming the workflow and the transition, as FrameworkBundle does for `framework.workflows`.
   1.15.2 only warned (deprecation); run `nowo:workflow:lint` before upgrading.
 
+## [1.15.2] - 2026-11-13
+
 ### Fixed
 
 - **Doctrine listeners under DoctrineBundle 3.x (Beacon):** `TablePrefixSubscriber` and `BinaryKeyCollationSubscriber`
@@ -126,6 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SQL filter mirroring (audit NZ-I6):** the private manager registers the class of each enabled source filter
   *instance* (not the class named in the source configuration), so the mirror is exact, also when a filter is
   registered again under the same name with another class.
+
+[1.15.2]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.15.2
 
 ## [1.15.1] - 2026-11-12
 

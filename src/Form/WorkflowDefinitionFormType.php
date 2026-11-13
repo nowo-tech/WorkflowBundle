@@ -69,6 +69,19 @@ final class WorkflowDefinitionFormType extends AbstractType
                 }
             });
         }
+
+        if ($section === WorkflowDefinitionFormSection::General || $section === WorkflowDefinitionFormSection::Transitions) {
+            // Since 1.15.2: the shape of every transition, checked on the submitted type and transitions (switching the
+            // type to state_machine in General cannot leave a transition with several targets behind).
+            $builder->addEventListener(FormEvents::POST_SUBMIT, static function (FormEvent $event) use ($section): void {
+                $definition = $event->getData();
+                $form       = $event->getForm();
+                $target     = $section === WorkflowDefinitionFormSection::General && $form->has('type') ? $form->get('type') : $form;
+                foreach ($definition instanceof WorkflowDefinition ? WorkflowShapeValidator::violations($definition) : [] as $violation) {
+                    $target->addError(new FormError($violation));
+                }
+            });
+        }
     }
 
     /**
