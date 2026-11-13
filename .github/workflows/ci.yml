@@ -107,11 +107,11 @@ jobs:
           SYMFONY_DEPRECATIONS_HELPER: max[direct]=0
         run: composer test
 
-      - name: Run tests with coverage (PHP 8.2 + Symfony 7.4 only)
+      - name: Run tests with coverage (PHP 8.2 + Symfony 7.4 only; fails below 100%, REQ-TEST-003)
         if: matrix.php == '8.2' && matrix.symfony == '7.4'
         env:
           SYMFONY_DEPRECATIONS_HELPER: max[direct]=0
-        run: composer test-coverage
+        run: composer test-coverage-100
 
   mysql-schema:
     # 1.15.2: the NO PAD key collation against real servers: migrations:diff stays clean, keys are exact.
