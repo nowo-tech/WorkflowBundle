@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Integration\Tenancy;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
@@ -92,6 +93,11 @@ trait TenancyKernelSupport
     private static function versioning(TenancyTestKernel $kernel): WorkflowVersioning
     {
         return self::service($kernel, WorkflowVersioning::class, 'test.' . WorkflowVersioning::class);
+    }
+
+    private static function versionManager(TenancyTestKernel $kernel): WorkflowVersionManagerInterface
+    {
+        return self::service($kernel, WorkflowVersionManagerInterface::class, 'test.' . WorkflowVersionManagerInterface::class);
     }
 
     private static function audit(TenancyTestKernel $kernel): RecordingAuditListener

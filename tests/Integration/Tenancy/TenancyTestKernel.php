@@ -13,6 +13,7 @@ use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowSlugResolverInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use Nowo\WorkflowBundle\NowoWorkflowBundle;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
@@ -164,6 +165,7 @@ final class TenancyTestKernel extends Kernel
         $services->alias('test.' . WorkflowRuntimeInterface::class, WorkflowRuntimeInterface::class)->public();
         $services->alias('test.' . WorkflowSlugResolverInterface::class, WorkflowSlugResolverInterface::class)->public();
         $services->alias('test.' . WorkflowVersioningInterface::class, WorkflowVersioningInterface::class)->public();
+        $services->alias('test.' . WorkflowVersionManagerInterface::class, WorkflowVersionManagerInterface::class)->public();
         if ($this->variant === 'tenancy-host-ports') {
             $services->set('app.workflow_versioning_audit', RecordingVersioningDecorator::class)
                 ->decorate(WorkflowVersioningInterface::class)

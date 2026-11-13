@@ -3,6 +3,8 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.19.0](#to-1190)
+  - [Framework-free versioning port (REQ-ARCH-001 rule 1)](#framework-free-versioning-port-req-arch-001-rule-1)
 - [To 1.18.0](#to-1180)
 - [To 1.17.0](#to-1170)
 - [To 1.16.0](#to-1160)
@@ -80,6 +82,69 @@
 
 ## Unreleased
 
+## To 1.19.0
+
+From **1.18.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+From **1.18.0**: no migration, no configuration change, nothing to do. Every default is unchanged.
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+### Framework-free versioning port (REQ-ARCH-001 rule 1)
+
+`Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface` is the twin of `WorkflowVersioningInterface`: the
+same flows with bundle value objects only. Autowire it and you never touch the `WorkflowDefinition` aggregate (through
+which a Doctrine `Collection` was reachable):
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
+use Nowo\WorkflowBundle\Model\WorkflowTenant;
+
+public function __construct(private WorkflowVersionManagerInterface $workflows) {}
+
+public function onboard(string $organizationId): void
+{
+    $tenant = new WorkflowTenant($organizationId);
+    $clone  = $this->workflows->cloneTemplate('leave', $tenant, publish: true);  // WorkflowDefinitionView
+    $draft  = $this->workflows->createDraftOf($clone->ref);                      // WorkflowDefinitionRef in
+    $this->workflows->publish($draft->ref);
+}
+```
+
+| Deprecated port (`WorkflowVersioningInterface`) | Twin (`WorkflowVersionManagerInterface`) |
+| --- | --- |
+| `cloneTemplate(string, WorkflowTenant, bool): WorkflowDefinition` | same arguments, returns `WorkflowDefinitionView` |
+| `createDraft(string, ?WorkflowTenant): WorkflowDefinition` | same arguments, returns `WorkflowDefinitionView` |
+| `publishDraft(string, ?WorkflowTenant): WorkflowDefinition` | same arguments, returns `WorkflowDefinitionView` |
+| `createDraftOf(WorkflowDefinition)` | `createDraftOf(WorkflowDefinitionRef)` |
+| `publish(WorkflowDefinition)` | `publish(WorkflowDefinitionRef)` |
+| `isStructureLocked(WorkflowDefinition)` | `isStructureLocked(WorkflowDefinitionRef)` |
+| `assertStructureAllowed(WorkflowDefinition)` | `assertStructureAllowed(WorkflowDefinitionRef)` |
+| `retire(WorkflowDefinition)` / `reinstate(WorkflowDefinition)` | `retire(WorkflowDefinitionRef)` / `reinstate(WorkflowDefinitionRef)` |
+| `delete(WorkflowDefinition)` | `delete(WorkflowDefinitionRef)` |
+| `isLockEnabled()`, `isRetiredScope()`, `forgetSubject()` | identical (already framework-free) |
+| — | `currentVersion()`, `draftVersion()`, `versions()`: entity-free reads that give you a reference |
+
+- **`WorkflowDefinitionRef`** names exactly one stored version: `id`, `slug`, `tenant` (null = global template),
+  `version`. Build it with `WorkflowDefinitionRef::fromDefinition()` or take `$view->ref`. The manager looks the
+  version up in its scope (slug and tenant, byte for byte) and then matches the row id, so a reference can never reach
+  another tenant's definition; an unknown one raises `WorkflowNotFoundException`.
+- **`WorkflowDefinitionView`** is a snapshot, never refreshed: places and transitions are **name lists**, not
+  collections. Ask the manager again for the current state.
+- **Nothing is deprecated for implementers.** `WorkflowVersioningInterface` is deprecated only **as the port hosts
+  call** (removed in 2.0). It stays the SPI: the admin UI keeps calling it with the entity it authorised, the twin
+  delegates every write to it, and your decorator or replacement of it keeps running and is honoured through the twin.
+  Replace versioning behaviour there; decorate the twin to change what *your* callers see.
+- **Still deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#deferred-to-20)): dropping the
+  aggregate from `WorkflowVersioningInterface` itself, the `runtime.flush_after_apply` default becoming `false`, and
+  the removal of the deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` ports.
+
 ## To 1.18.0
 
 From **1.17.0**:
@@ -106,11 +171,10 @@ composer update nowo-tech/workflow-bundle
 - **Deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#deferred-to-20)): the
   `runtime.flush_after_apply` default becomes `false` (REQ-ARCH-001 rule 6; set it explicitly now to silence the 1.14
   deprecation), and the deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` ports are removed.
-- **2.0 work on `WorkflowVersioningInterface` (REQ-ARCH-001 rule 1 stays ⚠️ until then).** In 1.17 it takes and
-  returns the bundle's `WorkflowDefinition` entity, through which Doctrine `Collection`s are reachable. 2.0 adds or
-  switches to id / slug-based forms that return VOs, e.g. `publishById(int $definitionId)`, `retireById()`,
-  `reinstateById()`, `deleteById()`, `createDraftOfId()`, and `cloneTemplate()` / `createDraft()` / `publishDraft()`
-  returning a definition VO (id, slug, version, tenant, status) instead of the entity.
+- **Rule 1 on `WorkflowVersioningInterface`.** In 1.17 it takes and returns the bundle's `WorkflowDefinition`
+  entity, through which Doctrine `Collection`s are reachable. The id / VO form of every method now exists on the twin
+  `WorkflowVersionManagerInterface`, see [Unreleased](#unreleased); dropping the aggregate from this interface still
+  waits for 2.0.
 - **Slug resolver scope.** Replacing `WorkflowSlugResolverInterface` changes only what your own callers get: the
   bundle's applicator, runtime and admin UI still use `Service\WorkflowResolver` directly.
 
