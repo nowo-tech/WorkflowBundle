@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\Collation;
 
-use Nowo\MigrationsKitBundle\Collation\ExactKeyColumn;
+use Nowo\MigrationsKitContracts\Collation\ExactKeyColumn;
 use Nowo\WorkflowBundle\Collation\WorkflowExactKeyColumns;
 use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 use PHPUnit\Framework\Attributes\CoversClass;

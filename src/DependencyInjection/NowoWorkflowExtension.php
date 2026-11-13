@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
-use Nowo\MigrationsKitBundle\Collation\ExactKeyColumnsInterface;
 use Nowo\UiKitBundle\Theme\ThemeSlots;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
@@ -47,7 +46,6 @@ use Symfony\Component\DependencyInjection\Reference;
 
 use function array_key_exists;
 use function in_array;
-use function interface_exists;
 use function is_array;
 use function is_bool;
 use function is_string;
@@ -536,16 +534,13 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     }
 
     /**
-     * REQ-SEC-006: declare the bundle's identity key columns when MigrationsKitBundle is installed, so
-     * nowo:migrations:check-key-collations asserts them against the host's real schema. Optional: the bundle does not
-     * require MigrationsKitBundle, and nothing is registered when the interface is absent.
+     * REQ-SEC-006: declare the bundle's identity key columns, so a host's nowo:migrations:check-key-collations
+     * asserts them against its real schema. The contract comes from nowo-tech/migrations-kit-contracts (interfaces
+     * and value objects, no dependencies beyond PHP); the check itself lives in MigrationsKitBundle, which only the
+     * host needs. A host without it simply never reads the tag.
      */
     private function registerExactKeyColumns(ContainerBuilder $container): void
     {
-        if (!interface_exists(ExactKeyColumnsInterface::class)) {
-            return;
-        }
-
         $container->register(WorkflowExactKeyColumns::class, WorkflowExactKeyColumns::class)
             ->setArguments([new Reference(TableNamePrefixer::class)])
             ->addTag('nowo_migrations_kit.exact_key_columns');

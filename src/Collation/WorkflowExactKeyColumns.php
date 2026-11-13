@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Collation;
 
-use Nowo\MigrationsKitBundle\Collation\ExactKeyColumn;
-use Nowo\MigrationsKitBundle\Collation\ExactKeyColumnsInterface;
+use Nowo\MigrationsKitContracts\Collation\ExactKeyColumn;
+use Nowo\MigrationsKitContracts\Collation\ExactKeyColumnsInterface;
 use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 
