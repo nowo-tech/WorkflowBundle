@@ -40,9 +40,4 @@ final class TablePrefixSubscriberTest extends TestCase
 
         self::assertSame('workflow_definition', $metadata->getTableName());
     }
-
-    public function testGetSubscribedEvents(): void
-    {
-        self::assertSame(['loadClassMetadata'], (new TablePrefixSubscriber(new TableNamePrefixer()))->getSubscribedEvents());
-    }
 }

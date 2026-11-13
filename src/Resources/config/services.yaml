@@ -88,14 +88,20 @@ services:
         arguments:
             $tablePrefix: '%nowo_workflow.table_prefix%'
 
+    # Since 1.15.2: listeners with explicit events (DoctrineBundle 2.x and 3.x; 3.x ignores doctrine.event_subscriber).
     Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber:
         tags:
-            - { name: doctrine.event_subscriber }
+            - { name: doctrine.event_listener, event: loadClassMetadata }
 
-    # Since 1.15 (audit NO M1): binary collation of tenant keys and subject references on MySQL / MariaDB.
+    # Since 1.15.2: refuses schema generation while a custom table_prefix meets unprefixed tables (DoctrineBundle 3 hosts).
+    Nowo\WorkflowBundle\Doctrine\UnprefixedTablesGuard:
+        tags:
+            - { name: doctrine.event_listener, event: postGenerateSchema }
+
+    # Since 1.15 (audit NO M1): binary collation of tenant keys and subject references on MySQL / MariaDB (NO PAD since 1.15.2).
     Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber:
         tags:
-            - { name: doctrine.event_subscriber }
+            - { name: doctrine.event_listener, event: postGenerateSchemaTable }
 
     # Built workflows dispatch the standard Symfony workflow events (guard, transition, completed, announce…).
     Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry:

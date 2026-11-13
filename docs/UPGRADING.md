@@ -75,6 +75,52 @@
 
 ## Unreleased
 
+From **1.15.1** (patch, no configuration change):
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+php bin/console doctrine:migrations:diff   # MySQL / MariaDB only, see below
+```
+
+- **MySQL / MariaDB:** the key columns (`tenant_key`, `slug`, `workflow_slug`, `subject_ref`) move to a NO PAD binary
+  collation: `utf8mb4_0900_bin` on MySQL 8.0.17+, `utf8mb4_nopad_bin` on MariaDB (MySQL < 8.0.17 keeps `utf8mb4_bin`).
+  Generate one migration: it alters those five columns once (`CHARACTER SET utf8mb4 COLLATE …`); afterwards the diff
+  is empty. Set `doctrine.dbal.server_version` (or `?serverVersion=` in the URL) with the full version (`8.4.3`,
+  `9.7`, `11.4.4-MariaDB`); `8.0` without a patch number is read as `8.0.0` and keeps `utf8mb4_bin`. PostgreSQL and
+  SQLite: nothing changes.
+- **DoctrineBundle 3 hosts:** the collation and `table_prefix` now apply (1.15.0 / 1.15.1 ignored them there). If you
+  added the collation by hand in a migration, the diff no longer proposes to drop it.
+- **⚠ DoctrineBundle 3 hosts with a custom `table_prefix` — back up first.** Your tables were created **without** the
+  prefix (`workflow_definition`, `workflow_place`, …). Since 1.15.2 schema generation stops with an error that lists
+  the statements to run, for example (MySQL / MariaDB; PostgreSQL / SQLite get `ALTER TABLE … RENAME TO …`):
+
+  ```text
+  nowo_workflow.table_prefix is "acme_", but the Workflow tables still have their default names (created while
+  DoctrineBundle 3 ignored the prefix, WorkflowBundle 1.15.0 / 1.15.1). A generated migration would DROP them and
+  create empty ones. Back up the database, rename them first, then generate the migration again:
+  RENAME TABLE workflow_definition TO acme_definition;
+  RENAME TABLE workflow_place TO acme_place;
+  RENAME TABLE workflow_transition TO acme_transition;
+  RENAME TABLE workflow_match_rule TO acme_match_rule;
+  RENAME TABLE workflow_subject_pin TO acme_subject_pin;
+  ```
+
+  Put those statements in a hand-written migration, run it, then run `doctrine:migrations:diff` again: it should only
+  contain index renames and the collation changes. **Never apply a generated `DROP TABLE` of the bundle tables.** Or
+  remove `table_prefix` to keep the unprefixed names. Hosts on DoctrineBundle 2, and hosts without `table_prefix`, are
+  not affected.
+- `TablePrefixSubscriber` and `BinaryKeyCollationSubscriber` no longer implement `Doctrine\Common\EventSubscriber`
+  (no `getSubscribedEvents()`); they are tagged `doctrine.event_listener`. If you registered them on an event manager
+  yourself, use `addEventListener(Events::loadClassMetadata, …)` / `addEventListener(ToolEvents::postGenerateSchemaTable, …)`.
+- **State machines:** a transition with several `from` places now fires from any of them (FrameworkBundle semantics).
+- **Invalid transition shapes:** run `php bin/console nowo:workflow:lint`. It lists every stored transition without
+  `from` or `to` places and every `state_machine` transition with several `to` places. In 1.15.2 they still run as in
+  1.15.1 (deprecation + warning), the editor and `publish()` refuse them, and **1.16.0 refuses to build them**: split
+  them into one transition per target before upgrading to 1.16.0.
+- **MySQL:** a `server_version` of `8` or `8.0` (no patch number) keeps the PAD SPACE `utf8mb4_bin` and logs a
+  warning; configure the full version (`8.0.40`). `8.4`, `9.7` and full versions are fine.
+
 ## To 1.15.1
 
 From **1.15.0**:

@@ -197,6 +197,7 @@ error:
   already_customized: 'Esta organización ya tiene su propia versión de ese workflow.'
   subject_class_not_allowed: 'Esta organización no puede crear workflows para esta clase de sujeto.'
   definition_in_use: 'Este workflow no se puede borrar: %count% solicitud(es) en curso usan todavía una de sus versiones. Deshabilítalo en su lugar.'
+  invalid_shape: 'Este workflow no se puede publicar: %violations%'
 
 kpi:
   definitions: 'Definiciones'

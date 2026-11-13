@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Doctrine;
 
-use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Event\LoadClassMetadataEventArgs;
-use Doctrine\ORM\Events;
 
 /**
  * Renames bundle entity tables and constraints according to {@see TableNamePrefixer}.
+ *
+ * Since 1.15.2 a plain Doctrine listener tagged `doctrine.event_listener` for `loadClassMetadata` (it no longer
+ * implements `EventSubscriber`): DoctrineBundle 3 does not register `doctrine.event_subscriber` services.
  */
-final class TablePrefixSubscriber implements EventSubscriber
+final class TablePrefixSubscriber
 {
     private const ENTITY_NAMESPACE = 'Nowo\\WorkflowBundle\\Entity\\';
 
@@ -21,14 +22,6 @@ final class TablePrefixSubscriber implements EventSubscriber
     public function __construct(
         private readonly TableNamePrefixer $tableNamePrefixer,
     ) {
-    }
-
-    /**
-     * Returns the Doctrine events this subscriber listens to.
-     */
-    public function getSubscribedEvents(): array
-    {
-        return [Events::loadClassMetadata];
     }
 
     /**

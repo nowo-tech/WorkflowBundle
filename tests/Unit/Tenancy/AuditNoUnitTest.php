@@ -172,7 +172,6 @@ final class AuditNoUnitTest extends TestCase
         $partial = $this->schemaArgs(WorkflowSubjectPin::class, ['tenant_key']);
         (new BinaryKeyCollationSubscriber($this->registry(new MySQLPlatform())))->postGenerateSchemaTable($partial);
         self::assertSame(BinaryKeyCollationSubscriber::COLLATION, $partial->getClassTable()->getColumn('tenant_key')->getCollation());
-        self::assertSame(['postGenerateSchemaTable'], (new BinaryKeyCollationSubscriber($this->registry(null)))->getSubscribedEvents());
 
         $this->expectException(RuntimeException::class);
         (new BinaryKeyCollationSubscriber($this->registry(null)))->postGenerateSchemaTable($this->schemaArgs(WorkflowDefinition::class, ['tenant_key']));

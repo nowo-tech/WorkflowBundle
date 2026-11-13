@@ -23,6 +23,8 @@
         {% set _b = page.bundle %}
         {% set form = section.form %}
         {{ form_start(form, {attr: {id: 'workflow-definition-form', class: nowo_ui_class('form', _b), 'data-nowo-ui-region': 'form'}|merge(nowo_ui_theme.attributesFor('form', _b, {}, nowo_ui_page_type))}) }}
+            {# Since 1.15.2: form-level errors (transition shapes). #}
+            {{ form_errors(form) }}
             {% if section.id == 'general' %}
                 {{ include('@NowoWorkflowBundle/workflow_definition/_general_fields.html.twig', {form: form}, false) }}
             {% else %}

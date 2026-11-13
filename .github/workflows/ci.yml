@@ -113,6 +113,52 @@ jobs:
           SYMFONY_DEPRECATIONS_HELPER: max[direct]=0
         run: composer test-coverage
 
+  mysql-schema:
+    # 1.15.2: the NO PAD key collation against real servers: migrations:diff stays clean, keys are exact.
+    name: Schema round trip (${{ matrix.db }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        db: ['mysql:8.4', 'mariadb:11.4']
+
+    services:
+      database:
+        image: ${{ matrix.db }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: workflow
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: workflow
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot || healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Collation round trip
+        env:
+          NOWO_WORKFLOW_TEST_MYSQL_URL: pdo-mysql://root:root@127.0.0.1:3306/workflow
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/MySqlNoPadCollationTest.php
+
   cs-check:
     name: Code Style Check
     runs-on: ubuntu-latest
