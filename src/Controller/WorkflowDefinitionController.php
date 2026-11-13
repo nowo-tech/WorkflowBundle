@@ -8,6 +8,7 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
+use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -22,7 +23,6 @@ use Nowo\WorkflowBundle\Model\WorkflowUiAction;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
-use Nowo\WorkflowBundle\Service\WorkflowVersioning;
 use Nowo\WorkflowBundle\View\WorkflowPageFactory;
 use Nowo\WorkflowBundle\View\WorkflowUiScope;
 use Psr\Log\LoggerInterface;
@@ -63,7 +63,7 @@ final class WorkflowDefinitionController extends AbstractController
         private readonly array $templates = Configuration::DEFAULT_TEMPLATES,
         private readonly LoggerInterface $logger = new NullLogger(),
         private readonly WorkflowUiTenancy $tenancy = new WorkflowUiTenancy(),
-        private readonly ?WorkflowVersioning $versioning = null,
+        private readonly ?WorkflowVersioningInterface $versioning = null,
     ) {
     }
 
@@ -481,7 +481,7 @@ final class WorkflowDefinitionController extends AbstractController
         return new WorkflowUiScope($this->tenancy->enabled(), $tenant);
     }
 
-    private function versioning(): WorkflowVersioning
+    private function versioning(): WorkflowVersioningInterface
     {
         // Wired by the extension; only a hand-built controller lacks it (tenancyAction() answered 404 already).
         return $this->versioning ?? throw new LogicException('WorkflowVersioning is not wired.');
@@ -495,7 +495,7 @@ final class WorkflowDefinitionController extends AbstractController
      */
     private function tenancyAction(Request $request, int $id, WorkflowUiAction $action, string $intention, bool $write = true): array
     {
-        if (!$this->tenancy->enabled() || !$this->versioning instanceof WorkflowVersioning) {
+        if (!$this->tenancy->enabled() || !$this->versioning instanceof WorkflowVersioningInterface) {
             throw $this->createNotFoundException('Tenancy is not enabled.');
         }
         $tenant     = $this->tenancy->tenant($request);

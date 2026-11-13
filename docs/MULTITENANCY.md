@@ -97,7 +97,8 @@ Pinning rules:
 - no automatic marking migration: a subject moves to a newer version only when you remove its pin
   (`WorkflowVersioning::forgetSubject()`), and then the "follow latest" rule above applies.
 
-The versioning operations are also a service for hosts: `Service\WorkflowVersioning` (`cloneTemplate()`,
+The versioning operations are also a port for hosts: `Contract\WorkflowVersioningInterface` (since 1.17; the
+built-in `Service\WorkflowVersioning` implements it, and a host may decorate it) (`cloneTemplate()`,
 `createDraft()` / `createDraftOf()`, `publishDraft()` / `publish()`, `delete()`, `forgetSubject()`; the UI acts on the
 already authorised entity, never on a new lookup by slug and tenant), e.g. to give each new organization a published copy
 of a template: `$versioning->cloneTemplate('leave', new WorkflowTenant($uuid), publish: true)`.

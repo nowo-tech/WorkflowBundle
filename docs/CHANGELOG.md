@@ -56,6 +56,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Versioning and slug-resolver ports (REQ-ARCH-001 rule 1):** `Contract\WorkflowVersioningInterface` (drafts,
+  publishing, retiring, template clones, `forgetSubject()`, `delete()`), implemented by `Service\WorkflowVersioning`,
+  and `Contract\WorkflowSlugResolverInterface` (`resolveSlug()`, `resolveSlugForSubject()`: the slug for
+  `WorkflowRuntimeInterface`), implemented by `Service\WorkflowResolver`. Both are aliased to the built-in services
+  (the class ids keep working); a host may alias them to its own service or decorate them. The admin UI now
+  type-hints `WorkflowVersioningInterface`, so a decorator sees its actions too. The delete rule is unchanged: no
+  delete while subjects are pinned.
+- **`docs/ARCHITECTURE.md`:** ports, SPI, events, persistence, the standard Symfony and DDD host paths, the
+  REQ-ARCH-001 status per rule, and what waits for 2.0 (`runtime.flush_after_apply` default, removal of the deprecated
+  ports, id-based versioning signatures).
+
 ## [1.16.0] - 2026-11-13
 
 ### Added

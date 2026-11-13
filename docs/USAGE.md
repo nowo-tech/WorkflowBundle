@@ -58,6 +58,10 @@ $applicator->getEnabledTransitionsForSubject($expense);
 $slug = $resolver->resolveSlugForSubject($expense);
 ```
 
+Since 1.17 the same slug lookup is the port `Contract\WorkflowSlugResolverInterface` (`resolveSlug()`,
+`resolveSlugForSubject()`), and the framework-free way to move the subject is `Contract\WorkflowRuntimeInterface`
+([Runtime port](#runtime-port-115), [ARCHITECTURE.md](ARCHITECTURE.md)).
+
 ## Extending entities
 
 - Add `metadata` JSON on `WorkflowDefinition` / `WorkflowMatchRule` for custom data.
@@ -337,9 +341,11 @@ final readonly class ApproveExpense
   state through intention-revealing methods.
 - With `runtime.flush_after_apply: true` (the value when the key is not set, deprecated since 1.14), `apply*()`
   flushes the default entity manager after each transition (including your other pending changes).
-- `WorkflowApplicator` and `WorkflowResolver` are final classes without interfaces; since 1.15
+- `WorkflowApplicator` is a final class without an interface (it works with Symfony Workflow types); since 1.15
   `WorkflowRuntimeInterface` is the framework-free, replaceable port (`WorkflowRegistryInterface` is deprecated for
-  hosts).
+  hosts). Since 1.17 `WorkflowSlugResolverInterface` (implemented by `WorkflowResolver`) gives the slug a subject runs
+  and `WorkflowVersioningInterface` (implemented by `WorkflowVersioning`) the tenant versions; see
+  [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## FrankenPHP / long-running workers
 

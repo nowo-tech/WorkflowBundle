@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Service;
 
 use Nowo\WorkflowBundle\Contract\WorkflowContextAwareInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowSlugResolverInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowAmbiguousMatchException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
@@ -28,8 +29,11 @@ use const PHP_INT_MIN;
  * - Definitions with more rules win over broader ones (specificity).
  * - On equal specificity, higher priority wins.
  * - Definitions without rules act as defaults for their subject class.
+ *
+ * Since 1.17 it implements {@see WorkflowSlugResolverInterface}, the port hosts type-hint (its other methods return the
+ * bundle's definition entities and stay for the bundle itself and standard hosts).
  */
-final class WorkflowResolver
+final class WorkflowResolver implements WorkflowSlugResolverInterface
 {
     /**
      * Creates the resolver with the definition repository.
