@@ -58,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests
+
+- CI: the coverage step of the `test` job (PHP 8.2 + Symfony 7.4) runs `composer test-coverage-100`, so a pull request that drops statement
+  coverage below 100 % fails the build; before, the threshold was only checked by hand in `make release-check` before a tag.
+
 ## [1.18.0] - 2026-11-13
 
 ### Added
