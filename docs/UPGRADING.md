@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.19.0](#to-1190)
   - [Framework-free versioning port (REQ-ARCH-001 rule 1)](#framework-free-versioning-port-req-arch-001-rule-1)
 - [To 1.18.0](#to-1180)
 - [To 1.17.0](#to-1170)
@@ -80,6 +81,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.19.0
+
+From **1.18.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 From **1.18.0**: no migration, no configuration change, nothing to do. Every default is unchanged.
 

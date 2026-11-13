@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.19.0] - 2026-11-13](#1190---2026-11-13)
 - [[1.18.0] - 2026-11-13](#1180---2026-11-13)
 - [[1.17.0] - 2026-11-13](#1170---2026-11-13)
 - [[1.16.0] - 2026-11-13](#1160---2026-11-13)
@@ -58,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-11-13
+
 ### Added
 
 - **Framework-free versioning port (REQ-ARCH-001 rule 1):** `Contract\WorkflowVersionManagerInterface`, the twin of
@@ -86,6 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CI: the coverage step of the `test` job (PHP 8.2 + Symfony 7.4) runs `composer test-coverage-100`, so a pull request that drops statement
   coverage below 100 % fails the build; before, the threshold was only checked by hand in `make release-check` before a tag.
+
+[1.19.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.19.0
 
 ## [1.18.0] - 2026-11-13
 
