@@ -3,49 +3,51 @@
 {% block title %}{{ 'playground.orders.title'|trans({}, 'demo') }}{% endblock %}
 
 {% block body %}
-    <h1 class="h2 mb-4">{{ 'playground.orders.title'|trans({}, 'demo') }}</h1>
+    <div class="nowo-ui-page-header"><h1 class="nowo-ui-page-header__title">{{ 'playground.orders.title'|trans({}, 'demo') }}</h1></div>
 
-    <div class="alert alert-light border shadow-sm mb-4">
+    <div class="nowo-ui-flash nowo-ui-flash--info">
         {{ 'playground.orders.hint'|trans({}, 'demo') }}
         <a href="{{ path('demo_change_requests') }}">{{ 'nav.change_requests'|trans({}, 'demo') }}</a>.
     </div>
 
     {{ form_start(create_form) }}
-        <div class="card-body">
-            <div class="row g-3 align-items-end">
+        <section class="nowo-ui-card">
+            <div class="nowo-ui-card__body">
+                <div class="nowo-ui-form__columns">
                 {% for child in create_form %}
                     {% if not child.rendered %}
                         {{ form_row(child) }}
                     {% endif %}
                 {% endfor %}
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-primary w-100">{{ 'playground.orders.create'|trans({}, 'demo') }}</button>
+                </div>
+                <div class="nowo-ui-form__actions">
+                    <button type="submit" class="nowo-ui-btn nowo-ui-btn--primary">{{ 'playground.orders.create'|trans({}, 'demo') }}</button>
                 </div>
             </div>
-        </div>
+        </section>
     {{ form_end(create_form) }}
 
     {% for item in orders %}
-        <div class="card shadow-sm mb-3">
-            <div class="card-body">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <section class="nowo-ui-card">
+            <div class="nowo-ui-card__body">
+                <div class="nowo-ui-card__toolbar">
                     <strong>#{{ item.entity.id }}</strong>
                     <span>{{ item.entity.title }}</span>
-                    <span class="badge text-bg-primary">{{ item.marking }}</span>
+                    <span class="nowo-ui-badge nowo-ui-badge--primary">{{ item.marking }}</span>
                 </div>
-                <p class="text-muted small mb-3">{{ 'playground.resolved'|trans({}, 'demo') }}: <code>{{ item.workflow_slug }}</code></p>
-                <div class="d-flex flex-wrap gap-2">
+                <p class="nowo-ui-muted">{{ 'playground.resolved'|trans({}, 'demo') }}: <code class="nowo-ui-code">{{ item.workflow_slug }}</code></p>
+                <div class="nowo-ui-card__toolbar">
                     {% for transition in item.transitions %}
                         {% set transition_form = item.transition_forms[transition] %}
                         {{ form_start(transition_form) }}
                             {% for child in transition_form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
-                            <button type="submit" class="btn btn-sm btn-outline-primary">{{ transition }}</button>
+                            <button type="submit" class="nowo-ui-btn nowo-ui-btn--sm nowo-ui-btn--outline">{{ transition }}</button>
                         {{ form_end(transition_form) }}
                     {% endfor %}
                 </div>
             </div>
-        </div>
+        </section>
     {% else %}
-        <p class="text-muted">{{ 'playground.no_items'|trans({}, 'demo') }}</p>
+        <p class="nowo-ui-muted">{{ 'playground.no_items'|trans({}, 'demo') }}</p>
     {% endfor %}
 {% endblock %}

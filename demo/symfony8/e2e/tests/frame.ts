@@ -15,6 +15,15 @@ export async function frameShot(page: Page, path: string, opts: { minHeight?: nu
     await expect(page.locator('.sf-toolbar .sf-toolbar-block-request').first()).toBeVisible();
   }
 
+  // Let the toolbar finish loading and a dialog finish its open animation before the capture.
+  await page.waitForFunction(() => !(document.querySelector('.sf-toolbar')?.textContent ?? '').includes('Loading'), undefined, { timeout: 15000 }).catch(() => undefined);
+  await page.waitForFunction(() => {
+    const dialog = document.querySelector('dialog[open]');
+
+    return !dialog || getComputedStyle(dialog).opacity === '1';
+  }, undefined, { timeout: 5000 }).catch(() => undefined);
+  await page.waitForTimeout(400);
+
   const contentBottom = await page.evaluate(() => {
     const main = document.querySelector('main');
     const bottom = main ? main.getBoundingClientRect().bottom + window.scrollY : document.documentElement.scrollHeight;

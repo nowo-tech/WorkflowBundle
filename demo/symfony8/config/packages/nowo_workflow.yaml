@@ -4,7 +4,7 @@ nowo_workflow:
         flush_after_apply: false
     web_ui:
         path_prefix: '/workflow'
-        # null (default) = UiKit layout: nowo_ui_kit.layouts.admin → templates/layouts/admin.html.twig
+        # null (default) = UiKit layout: nowo_ui_kit.layouts.admin → templates/base.html.twig
         layout_template: null
         default_locale: 'en'
         locales: ['en', 'es', 'fr', 'it']

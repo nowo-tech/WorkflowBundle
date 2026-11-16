@@ -1,23 +1,8 @@
-# REQ-UI-003 host integration: one layout bridge and one theme for every bundle page.
+# REQ-DEMO-014: UiKit's default theme, unchanged (no CSS framework, no CDN, no token override); the demo shell
+# (templates/base.html.twig) is the admin layout of every Workflow page. Icons are inline SVG (no icon font from a CDN).
 nowo_ui_kit:
-    css_framework: bootstrap5
-    icon_set: bootstrap-icons
+    css_framework: custom
+    icon_set: svg_inline
     row_actions_display: icon
     layouts:
-        # Bridge into the demo base.html.twig (renders the UiKit canonical blocks).
-        admin: 'layouts/admin.html.twig'
-    theme:
-        # Host design tokens (UiKit paints its components from --nowo-ui-*).
-        tokens:
-            primary: '#4338ca'
-            primary-contrast: '#ffffff'
-            surface: '#ffffff'
-            surface-muted: '#f4f5fb'
-            border: '#e3e5f0'
-            border-strong: '#c9cde0'
-            text: '#1e2235'
-            muted: '#5d6280'
-            radius: '0.6rem'
-        classes:
-            card: 'demo-card'
-            page_title: 'demo-page-title'
+        admin: base.html.twig
