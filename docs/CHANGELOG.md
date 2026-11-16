@@ -59,6 +59,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Demo
+
+- The demo is built on UiKit and FormKit (REQ-DEMO-014 / REQ-DEMO-015): `templates/base.html.twig` is UiKit's admin layout with its default theme and a masthead (active item, locale switcher, theme toggle) instead of the Bootstrap CDN navbar shell, the host `layouts/admin.html.twig` bridge and `demo-theme.css` are gone, `nowo_ui_kit` uses `css_framework: custom` with `icon_set: svg_inline` and no token override, the demo pages use UiKit cards, badges, buttons, flashes and data tables, and no Bootstrap CSS/JS or icon font is loaded from a CDN. `PlaygroundSubjectType`, `ResolverFilterType` and `TransitionType` are FormKit types (`#[FormKitConfig('demo')]`, profile `demo` on UiKit's form theme). The demo requires `nowo-tech/ui-kit-bundle` `^2.52` and `nowo-tech/form-kit-bundle` `^2.23`; the README WebP screenshots are re-captured (REQ-DEMO-013). No bundle runtime change.
+
 ### Changed
 
 - Tooling: `rector.php` now skips two Rector rules in one file each, with the reason written beside each skip, so

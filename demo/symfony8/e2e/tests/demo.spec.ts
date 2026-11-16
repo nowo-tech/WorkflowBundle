@@ -57,9 +57,10 @@ test.describe('workflow admin (UiKit page contract)', () => {
     const placeDialog = page.locator('dialog[open][data-nowo-ui-dialog]');
     await expect(placeDialog).toHaveCount(1);
     await placeDialog.locator('[data-nowo-ui-dialog-replace]').first().click();
-    await expect(page.locator('dialog[open]')).toHaveAttribute('id', /^workflow-transition-/);
+    // A dialog that is closing keeps `open` until its animation ends: only count the ones that are not closing.
+    await expect(page.locator('dialog[open]:not([data-nowo-ui-closing])')).toHaveAttribute('id', /^workflow-transition-/);
     await page.keyboard.press('Escape');
-    await expect(page.locator('dialog[open]')).toHaveCount(0);
+    await expect(page.locator('dialog[open]:not([data-nowo-ui-closing])')).toHaveCount(0);
 
     await page.locator('[data-nowo-ui-region="header"] [data-nowo-confirm-open]').click();
     await expect(page.locator('dialog[open][data-nowo-ui-confirm]')).toBeVisible();
