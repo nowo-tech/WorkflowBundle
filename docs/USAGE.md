@@ -14,6 +14,8 @@
 - [Runtime port (1.15)](#runtime-port-115)
 - [Custom workflow registry (deprecated port)](#custom-workflow-registry-deprecated-port)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
+  - [Keep the domain in charge](#keep-the-domain-in-charge)
+  - [Known limitations](#known-limitations)
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
 - [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
 - [Overriding translations (REQ-I18N-001)](#overriding-translations-req-i18n-001)

@@ -63,6 +63,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The demo is built on UiKit and FormKit (REQ-DEMO-014 / REQ-DEMO-015): `templates/base.html.twig` is UiKit's admin layout with its default theme and a masthead (active item, locale switcher, theme toggle) instead of the Bootstrap CDN navbar shell, the host `layouts/admin.html.twig` bridge and `demo-theme.css` are gone, `nowo_ui_kit` uses `css_framework: custom` with `icon_set: svg_inline` and no token override, the demo pages use UiKit cards, badges, buttons, flashes and data tables, and no Bootstrap CSS/JS or icon font is loaded from a CDN. `PlaygroundSubjectType`, `ResolverFilterType` and `TransitionType` are FormKit types (`#[FormKitConfig('demo')]`, profile `demo` on UiKit's form theme). The demo requires `nowo-tech/ui-kit-bundle` `^2.52` and `nowo-tech/form-kit-bundle` `^2.23`; the README WebP screenshots are re-captured (REQ-DEMO-013). No bundle runtime change.
 
+### Documentation
+
+- Spec Kit baseline (REQ-SPECKIT-001 / REQ-SPECKIT-003): `specs/001-baseline/code-inventory.md` now maps all 163 files under `src/` (it listed 79 before; 81 files of 1.13 to 1.19 were unmapped) in new categories (private entity manager, ports, model value objects, versioning and tenancy, expression guards, events and audit, commands and shape validation, further exceptions); `spec.md` gains the functional requirements of 1.13 to 1.19 (`FR-WF-008`/`009`, `FR-SHAPE-001`, `FR-CLI-004`, `FR-ERR-002`, `FR-DI-003`, `FR-DB-004` to `FR-DB-007`, `FR-ACL-001`, `FR-RT-001`/`002`, `FR-VER-001` to `004`, `FR-TEN-001`/`002`, `FR-GUARD-001`, `FR-EXPR-001`, `FR-EVT-002`, `FR-AUD-001`, `FR-I18N-005`).
+- README `## Documentation` follows REQ-DOCS-002 (base links in canonical order, package-specific links under `### Additional documentation`); `## Tests and coverage` lists PHP, TS/JS (N/A, no Vitest suite) and Python (N/A) per REQ-TEST-007.
+- Tables of contents (REQ-DOCS-005): added to `docs/CONFIGURATION.md`; `docs/USAGE.md` lists "Keep the domain in charge" and "Known limitations"; `docs/FRANKENPHP-WORKER-AUDIT.md` lists the 1.15.0 re-audit.
+
+### CI
+
+- Dependabot (REQ-GH-002): new `npm` entry for `/demo/symfony8/e2e`. No bundle runtime change.
+
 ### Changed
 
 - Tooling: `rector.php` now skips two Rector rules in one file each, with the reason written beside each skip, so

@@ -1,5 +1,15 @@
 # Configuration
 
+## Table of contents
+
+- [Standard Symfony host](#standard-symfony-host)
+- [DDD / hexagonal host](#ddd--hexagonal-host)
+- [Flushing after apply: new installs and upgrades](#flushing-after-apply-new-installs-and-upgrades)
+- [Doctrine: the private entity manager (1.14)](#doctrine-the-private-entity-manager-114)
+  - [Deprecated keys (since 1.9, removed in 2.0)](#deprecated-keys-since-19-removed-in-20)
+- [Host layout integration (REQ-UI-003)](#host-layout-integration-req-ui-003)
+- [Protecting the CRUD UI (REQ-UI-002)](#protecting-the-crud-ui-req-ui-002)
+
 ```yaml
 # config/packages/nowo_workflow.yaml
 nowo_workflow:

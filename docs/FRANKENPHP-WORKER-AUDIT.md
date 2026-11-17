@@ -20,6 +20,7 @@
   - [W-03 — `WorkflowApplicator` depends on Doctrine's resetter after a failed flush (Medium, scenario B only)](#w-03--workflowapplicator-depends-on-doctrines-resetter-after-a-failed-flush-medium-scenario-b-only)
   - [Re-audit 2026-11-10: workflow event dispatcher (1.13.0)](#re-audit-2026-11-10-workflow-event-dispatcher-1130)
   - [Re-audit 2026-11-12: private entity manager and access VOs (1.14.0)](#re-audit-2026-11-12-private-entity-manager-and-access-vos-1140)
+  - [Re-audit 2026-11-12: tenancy, guards, audit event, runtime port (1.15.0)](#re-audit-2026-11-12-tenancy-guards-audit-event-runtime-port-1150)
 - [Usage recommendations in worker mode](#usage-recommendations-in-worker-mode)
 - [Re-audit triggers](#re-audit-triggers)
 

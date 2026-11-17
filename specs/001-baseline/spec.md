@@ -57,6 +57,48 @@ Per SDD US-01–US-05: DB-backed definitions, CRUD UI with flow diagram, context
 - **FR-CLI-002 / FR-CLI-003**: Demo seed and schema sync commands.
 - **FR-TWIG-001**: Workflow Twig extension globals (`nowo_workflow_layout_template`, `nowo_workflow_css_framework`, `nowo_workflow_icon_set`, locales).
 
+### Versions 1.13 to 1.19
+
+- **FR-WF-008**: Database workflows are built with the application `event_dispatcher` and dispatch the standard Symfony workflow events (`workflow.<slug>.guard.<transition>`, `leave`, `transition`, `enter`, `entered`, `completed`, `announce`), so host guard listeners run (1.13.0). `WorkflowApplicator::apply*()` turns a refused transition into `WorkflowTransitionBlockedException` carrying the blocker messages and codes (FR-ERR-002).
+- **FR-WF-009**: A database workflow slug may not equal the name of a workflow configured under `framework.workflows`: `FrameworkWorkflowNamesPass` collects those names and `DatabaseWorkflowRegistry` refuses a colliding slug with `WorkflowNameCollisionException` (FR-ERR-002).
+- **FR-SHAPE-001**: Shape rules of stored transitions as FrameworkBundle enforces them (at least one `from` and one `to` place, each listed once; a `state_machine` transition has exactly one `to` place). `WorkflowShapeValidator` is applied by the editor and by `WorkflowVersioning::publish()`; `WorkflowInvalidShapeException` reports a violation; 1.16.0 refuses to build such workflows (1.15.2 only warned).
+- **FR-CLI-004**: `nowo:workflow:lint` (`LintCommand`) lists stored definitions, every tenant and version, whose transitions violate FR-SHAPE-001; exit code 1 when one is found.
+- **FR-ERR-002**: Further domain exceptions: `WorkflowTransitionBlockedException` (extends `InvalidArgumentException`), `WorkflowNameCollisionException`, `WorkflowInvalidShapeException`, `WorkflowDefinitionInUseException`, `WorkflowPinConflictException`, `WorkflowStructureLockedException`.
+- **FR-DI-003**: Compiler passes added since 1.14: `PrivateEntityManagerPass` (private manager wiring and validation of `doctrine.entity_manager`), `WorkflowRuntimePass` (runtime port wiring, host runtime wins, deprecated registry port kept as SPI), `FrameworkWorkflowNamesPass` (FR-WF-009).
+
+### Private entity manager and persistence (1.14 to 1.16)
+
+- **FR-DB-004**: The definitions are written through a bundle-private Doctrine entity manager (`WorkflowEntityManager`, internal, REQ-ARCH-001 rule 6) created on the source manager's connection, configuration and event manager, so saving a definition never flushes the application's pending changes. `WorkflowManagerRegistry` resolves the definition entities to it, `PrivateEntityManagerMiddleware` / `PrivateEntityManagerDriver` / `PrivateEntityManagerConnection` report rolled-back transactions and savepoints so a stale identity map is replaced, `PrivateManagerRepositoryFactory` keeps repositories per manager so replaced managers are collected, `WorkflowUnitOfWorkSubscriber` drops it at every outermost unit-of-work boundary (request, Messenger message, console command), and `PrivateEntityManagerPass` wires and validates it (options `doctrine.entity_manager`, `doctrine.private_entity_manager`).
+- **FR-DB-005**: Exact identity keys (REQ-SEC-006): `BinaryKeyCollationSubscriber` gives the key columns (`tenant_key`, `slug`, `workflow_slug`, `subject_ref`) a binary NO PAD collation on MySQL / MariaDB when the schema is generated; `WorkflowExactKeyColumns` declares them to the MigrationsKit key-collation check.
+- **FR-DB-006**: `UnprefixedTablesGuard` stops schema generation when `table_prefix` is set but the bundle tables still have their default names (DoctrineBundle 3 hosts on 1.15.0 / 1.15.1) and lists the `RENAME` statements to run first.
+- **FR-DB-007**: XML mapping of the entities (`Resources/config/doctrine/*.orm.xml`, same schema as the attributes; options `doctrine.mapping_type`, `doctrine.register_mapping`).
+
+### Access policy value objects (1.14)
+
+- **FR-ACL-001**: Framework-free Workflow UI access port (REQ-ARCH-001 rule 3): `WorkflowUiAccessPolicyInterface::allows()` takes a `WorkflowUiAccessCheck` (method, route, controller, path, route parameters, `WorkflowActor`) built at the HTTP edge by `WorkflowUiAccessCheckFactory`; `WorkflowActor` / `WorkflowUiAccessCheck` keep request-derived values out of their properties through `Internal\HiddenValues`, so no dump or serialization shows them. The deprecated `WorkflowUiAccessCheckerInterface` stays the SPI behind it.
+
+### Runtime port and pins (1.15, 1.16)
+
+- **FR-RT-001**: Framework-free runtime port `WorkflowRuntimeInterface` (`can()`, `apply()`, `enabledTransitions()`, `marking()`) with `WorkflowTransitionResult` and `WorkflowMarkingView`; default `WorkflowRuntime` is `WorkflowApplicator` behind scalars and bundle value objects; `WorkflowRegistryInterface` is deprecated as a host port. `WorkflowSlugResolverInterface` gives the slug for a subject or context.
+- **FR-RT-002**: `WorkflowRuntimeInterface::pin()` (1.16) pins a subject to the version it would start with, without transition or flush; `WorkflowPinMode` (`KeepExisting`, `Repin`) and `WorkflowPinResult` describe the outcome.
+
+### Versioning and tenancy (1.15 to 1.19)
+
+- **FR-VER-001**: Definition versions: `WorkflowDefinitionStatus` (published, draft, retired); with tenancy a published version is never edited, the editor works on a draft and `WorkflowVersioning` publishes it, clones a global template into a tenant, retires and reinstates a clone, and deletes drafts or a whole scope. A published definition with pinned subjects cannot be deleted (`WorkflowDefinitionInUseException`).
+- **FR-VER-002**: Framework-free versioning port `WorkflowVersionManagerInterface` (1.19, REQ-ARCH-001 rule 1), twin of `WorkflowVersioningInterface`: takes a `WorkflowDefinitionRef` and returns a `WorkflowDefinitionView`, implemented by `WorkflowVersionManager` over the versioning SPI.
+- **FR-VER-003**: In-flight subjects keep the version they started with: `WorkflowSubjectPin` rows (tenant, slug, opaque subject reference) are written by `SubjectPinStore` with plain DBAL statements, with concurrent first applies resolved to one version (`WorkflowPinConflictException` when the winning pin cannot be read).
+- **FR-VER-004**: `tenancy.lock_clone_structure` (1.16): a tenant clone keeps the global template's structure (initial place, places, transitions); `CloneStructureLock` enforces it and `WorkflowStructureLockedException` reports a violation.
+- **FR-TEN-001**: Opt-in multitenancy (`tenancy.tenant_resolver`): definitions belong to a tenant or are global templates; `WorkflowDefinitionLocator` picks the pinned version, else the tenant's current published version, else the global template, never another tenant's; `TenancyContext` asks the host ports (`WorkflowTenantResolverInterface`, `WorkflowSubjectReferenceResolverInterface`, `WorkflowActorProviderInterface`, default `SecurityTokenActorProvider`) on every call with `WorkflowTenant`, `WorkflowSubject`, `WorkflowSubjectRef` and `WorkflowActorRef`; `TenantIsolationGuardSubscriber` blocks any transition of a workflow not built from the version the subject runs.
+- **FR-TEN-002**: Embeddable per-tenant UI: `web_ui.path_prefix` may hold route variables (`WorkflowUiRouteContextSubscriber` keeps them in every link), `WorkflowUiTenancy` scopes every controller action, host ports `WorkflowUiTenantResolverInterface` and `WorkflowUiActionCheckerInterface` (`WorkflowUiAction`, `WorkflowUiActionCheck`) decide scope and action (deny by default), and `WorkflowUiScope` drives row actions and badges.
+
+### Guards, audit and labels (1.15, 1.16)
+
+- **FR-GUARD-001**: Per-transition guards set in the editor, enforced by `TransitionGuardSubscriber`: a `permission` decided by the host's `WorkflowTransitionPermissionCheckerInterface` (`WorkflowTransitionPermissionCheck`), a `condition` evaluated over the host's whitelisted scalars (`WorkflowSubjectVariablesProviderInterface`, `WorkflowSubjectVariables`), and automatic transitions; a missing port or a throwing guard blocks (fail closed).
+- **FR-EXPR-001**: Condition language: `GuardExpression` is a closed DSL (not Symfony ExpressionLanguage) over scalar variables only, with no function, method, property, index or arithmetic and bounded size and depth; `GuardExpressionException` reports a condition that cannot be parsed or evaluated.
+- **FR-EVT-002**: `WorkflowTransitionAppliedEvent` (ids only, no entity or framework type) is dispatched once the transaction that persisted the subject committed (`audit.enabled`, on by default with tenancy); `TransitionAuditSubscriber` records it for every transition a database workflow completes.
+- **FR-AUD-001**: After-commit dispatch: `AuditMiddleware`, `AuditDriver` and `AuditConnection` (DBAL 4) report transactions and savepoints to `AfterCommitDispatcher` (`TransactionObserverInterface`), which drops events of rolled-back or never committed work and dispatches the rest at a safe point, never from `postFlush`.
+- **FR-I18N-005**: Translatable place and transition labels (1.16): `LabelTranslationTrait` adds `label_key` / `label_domain`, `WorkflowLabelTranslator` resolves them with fallback to the plain label then the name, and `LabelTranslationConstraints` validates the editor fields against `tenancy.label_domains`.
+
 ---
 
 ## Non-goals
@@ -75,7 +117,7 @@ None at this time. Planned work must be added here (or under `FUT-*` IDs) with e
 
 ## Success Criteria
 
-- **SC-001**: 100% of production files in `src/` appear in [`code-inventory.md`](code-inventory.md) with requirement IDs (**79/79**, audited 2026-10-20).
+- **SC-001**: 100% of production files in `src/` appear in [`code-inventory.md`](code-inventory.md) with requirement IDs (**163/163**, audited 2026-11-17).
 - **SC-002**: Configuration keys in `docs/CONFIGURATION.md` match `Configuration.php`.
 - **SC-003**: `composer qa` / `make release-check` pass in CI (PHPUnit, PHPStan where applicable).
 - **SC-004**: No Packagist-visible behavior change without spec, inventory, and test updates.
@@ -87,7 +129,7 @@ None at this time. Planned work must be added here (or under `FUT-*` IDs) with e
 | Check | Command |
 | --- | --- |
 | Full QA | `make release-check` or `composer qa` |
-| Code inventory audit | `find src -type f ! -path '*/assets/dist/*' ! -name '*.test.ts' \| wc -l` |
+| Code inventory audit | `git ls-files src \| wc -l` (all tracked files under `src/`, no `*.test.ts` exist) |
 | Demo smoke | `make demo-smoke` |
 
 When changing behavior, update this spec, `code-inventory.md`, integrator docs, and tests.

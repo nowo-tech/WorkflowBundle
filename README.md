@@ -84,9 +84,7 @@ make demo-smoke
 
 - [Installation](docs/INSTALLATION.md)
 - [Configuration](docs/CONFIGURATION.md)
-- [Usage](docs/USAGE.md) — [Standard Symfony host](docs/USAGE.md#standard-symfony-host) / [DDD / hexagonal host](docs/USAGE.md#ddd--hexagonal-host)
-- [Multitenant workflows](docs/MULTITENANCY.md) (1.15: per-organization definitions, versions, guards, audit)
-- [Architecture](docs/ARCHITECTURE.md) — ports, SPI, events, standard Symfony and DDD hosts (REQ-ARCH-001)
+- [Usage](docs/USAGE.md)
 - [Contributing](docs/CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Changelog](docs/CHANGELOG.md)
@@ -99,6 +97,10 @@ make demo-smoke
 
 ### Additional documentation
 
+- [Usage: standard Symfony host](docs/USAGE.md#standard-symfony-host)
+- [Usage: DDD / hexagonal host](docs/USAGE.md#ddd--hexagonal-host)
+- [Multitenant workflows](docs/MULTITENANCY.md) (1.15: per-organization definitions, versions, guards, audit)
+- [Architecture](docs/ARCHITECTURE.md) (ports, SPI, events, standard Symfony and DDD hosts, REQ-ARCH-001)
 - [Templates (UiKit page contract)](docs/TEMPLATES.md)
 - [PSR evaluation (REQ-CS-007)](docs/PSR.md)
 - [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md)
@@ -107,9 +109,13 @@ make demo-smoke
 
 ## Tests and coverage
 
-| Area | Coverage |
-|------|----------|
-| PHP | 100% |
+| Area | Coverage / status |
+|------|-------------------|
+| PHP | 100% (statement coverage gate: `make coverage-check` and `composer test-coverage-100` in CI) |
+| TS/JS | N/A (the only shipped script, `src/Resources/public/js/nowo-workflow.js`, is hand-written and has no Vitest suite; the admin UI is exercised by the demo Playwright e2e under `demo/symfony8/e2e`) |
+| Python | N/A |
+
+Tests summary: PHPUnit unit and integration suites (`tests/Unit`, `tests/Integration`).
 
 ```bash
 make test
