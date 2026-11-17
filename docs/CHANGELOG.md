@@ -59,6 +59,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `make test-with-db` / `make test-coverage-with-db` run the real-server tests (PHPUnit group `database`: MySQL / MariaDB NO PAD collation round trip, identity key columns, and a new PostgreSQL schema round trip) against the `mysql` and `postgres` services of the root `docker-compose.yml`; the dev image ships `pdo_mysql` and `pdo_pgsql`; a `pgsql-schema` CI job runs the PostgreSQL test (REQ-TEST-005).
+
+### Fixed
+
+- Tests: the PHPUnit deprecations are gone (`getMockForAbstractClass()` replaced by `createMock()`, `phpunit.xml.dist` on the 11.5 schema with `ignoreIndirectDeprecations`) (REQ-SF-005).
+
 ### Demo
 
 - The demo is built on UiKit and FormKit (REQ-DEMO-014 / REQ-DEMO-015): `templates/base.html.twig` is UiKit's admin layout with its default theme and a masthead (active item, locale switcher, theme toggle) instead of the Bootstrap CDN navbar shell, the host `layouts/admin.html.twig` bridge and `demo-theme.css` are gone, `nowo_ui_kit` uses `css_framework: custom` with `icon_set: svg_inline` and no token override, the demo pages use UiKit cards, badges, buttons, flashes and data tables, and no Bootstrap CSS/JS or icon font is loaded from a CDN. `PlaygroundSubjectType`, `ResolverFilterType` and `TransitionType` are FormKit types (`#[FormKitConfig('demo')]`, profile `demo` on UiKit's form theme). The demo requires `nowo-tech/ui-kit-bundle` `^2.52` and `nowo-tech/form-kit-bundle` `^2.23`; the README WebP screenshots are re-captured (REQ-DEMO-013). No bundle runtime change.

@@ -20,6 +20,7 @@ use Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
+use PHPUnit\Framework\Attributes\Group;
 
 use function dirname;
 
@@ -36,6 +37,7 @@ use const PHP_VERSION_ID;
  * A key column added to the mapping and left on the server default fails here, in this bundle's pipeline, before any
  * host installs it.
  */
+#[Group('database')]
 final class WorkflowExactKeyColumnsTest extends ExactKeyColumnsTestCase
 {
     private const PREFIX = 'colcheck_';
