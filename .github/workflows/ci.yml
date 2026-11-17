@@ -164,6 +164,45 @@ jobs:
           NOWO_WORKFLOW_TEST_MYSQL_URL: pdo-mysql://root:root@127.0.0.1:3306/workflow
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Collation/WorkflowExactKeyColumnsTest.php
 
+  pgsql-schema:
+    # REQ-TEST-005: the schema and a definition round trip against a real PostgreSQL server.
+    name: Schema round trip (postgres:16)
+    runs-on: ubuntu-latest
+
+    services:
+      database:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: workflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_pgsql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: PostgreSQL round trip
+        env:
+          NOWO_WORKFLOW_TEST_PGSQL_URL: pdo-pgsql://postgres@127.0.0.1:5432/workflow
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/PostgreSqlSchemaRoundTripTest.php
+
   cs-check:
     name: Code Style Check
     runs-on: ubuntu-latest

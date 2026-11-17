@@ -93,10 +93,7 @@ final class SchemaSyncServiceTest extends TestCase
 
     public function testFilterExistingSchemaObjectsSkipsExistingSequences(): void
     {
-        $schemaManager = $this->getMockBuilder(AbstractSchemaManager::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['listTableNames', 'listTableIndexes', 'listSequences'])
-            ->getMockForAbstractClass();
+        $schemaManager = $this->createMock(AbstractSchemaManager::class);
         $schemaManager->method('listTableNames')->willReturn([]);
         $schemaManager->method('listTableIndexes')->willReturn([]);
         $schemaManager->method('listSequences')->willReturn([new Sequence('workflow_definition_id_seq')]);
@@ -121,10 +118,7 @@ final class SchemaSyncServiceTest extends TestCase
 
     public function testListExistingSequenceNamesReturnsEmptyWhenListSequencesFails(): void
     {
-        $schemaManager = $this->getMockBuilder(AbstractSchemaManager::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['listTableNames', 'listTableIndexes', 'listSequences'])
-            ->getMockForAbstractClass();
+        $schemaManager = $this->createMock(AbstractSchemaManager::class);
         $schemaManager->method('listTableNames')->willReturn([]);
         $schemaManager->method('listTableIndexes')->willReturn([]);
         $schemaManager->method('listSequences')->willThrowException(new RuntimeException('unsupported'));
@@ -196,10 +190,7 @@ final class SchemaSyncServiceTest extends TestCase
 
     public function testFilterExistingSchemaObjectsSkipsSchemaQualifiedCreateSequence(): void
     {
-        $schemaManager = $this->getMockBuilder(AbstractSchemaManager::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['listTableNames', 'listTableIndexes', 'listSequences'])
-            ->getMockForAbstractClass();
+        $schemaManager = $this->createMock(AbstractSchemaManager::class);
         $schemaManager->method('listTableNames')->willReturn([]);
         $schemaManager->method('listTableIndexes')->willReturn([]);
         $schemaManager->method('listSequences')->willReturn([new Sequence('workflow_definition_id_seq')]);

@@ -6,7 +6,7 @@ COMPOSE_BIN := $(shell docker compose version >/dev/null 2>&1 && echo "docker co
 COMPOSE     := $(COMPOSE_BIN) -f $(COMPOSE_FILE)
 SERVICE_PHP := php
 
-.PHONY: help up down build shell install assets test test-coverage coverage-check cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan igor update validate validate-translations setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke down-dev check-twig-extra check-no-raw-html-form
+.PHONY: help up down build shell install assets test test-coverage test-with-db test-coverage-with-db coverage-check cs-check cs-fix qa clean release-check release-check-demos composer-sync rector rector-dry phpstan igor update validate validate-translations setup-hooks check-no-cursor-coauthor check-open-prs strip-cursor-coauthor-from-history demo-smoke down-dev check-twig-extra check-no-raw-html-form
 
 help:
 	@echo "Usage: make <target>"
@@ -19,6 +19,8 @@ help:
 	@echo "  assets"
 	@echo "Tests:"
 	@echo "  test test-coverage coverage-check demo-smoke"
+	@echo "  test-with-db           Real-server suite (group database) against the MySQL and PostgreSQL services (REQ-TEST-005)"
+	@echo "  test-coverage-with-db  The same with a text coverage report"
 	@echo "Quality:"
 	@echo "  cs-check cs-fix rector rector-dry phpstan qa validate-translations"
 	@echo "Release:"
@@ -66,6 +68,16 @@ ensure-up:
 
 test: ensure-up
 	$(COMPOSE) exec $(SERVICE_PHP) composer test
+
+# REQ-TEST-005: the tests that need a real server (group `database`: MySQL / MariaDB NO PAD collation round trip,
+# identity key columns, PostgreSQL schema round trip) against the mysql and postgres services of the root
+# docker-compose.yml (NOWO_WORKFLOW_TEST_MYSQL_URL / NOWO_WORKFLOW_TEST_PGSQL_URL are set on the php service;
+# skipped tests fail the target).
+test-with-db: ensure-up
+	$(COMPOSE) exec -T $(SERVICE_PHP) vendor/bin/phpunit --no-coverage --fail-on-skipped --group database
+
+test-coverage-with-db: ensure-up
+	$(COMPOSE) exec -T $(SERVICE_PHP) vendor/bin/phpunit --fail-on-skipped --group database --coverage-text
 
 test-coverage: ensure-up
 	$(COMPOSE) exec $(SERVICE_PHP) composer test-coverage | tee coverage-php.txt

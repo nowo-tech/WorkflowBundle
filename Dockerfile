@@ -4,9 +4,13 @@ RUN apk add --no-cache \
     git \
     unzip \
     bash \
-    libzip-dev
+    libzip-dev \
+    libpq
 
-RUN docker-php-ext-install -j$(nproc) zip
+# REQ-TEST-005: pdo_mysql / pdo_pgsql for the real-server suite (make test-with-db).
+RUN apk add --no-cache --virtual .db-build-deps postgresql-dev \
+    && docker-php-ext-install -j$(nproc) zip pdo_mysql pdo_pgsql \
+    && apk del .db-build-deps
 
 RUN apk add --no-cache $PHPIZE_DEPS \
     && pecl install pcov \

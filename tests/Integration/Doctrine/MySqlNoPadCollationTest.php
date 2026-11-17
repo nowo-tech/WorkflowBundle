@@ -16,6 +16,7 @@ use Doctrine\ORM\Tools\ToolEvents;
 use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
@@ -34,6 +35,7 @@ use const PHP_VERSION_ID;
  * - a 1.15.1 database (`utf8mb4_bin`) gets one ALTER per key column, then is clean;
  * - keys are NO PAD and binary: `acme`, `acme ` and `Acme` are three different tenants.
  */
+#[Group('database')]
 final class MySqlNoPadCollationTest extends TestCase
 {
     private EntityManagerInterface $manager;
