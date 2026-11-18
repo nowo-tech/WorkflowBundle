@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.20.0] - 2026-11-18](#1200---2026-11-18)
 - [[1.19.0] - 2026-11-13](#1190---2026-11-13)
 - [[1.18.0] - 2026-11-13](#1180---2026-11-13)
 - [[1.17.0] - 2026-11-13](#1170---2026-11-13)
@@ -59,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-11-18
+
 ### Added
 
 - `nowo_workflow.runtime.concurrency` (REQ-RUNTIME-003): `default` (`lock`, `optimistic` or `none`; default `lock`), `workflows` (a mode per workflow slug) and `retry_after` (seconds, default `1`). New `WorkflowConflictException` (a `TransientStorageFailure` of `nowo-tech/transaction-contract` and a `LockConflictExceptionInterface` of `nowo-tech/transaction-doctrine`; `reason`, `expectedPlaces`, `currentPlaces`, code `CONFLICT_001`). On the bundle's own routes a lock conflict, deadlock, lock wait timeout, serialization failure or `OptimisticLockException` answers 409 + `Retry-After` with `CONFLICT_001` instead of a 500. New `docs/CONCURRENCY.md` (write paths, modes, conflict codes, host part, residual risks).
@@ -93,6 +96,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is skipped in `src/Doctrine/UnprefixedTablesGuard.php` (`renameSql()` is a pure function and intentionally `static`) and
   `RemoveNullArgOnNullDefaultParamRector` in `tests/Unit/Doctrine/BinaryKeyCollationSubscriberTest.php` (the explicit `null`
   documents the case under test). Do not apply those hunks; no production or test code changed.
+
+[1.20.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.20.0
 
 ## [1.19.0] - 2026-11-13
 

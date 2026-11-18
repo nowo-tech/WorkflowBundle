@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.20.0](#to-1200)
   - [Concurrent applies (REQ-RUNTIME-003)](#concurrent-applies-req-runtime-003)
 - [To 1.19.0](#to-1190)
   - [Framework-free versioning port (REQ-ARCH-001 rule 1)](#framework-free-versioning-port-req-arch-001-rule-1)
@@ -82,6 +83,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.20.0
+
+From **1.19.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 ### Concurrent applies (REQ-RUNTIME-003)
 
