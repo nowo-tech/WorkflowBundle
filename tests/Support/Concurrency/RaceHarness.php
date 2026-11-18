@@ -55,7 +55,11 @@ final class RaceHarness
             $config->enableNativeLazyObjects(true);
         }
 
-        return new EntityManager(DriverManager::getConnection($params, $config), $config);
+        $connection = DriverManager::getConnection($params, $config);
+        // DBAL 3: nested transactions as savepoints, as DoctrineBundle configures them (DBAL 4 always uses them).
+        $connection->setNestTransactionsWithSavepoints(true);
+
+        return new EntityManager($connection, $config);
     }
 
     /**

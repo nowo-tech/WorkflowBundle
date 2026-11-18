@@ -150,7 +150,7 @@ abstract class AbstractConcurrentApplyRealDatabaseTestCase extends TestCase
 
         $connection = $this->b->getConnection();
         $connection->beginTransaction();
-        $connection->executeStatement("INSERT INTO wfrt_race_subject (status, note) VALUES ('host', 'host work')");
+        $connection->executeStatement("INSERT INTO wfrt_race_subject (id, status, note) VALUES (900001, 'host', 'host work')");
         try {
             RaceHarness::applicator($this->b, flushAfterApply: false)->apply($subject, RaceHarness::SLUG, 'submit');
             self::fail('A row lock held by another transaction must be a conflict.');
