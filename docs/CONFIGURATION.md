@@ -17,6 +17,10 @@ nowo_workflow:
     table_prefix: workflow_
     runtime:
         flush_after_apply: false    # 1.14 recipe value; unset = true (1.13 behaviour) with a deprecation, false in 2.0
+        concurrency:                # 1.20, REQ-RUNTIME-003 (docs/CONCURRENCY.md)
+            default: lock           # lock (SELECT … FOR UPDATE + expected marking) | optimistic (#[Version]) | none
+            workflows: {}           # mode per workflow slug, e.g. { imported_orders: none }
+            retry_after: 1          # Retry-After (seconds) of a WorkflowConflictException / 409 answer
     doctrine:
         entity_manager: null        # source manager of the private entity manager (null = the one mapping the entities)
         register_mapping: true      # false = map the bundle entities yourself (DDD host, dedicated manager)

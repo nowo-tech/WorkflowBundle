@@ -69,7 +69,7 @@ ensure-up:
 test: ensure-up
 	$(COMPOSE) exec $(SERVICE_PHP) composer test
 
-# REQ-TEST-005: the tests that need a real server (group `database`: MySQL / MariaDB NO PAD collation round trip,
+# REQ-TEST-005: the tests that need a real server (group `database`: the REQ-RUNTIME-003 race tests, MySQL / MariaDB NO PAD collation round trip,
 # identity key columns, PostgreSQL schema round trip) against the mysql and postgres services of the root
 # docker-compose.yml (NOWO_WORKFLOW_TEST_MYSQL_URL / NOWO_WORKFLOW_TEST_PGSQL_URL are set on the php service;
 # skipped tests fail the target).

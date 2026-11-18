@@ -23,6 +23,7 @@ final class ConfigurationTest extends TestCase
         self::assertSame('default', $config['connection']);
         self::assertSame('workflow_', $config['table_prefix']);
         self::assertTrue($config['runtime']['flush_after_apply']);
+        self::assertSame(['default' => 'lock', 'workflows' => [], 'retry_after' => 1], $config['runtime']['concurrency']);
         self::assertTrue($config['web_ui']['enabled']);
         self::assertSame('/workflow', $config['web_ui']['path_prefix']);
         self::assertNull($config['web_ui']['layout_template']);
@@ -277,5 +278,25 @@ final class ConfigurationTest extends TestCase
             'environments' => ['prod'],
         ]]);
         self::assertSame(['prod'], $config['environments']);
+    }
+
+    #[Test]
+    public function theConcurrencyModeIsSetPerWorkflow(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [['runtime' => ['concurrency' => [
+            'default'     => 'optimistic',
+            'workflows'   => ['leave' => 'none', 'order' => 'lock'],
+            'retry_after' => 3,
+        ]]]]);
+
+        self::assertSame(['default' => 'optimistic', 'workflows' => ['leave' => 'none', 'order' => 'lock'], 'retry_after' => 3], $config['runtime']['concurrency']);
+    }
+
+    #[Test]
+    public function anUnknownConcurrencyModeIsRefused(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        (new Processor())->processConfiguration(new Configuration(), [['runtime' => ['concurrency' => ['workflows' => ['leave' => 'pessimistic']]]]]);
     }
 }

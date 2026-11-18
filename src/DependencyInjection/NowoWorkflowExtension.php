@@ -338,6 +338,9 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.connection', $config['connection']);
         $container->setParameter(Configuration::ALIAS . '.table_prefix', $config['table_prefix']);
         $container->setParameter(Configuration::ALIAS . '.runtime.flush_after_apply', $config['runtime']['flush_after_apply']);
+        $container->setParameter(Configuration::ALIAS . '.runtime.concurrency.default', $config['runtime']['concurrency']['default']);
+        $container->setParameter(Configuration::ALIAS . '.runtime.concurrency.workflows', $config['runtime']['concurrency']['workflows']);
+        $container->setParameter(Configuration::ALIAS . '.runtime.concurrency.retry_after', $config['runtime']['concurrency']['retry_after']);
         if (!$this->setsFlushAfterApply($configs)) {
             trigger_deprecation(Configuration::PACKAGE, '1.14', 'Not setting "nowo_workflow.runtime.flush_after_apply" is deprecated: it keeps the 1.13 default (true, WorkflowApplicator flushes the application\'s default entity manager after each transition) and becomes false in 2.0. Set it explicitly: false to persist the subject yourself (what the 1.14 recipe installs), true to keep the current behaviour.');
         }

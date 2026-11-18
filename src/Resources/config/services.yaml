@@ -24,6 +24,7 @@ services:
             - '../../Event/'
             - '../../Expression/'
             - '../../Audit/'
+            - '../../Concurrency/'
             - '../../Tenancy/'
             - '../../View/WorkflowUiScope.php'
             - '../../EventListener/TransitionGuardSubscriber.php'
@@ -115,9 +116,27 @@ services:
             # A database slug equal to a framework.workflows name would share its workflow.<name>.* events.
             $frameworkWorkflowNames: '%nowo_workflow.framework_workflow_names%'
 
+    # Since 1.20 (REQ-RUNTIME-003): the concurrency control of each workflow (docs/CONCURRENCY.md).
+    Nowo\WorkflowBundle\Concurrency\WorkflowConcurrencyPolicy:
+        arguments:
+            $default: '%nowo_workflow.runtime.concurrency.default%'
+            $workflows: '%nowo_workflow.runtime.concurrency.workflows%'
+            $retryAfterSeconds: '%nowo_workflow.runtime.concurrency.retry_after%'
+
+    Nowo\WorkflowBundle\Concurrency\SubjectMarkingGuard:
+        arguments:
+            $managerRegistry: '@?doctrine'
+
     Nowo\WorkflowBundle\Service\WorkflowApplicator:
         arguments:
             $flushAfterApply: '%nowo_workflow.runtime.flush_after_apply%'
+            $concurrency: '@Nowo\WorkflowBundle\Concurrency\WorkflowConcurrencyPolicy'
+            $markingGuard: '@Nowo\WorkflowBundle\Concurrency\SubjectMarkingGuard'
+
+    # Since 1.20 (REQ-RUNTIME-003): a lock conflict or deadlock on the bundle's own routes answers 409 + Retry-After.
+    Nowo\WorkflowBundle\EventListener\WorkflowConflictResponseSubscriber:
+        arguments:
+            $retryAfterSeconds: '%nowo_workflow.runtime.concurrency.retry_after%'
 
     # SPI of WorkflowApplicator (deprecated for callers since 1.15: use WorkflowRuntimeInterface). WorkflowRuntimePass
     # checks a host replacement or decorator of it.

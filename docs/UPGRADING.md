@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [Concurrent applies (REQ-RUNTIME-003)](#concurrent-applies-req-runtime-003)
 - [To 1.19.0](#to-1190)
   - [Framework-free versioning port (REQ-ARCH-001 rule 1)](#framework-free-versioning-port-req-arch-001-rule-1)
 - [To 1.18.0](#to-1180)
@@ -81,6 +82,43 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+### Concurrent applies (REQ-RUNTIME-003)
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console cache:clear
+```
+
+The bundle now requires `nowo-tech/transaction-contract` `^1.0` and `nowo-tech/transaction-doctrine` `^1.4` (libraries
+only: nothing to register). `nowo_workflow.runtime.concurrency.default` is `lock`, so every apply on a persisted
+Doctrine entity is protected from the upgrade on. What changes for a host (see [CONCURRENCY.md](CONCURRENCY.md)):
+
+- **A lost race is an exception.** `apply*()` and `WorkflowRuntimeInterface::apply()` throw `WorkflowConflictException`
+  when another request changed the subject's marking after this request loaded it (1.19 applied the transition anyway).
+  Map it to 409 + `Retry-After` + `CONFLICT_001` on your routes (transaction-doctrine's conflict responder does it
+  for you), or catch it, reload the subject and retry.
+- **One more query and a transaction.** Each apply re-reads the marking column with `SELECT … FOR UPDATE`. With
+  `flush_after_apply: true` the check, the transition and the flush run in one transaction on the subject's connection
+  (a savepoint when you already have one open), so the Symfony workflow listeners now run inside it: keep mails, HTTP
+  calls and messages for after the commit (the audit events already are).
+- **`flush_after_apply: false`** (the recipe value): nothing is flushed, as before. The marking is checked with a row
+  lock when a transaction is open on the subject's connection (the lock is held until you commit), without one
+  otherwise. Wrap apply and your flush in one transaction to close the window completely.
+- **Subjects with a `#[Version]` field** are also protected by Doctrine's optimistic locking: a versioned UPDATE that
+  finds a newer version is a `WorkflowConflictException` too. Set `optimistic` for such a workflow to skip the row
+  lock; `optimistic` on a subject without `#[Version]` is refused with a `LogicException`.
+- **Opt out** per workflow with `none` (the 1.19 behaviour):
+
+```yaml
+nowo_workflow:
+    runtime:
+        concurrency:
+            default: lock          # lock | optimistic | none
+            workflows:
+                imported_orders: none
+            retry_after: 1
+```
 
 ## To 1.19.0
 
