@@ -67,9 +67,12 @@ With `flush_after_apply: true` (the 1.13 default) and a subject of the applicati
 
 1. A transaction opens on the subject's connection (transaction-doctrine's `DoctrineTransactionRunner::forConnection()`:
    a savepoint when the host already has a transaction open).
-2. `SELECT <marking> FROM <subject table> WHERE <id> = ? FOR UPDATE` (a scalar DQL read: the identity map and the
-   subject object are not touched). The value must equal the marking in the unit of work's snapshot of the subject,
-   i.e. what this request loaded. A concurrent apply that committed first, or a deleted row, refuses the apply with
+2. `SELECT <marking> FROM <table that declares the marking column> WHERE <id columns> = ? FOR UPDATE` (plain SQL:
+   the identity map and the subject object are not touched; with JOINED inheritance the subclass tables are never
+   joined, which PostgreSQL could not lock). The value is converted with the field's Doctrine type (a JSON marking of
+   a `workflow` / Petri net compares as its place => tokens map: key order and token counts matter as Symfony sees
+   them) and must equal the marking in the unit of work's snapshot of the subject, i.e. what this request loaded (a
+   proxy subject is initialised first). A concurrent apply that committed first, or a deleted row, refuses the apply with
    `WorkflowConflictException` (`reason` `marking_changed` / `subject_missing`): nothing is applied.
 3. The transition (guards, Symfony workflow events), the automatic transitions it enables, and the flush.
 4. Commit; then the audit events go out.
@@ -86,8 +89,10 @@ ORM closes it) is replaced through the registry, as before.
 With `flush_after_apply: false` (the recipe value), or when the subject belongs to another entity manager than the
 default one, the host owns the unit of work and the bundle flushes nothing:
 
-- with a transaction open on the subject's connection, the marking is read with `SELECT … FOR UPDATE`: the row lock is
-  held until the host commits, so the apply is safe;
+- with a transaction open on the subject's connection, the marking is read with `SELECT … FOR UPDATE` in a savepoint
+  of the bundle's own: the row lock is held until the host commits, so the apply is safe, and a failed read (a conflict
+  or a lock wait timeout) rolls back to that savepoint only, so the host's transaction stays usable and keeps its
+  earlier writes (on PostgreSQL an error would otherwise abort the whole transaction);
 - without one, the marking is compared without a lock: a stale subject is refused, but the window between the check
   and your flush stays open. Wrap the apply and your flush in one transaction (`EntityManager::wrapInTransaction()`,
   or your `TransactionRunnerInterface`) to close it, or give the subject a `#[Version]` field.
@@ -146,5 +151,14 @@ the conflict subscriber hold no per-request state, and the transaction runner is
 - Non-Doctrine subjects and unmapped marking properties: no control; the host's write unit decides.
 - Symfony workflow listeners run inside the apply's transaction: a listener doing HTTP, mail or file I/O holds the row
   lock meanwhile (REQ-RUNTIME-003 rule 9). Do such work after the commit (`WorkflowTransitionAppliedEvent`).
+- A host listener that flushes during the apply (an `entered` listener, say) writes inside the bundle's transaction;
+  when a later listener or the flush then fails, the transaction rolls back, but the host's entity manager is not
+  cleared (the bundle never clears it): its snapshot still holds the rolled-back values, a later host flush writes
+  nothing for them and the next apply on that subject is a conflict. Reload the subject after a failed apply, and do
+  not flush from workflow listeners.
+- Listeners that write other rows while the subject's row lock is held can deadlock with a request that locks the
+  same rows in the other order. The database picks a loser, which gets `WorkflowConflictException` (`reason` `lock`,
+  connection usable, nothing of it committed); the data stays consistent. Keep one lock order (the subject first, then
+  the rows a listener writes), or move those writes after the commit.
 - A first apply with tenancy commits the subject's version pin before the transition's unit (autocommit, outside a host
   transaction). The pin is idempotent and the first one wins, so a conflict after it still allows a safe retry.

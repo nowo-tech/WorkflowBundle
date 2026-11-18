@@ -94,6 +94,10 @@ final class WorkflowApplicator
      * `guards.max_automatic_transitions` steps.
      *
      * Call it after creating a subject whose initial place has an automatic transition; apply*() runs it already.
+     * A definition with no automatic transition returns [] at once. Otherwise, since 1.20, it runs under the workflow's
+     * concurrency control like apply*().
+     *
+     * @throws WorkflowConflictException when a concurrent write changed the subject (since 1.20; nothing committed)
      *
      * @return list<string> the transitions applied, in order
      */
@@ -102,7 +106,11 @@ final class WorkflowApplicator
         $definition = $workflowSlug !== null ? $this->definitionFor($subject, $workflowSlug) : $this->resolveDefinitionForSubject($subject);
         $this->assertSubjectSupported($subject, $definition);
         $definition = $this->locator?->ensurePinned($subject, $definition) ?? $definition;
-        $workflow   = $this->workflowFor($definition);
+        if (!$this->hasAutomatic($definition)) {
+            // Nothing can run: no transaction, no lock, no flush (as in 1.19).
+            return [];
+        }
+        $workflow = $this->workflowFor($definition);
 
         return $this->writeUnit($subject, $definition, function () use ($definition, $workflow, $subject): array {
             $applied = $this->runAutomatic($definition, $workflow, $subject);
@@ -330,8 +338,16 @@ final class WorkflowApplicator
         $retryAfter = $this->concurrency->retryAfterSeconds;
 
         if (!$this->flushAfterApply || $manager !== $this->entityManager) {
+            $connection = $manager->getConnection();
             try {
-                $this->markingGuard->assertUnchanged($manager, $subject, $definition, $lock && $manager->getConnection()->isTransactionActive(), $retryAfter);
+                if ($connection->isTransactionActive()) {
+                    // Inside the application's transaction: in a savepoint of its own, so a failed locking read (a
+                    // lock wait timeout) rolls back to it and never aborts the application's transaction (PostgreSQL
+                    // 25P02). The row lock outlives the released savepoint until the application commits.
+                    DoctrineTransactionRunner::forConnection($connection, $retryAfter)->run(fn (): bool => $this->markingGuard->assertUnchanged($manager, $subject, $definition, $lock, $retryAfter));
+                } else {
+                    $this->markingGuard->assertUnchanged($manager, $subject, $definition, false, $retryAfter);
+                }
             } catch (Throwable $exception) {
                 throw $this->conflictOf($exception, $definition) ?? $exception;
             }
@@ -413,6 +429,17 @@ final class WorkflowApplicator
         }
         // The flush committed: the audit events it persisted can go out now.
         $this->audit?->dispatchPending();
+    }
+
+    private function hasAutomatic(WorkflowDefinition $definition): bool
+    {
+        foreach ($definition->getTransitions() as $transition) {
+            if ($transition->isAutomatic()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

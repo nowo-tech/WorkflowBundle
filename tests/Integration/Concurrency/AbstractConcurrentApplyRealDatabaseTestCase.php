@@ -44,6 +44,8 @@ use const PHP_BINARY;
  */
 abstract class AbstractConcurrentApplyRealDatabaseTestCase extends TestCase
 {
+    use ConcurrentApplyScenarios;
+
     protected string $url;
 
     protected EntityManagerInterface $a;
@@ -132,6 +134,37 @@ abstract class AbstractConcurrentApplyRealDatabaseTestCase extends TestCase
         // The lock is gone: the same apply now goes through on the same connection.
         RaceHarness::applicator($this->b)->apply($subject, RaceHarness::SLUG, 'submit');
         self::assertSame('review', RaceHarness::storedStatus($this->a, $id));
+    }
+
+    #[Test]
+    public function aLockTimeoutInsideTheApplicationTransactionKeepsTheApplicationWork(): void
+    {
+        $id      = $this->subject();
+        $subject = $this->b->find(RaceSubject::class, $id);
+        self::assertInstanceOf(RaceSubject::class, $subject);
+        $this->shortLockWait($this->b);
+
+        $holder = $this->a->getConnection();
+        $holder->beginTransaction();
+        $holder->fetchOne('SELECT status FROM wfrt_race_subject WHERE id = ? FOR UPDATE', [$id]);
+
+        $connection = $this->b->getConnection();
+        $connection->beginTransaction();
+        $connection->executeStatement("INSERT INTO wfrt_race_subject (status, note) VALUES ('host', 'host work')");
+        try {
+            RaceHarness::applicator($this->b, flushAfterApply: false)->apply($subject, RaceHarness::SLUG, 'submit');
+            self::fail('A row lock held by another transaction must be a conflict.');
+        } catch (WorkflowConflictException $conflict) {
+            self::assertSame(WorkflowConflictException::REASON_LOCK, $conflict->reason);
+        } finally {
+            $holder->rollBack();
+        }
+        // PostgreSQL: the failed locking read rolled back to the bundle's savepoint, not the whole transaction (25P02).
+        self::assertSame(1, $connection->getTransactionNestingLevel());
+        self::assertSame(1, (int) $connection->fetchOne('SELECT 1'));
+        $connection->commit();
+
+        self::assertSame(1, (int) $this->a->getConnection()->fetchOne("SELECT COUNT(*) FROM wfrt_race_subject WHERE note = 'host work'"));
     }
 
     #[Test]

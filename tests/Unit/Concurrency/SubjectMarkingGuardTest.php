@@ -33,10 +33,15 @@ final class SubjectMarkingGuardTest extends TestCase
         self::assertSame(['7'], SubjectMarkingGuard::places(7));
         self::assertSame(['lock'], SubjectMarkingGuard::places(WorkflowConcurrencyMode::Lock));
         self::assertSame(['a', 'b'], SubjectMarkingGuard::places(['b' => 1, 'a' => 1]));
-        self::assertSame(['a', 'b'], SubjectMarkingGuard::places(['b', 'a']));
-        self::assertSame(['', 'b'], SubjectMarkingGuard::places([$stringable, new stdClass()]));
         self::assertSame(['b'], SubjectMarkingGuard::places($stringable));
         self::assertSame([''], SubjectMarkingGuard::places(new stdClass()));
+        // Audit TF-L3: a place => tokens map, also for places named "0" and "1".
+        self::assertSame(['0'], SubjectMarkingGuard::places(['0' => 1]));
+        self::assertSame(['1'], SubjectMarkingGuard::places(['1' => 1]));
+        self::assertNotSame(SubjectMarkingGuard::marking(['0' => 1]), SubjectMarkingGuard::marking(['1' => 1]));
+        // Token counts count: a place holding two tokens is not the same marking.
+        self::assertSame(['a' => 2, 'b' => 1], SubjectMarkingGuard::marking(['b' => 1, 'a' => '2']));
+        self::assertSame(['a' => 1], SubjectMarkingGuard::marking(['a' => true]));
     }
 
     #[Test]

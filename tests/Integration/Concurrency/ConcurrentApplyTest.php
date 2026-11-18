@@ -14,6 +14,8 @@ use Nowo\TransactionContract\TransientStorageFailure;
 use Nowo\WorkflowBundle\Concurrency\WorkflowConcurrencyPolicy;
 use Nowo\WorkflowBundle\Exception\WorkflowConflictException;
 use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
+use Nowo\WorkflowBundle\Tests\Support\Concurrency\EnumRaceSubject;
+use Nowo\WorkflowBundle\Tests\Support\Concurrency\LockingSqlMiddleware;
 use Nowo\WorkflowBundle\Tests\Support\Concurrency\RaceHarness;
 use Nowo\WorkflowBundle\Tests\Support\Concurrency\RaceSubject;
 use Nowo\WorkflowBundle\Tests\Support\Concurrency\VersionedRaceSubject;
@@ -21,7 +23,10 @@ use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
+use function array_filter;
+use function array_values;
 use function is_file;
+use function str_ends_with;
 use function sys_get_temp_dir;
 use function tempnam;
 use function unlink;
@@ -33,6 +38,8 @@ use function unlink;
  */
 final class ConcurrentApplyTest extends TestCase
 {
+    use ConcurrentApplyScenarios;
+
     private string $path;
 
     private EntityManagerInterface $a;
@@ -338,6 +345,62 @@ final class ConcurrentApplyTest extends TestCase
         $this->a->getConnection()->executeStatement('DROP TABLE wfrt_race_subject');
         $this->expectException(TableNotFoundException::class);
         RaceHarness::applicator($this->b, flushAfterApply: false)->apply($subject, RaceHarness::SLUG, 'submit');
+    }
+
+    #[Test]
+    public function onAServerWithRowLocksTheMarkingIsReadForUpdateOnItsTable(): void
+    {
+        $locking = new LockingSqlMiddleware();
+        $mysql   = RaceHarness::entityManager(RaceHarness::sqliteParams($this->path), $locking);
+        $id      = $this->subject('draft');
+        $subject = $mysql->find(RaceSubject::class, $id);
+        self::assertInstanceOf(RaceSubject::class, $subject);
+
+        RaceHarness::applicator($mysql)->apply($subject, RaceHarness::SLUG, 'submit');
+
+        $locks = array_values(array_filter($locking->statements, static fn (string $sql): bool => str_ends_with($sql, ' FOR UPDATE')));
+        self::assertCount(1, $locks);
+        self::assertMatchesRegularExpression('/^SELECT status FROM wfrt_race_subject WHERE id = \S+ FOR UPDATE$/', $locks[0]);
+        self::assertSame('review', RaceHarness::storedStatus($this->b, $id));
+        $mysql->getConnection()->close();
+    }
+
+    #[Test]
+    public function anEnumMarkingComparesByItsValue(): void
+    {
+        $subject = new EnumRaceSubject();
+        $this->a->persist($subject);
+        $this->a->flush();
+        $id = (int) $subject->getId();
+        $this->a->clear();
+        $stale  = $this->a->find(EnumRaceSubject::class, $id);
+        $loaded = $this->b->find(EnumRaceSubject::class, $id);
+        self::assertInstanceOf(EnumRaceSubject::class, $stale);
+        self::assertInstanceOf(EnumRaceSubject::class, $loaded);
+
+        RaceHarness::applicator($this->b)->apply($loaded, RaceHarness::ENUM_SLUG, 'submit');
+        self::assertSame('review', RaceHarness::storedStatus($this->a, $id, 'wfrt_enum_race_subject'));
+
+        try {
+            RaceHarness::applicator($this->a)->apply($stale, RaceHarness::ENUM_SLUG, 'submit');
+            self::fail('The stale enum subject must conflict.');
+        } catch (WorkflowConflictException $conflict) {
+            self::assertSame(['draft'], $conflict->expectedPlaces);
+            self::assertSame(['review'], $conflict->currentPlaces);
+        }
+    }
+
+    #[Test]
+    public function automaticTransitionsOfAWorkflowWithoutAnyAreANoOp(): void
+    {
+        $id      = $this->subject('draft');
+        $subject = $this->b->find(RaceSubject::class, $id);
+        self::assertInstanceOf(RaceSubject::class, $subject);
+        // Even a stale subject: nothing is read, locked or flushed (as in 1.19).
+        $this->a->getConnection()->executeStatement("UPDATE wfrt_race_subject SET status = 'review' WHERE id = ?", [$id]);
+
+        self::assertSame([], RaceHarness::applicator($this->b)->applyAutomaticTransitions($subject, RaceHarness::SLUG));
+        self::assertSame(0, $this->b->getConnection()->getTransactionNestingLevel());
     }
 
     private function subject(?string $status): int

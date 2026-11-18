@@ -108,6 +108,12 @@ Doctrine entity is protected from the upgrade on. What changes for a host (see [
 - **Subjects with a `#[Version]` field** are also protected by Doctrine's optimistic locking: a versioned UPDATE that
   finds a newer version is a `WorkflowConflictException` too. Set `optimistic` for such a workflow to skip the row
   lock; `optimistic` on a subject without `#[Version]` is refused with a `LogicException`.
+- **`applyAutomaticTransitions()`** still returns `[]` at once for a workflow with no automatic transition; when
+  the workflow has some, it now runs under the same control and can throw `WorkflowConflictException`.
+- **DBAL 3 with savepoints off** (`nest_transactions_with_savepoints: false`, the DBAL 3 default for a hand-built
+  connection): inside your transaction the bundle's nested unit cannot roll back to a savepoint, so a conflict marks
+  your whole transaction rollback-only (1.19 would have applied the transition). Turn savepoints on (DoctrineBundle
+  does by default with DBAL 3.x recent versions; DBAL 4 always uses them), or call the apply outside your transaction.
 - **Opt out** per workflow with `none` (the 1.19 behaviour):
 
 ```yaml
