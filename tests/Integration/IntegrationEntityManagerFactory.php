@@ -44,6 +44,21 @@ final class IntegrationEntityManagerFactory
         return $entityManager;
     }
 
+    /**
+     * The bundle entities on the given connection (real-database tests).
+     *
+     * @param array<string, mixed> $params DBAL connection parameters
+     */
+    public static function createForParams(array $params): EntityManagerInterface
+    {
+        $config = ORMSetup::createAttributeMetadataConfiguration([dirname(__DIR__, 2) . '/src/Entity'], true);
+        if (PHP_VERSION_ID >= 80400) {
+            $config->enableNativeLazyObjects(true);
+        }
+
+        return new EntityManager(DriverManager::getConnection($params, $config), $config);
+    }
+
     public static function createSyncedInMemory(?string $tablePrefix = null, ?DebugDataHolder $queries = null): EntityManagerInterface
     {
         $entityManager = self::createInMemory($tablePrefix, $queries);

@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection;
 
 use Doctrine\Bundle\DoctrineBundle\DependencyInjection\DoctrineExtension;
+use Nowo\WorkflowBundle\Concurrency\SubjectMarkingGuard;
+use Nowo\WorkflowBundle\Concurrency\WorkflowConcurrencyPolicy;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Doctrine\WorkflowManagerRegistry;
+use Nowo\WorkflowBundle\EventListener\WorkflowConflictResponseSubscriber;
 use Nowo\WorkflowBundle\EventListener\WorkflowUnitOfWorkSubscriber;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use Nowo\WorkflowBundle\Service\DemoSeedService;
+use Nowo\WorkflowBundle\Service\WorkflowApplicator;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
@@ -68,6 +72,20 @@ final class NowoWorkflowExtensionPersistenceTest extends TestCase
         self::assertInstanceOf(IteratorArgument::class, $resettables);
         self::assertCount(1, $resettables->getValues());
         self::assertSame([], $this->deprecations, 'flush_after_apply set explicitly: no deprecation');
+    }
+
+    #[Test]
+    public function theConcurrencyPolicyIsWiredIntoTheApplicator(): void
+    {
+        $container = $this->load(['runtime' => ['flush_after_apply' => true, 'concurrency' => ['workflows' => ['leave' => 'none'], 'retry_after' => 2]]]);
+
+        self::assertSame('lock', $container->getParameter('nowo_workflow.runtime.concurrency.default'));
+        self::assertSame(['leave' => 'none'], $container->getParameter('nowo_workflow.runtime.concurrency.workflows'));
+        self::assertSame(2, $container->getParameter('nowo_workflow.runtime.concurrency.retry_after'));
+        $applicator = $container->getDefinition(WorkflowApplicator::class);
+        self::assertEquals(new Reference(WorkflowConcurrencyPolicy::class), $applicator->getArgument('$concurrency'));
+        self::assertEquals(new Reference(SubjectMarkingGuard::class), $applicator->getArgument('$markingGuard'));
+        self::assertSame('%nowo_workflow.runtime.concurrency.retry_after%', $container->getDefinition(WorkflowConflictResponseSubscriber::class)->getArgument('$retryAfterSeconds'));
     }
 
     #[Test]

@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Contract;
 use InvalidArgumentException;
 use LogicException;
 use Nowo\WorkflowBundle\Enum\WorkflowPinMode;
+use Nowo\WorkflowBundle\Exception\WorkflowConflictException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowMarkingView;
 use Nowo\WorkflowBundle\Model\WorkflowPinResult;
@@ -34,8 +35,12 @@ interface WorkflowRuntimeInterface
      * Applies the transition (and the automatic transitions it enables), then flushes unless
      * `runtime.flush_after_apply` is false. A blocked transition is not an error: the result says why.
      *
+     * Since 1.20 a lost race with a concurrent write on the same subject is an exception (nothing committed; answer
+     * 409 + Retry-After, code CONFLICT_001), see docs/CONCURRENCY.md.
+     *
      * @throws WorkflowNotFoundException
      * @throws InvalidArgumentException when the subject is not supported or the transition is not defined
+     * @throws WorkflowConflictException when a concurrent write changed the subject (`runtime.concurrency`)
      */
     public function apply(object $subject, string $workflowSlug, string $transition): WorkflowTransitionResult;
 

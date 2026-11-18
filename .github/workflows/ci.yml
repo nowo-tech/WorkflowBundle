@@ -203,6 +203,78 @@ jobs:
           NOWO_WORKFLOW_TEST_PGSQL_URL: pdo-pgsql://postgres@127.0.0.1:5432/workflow
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/PostgreSqlSchemaRoundTripTest.php
 
+  databases:
+    # REQ-RUNTIME-003: the two-connection race tests (applies, row locks, two processes, definition versions) against
+    # real servers with real row locks, on DBAL 3 and DBAL 4. Required check on main.
+    name: Databases (${{ matrix.db.image }}, DBAL ${{ matrix.dbal }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        dbal: ['3', '4']
+        db:
+          - image: 'mysql:8.4'
+            port: 3306
+            health: 'mysqladmin ping -h 127.0.0.1 -proot'
+            url_var: NOWO_WORKFLOW_TEST_MYSQL_URL
+            url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
+            test: tests/Integration/Concurrency/ConcurrentApplyMySqlTest.php
+          - image: 'mariadb:11.4'
+            port: 3306
+            health: 'healthcheck.sh --connect --innodb_initialized'
+            url_var: NOWO_WORKFLOW_TEST_MYSQL_URL
+            url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
+            test: tests/Integration/Concurrency/ConcurrentApplyMySqlTest.php
+          - image: 'postgres:16'
+            port: 5432
+            health: 'pg_isready -U postgres'
+            url_var: NOWO_WORKFLOW_TEST_PGSQL_URL
+            url: 'pdo-pgsql://postgres@127.0.0.1:5432/workflow'
+            test: tests/Integration/Concurrency/ConcurrentApplyPostgreSqlTest.php
+
+    services:
+      database:
+        image: ${{ matrix.db.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: workflow
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: workflow
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: workflow
+        ports:
+          - ${{ matrix.db.port }}:${{ matrix.db.port }}
+        options: >-
+          --health-cmd="${{ matrix.db.health }}"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, pdo_pgsql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Use DBAL 3
+        if: matrix.dbal == '3'
+        run: composer require doctrine/dbal:^3.8.2 --with-all-dependencies --no-interaction --no-progress
+
+      - name: Race tests (REQ-RUNTIME-003)
+        env:
+          ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.test }}
+
   cs-check:
     name: Code Style Check
     runs-on: ubuntu-latest

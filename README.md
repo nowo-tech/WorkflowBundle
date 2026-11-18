@@ -100,6 +100,7 @@ make demo-smoke
 - [Usage: standard Symfony host](docs/USAGE.md#standard-symfony-host)
 - [Usage: DDD / hexagonal host](docs/USAGE.md#ddd--hexagonal-host)
 - [Multitenant workflows](docs/MULTITENANCY.md) (1.15: per-organization definitions, versions, guards, audit)
+- [Concurrency](docs/CONCURRENCY.md) (safe concurrent applies, conflict codes, REQ-RUNTIME-003)
 - [Architecture](docs/ARCHITECTURE.md) (ports, SPI, events, standard Symfony and DDD hosts, REQ-ARCH-001)
 - [Templates (UiKit page contract)](docs/TEMPLATES.md)
 - [PSR evaluation (REQ-CS-007)](docs/PSR.md)

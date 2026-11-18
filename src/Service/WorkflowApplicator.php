@@ -5,16 +5,24 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Service;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\OptimisticLockException;
 use Doctrine\Persistence\ManagerRegistry;
 use InvalidArgumentException;
 use LogicException;
+use Nowo\TransactionContract\TransientStorageFailure;
+use Nowo\TransactionDoctrine\DoctrineTransactionRunner;
+use Nowo\TransactionDoctrine\TransientFailureClassifier;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
+use Nowo\WorkflowBundle\Concurrency\SubjectMarkingGuard;
+use Nowo\WorkflowBundle\Concurrency\WorkflowConcurrencyPolicy;
 use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Enum\WorkflowConcurrencyMode;
 use Nowo\WorkflowBundle\Enum\WorkflowPinMode;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
+use Nowo\WorkflowBundle\Exception\WorkflowConflictException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
@@ -31,7 +39,10 @@ use Symfony\Component\Workflow\WorkflowInterface;
 use Throwable;
 
 use function array_keys;
+use function array_map;
+use function array_values;
 use function implode;
+use function is_a;
 use function sort;
 use function sprintf;
 
@@ -65,8 +76,16 @@ final class WorkflowApplicator
         private readonly ?AfterCommitDispatcher $audit = null,
         private readonly int $maxAutomaticTransitions = 10,
         private readonly ?LoggerInterface $logger = null,
+        ?WorkflowConcurrencyPolicy $concurrency = null,
+        ?SubjectMarkingGuard $markingGuard = null,
     ) {
+        $this->concurrency  = $concurrency ?? new WorkflowConcurrencyPolicy();
+        $this->markingGuard = $markingGuard ?? new SubjectMarkingGuard($entityManager, $managerRegistry);
     }
+
+    private readonly WorkflowConcurrencyPolicy $concurrency;
+
+    private readonly SubjectMarkingGuard $markingGuard;
 
     /**
      * Applies the automatic transitions the subject can take now, one after the other (since 1.15), and flushes when
@@ -75,6 +94,10 @@ final class WorkflowApplicator
      * `guards.max_automatic_transitions` steps.
      *
      * Call it after creating a subject whose initial place has an automatic transition; apply*() runs it already.
+     * A definition with no automatic transition returns [] at once. Otherwise, since 1.20, it runs under the workflow's
+     * concurrency control like apply*().
+     *
+     * @throws WorkflowConflictException when a concurrent write changed the subject (since 1.20; nothing committed)
      *
      * @return list<string> the transitions applied, in order
      */
@@ -83,13 +106,17 @@ final class WorkflowApplicator
         $definition = $workflowSlug !== null ? $this->definitionFor($subject, $workflowSlug) : $this->resolveDefinitionForSubject($subject);
         $this->assertSubjectSupported($subject, $definition);
         $definition = $this->locator?->ensurePinned($subject, $definition) ?? $definition;
-        $applied    = $this->runAutomatic($definition, $this->workflowFor($definition), $subject);
-        if ($applied === []) {
+        if (!$this->hasAutomatic($definition)) {
+            // Nothing can run: no transaction, no lock, no flush (as in 1.19).
             return [];
         }
-        $this->flushIfConfigured();
+        $workflow = $this->workflowFor($definition);
 
-        return $applied;
+        return $this->writeUnit($subject, $definition, function () use ($definition, $workflow, $subject): array {
+            $applied = $this->runAutomatic($definition, $workflow, $subject);
+
+            return [$applied !== [], $applied];
+        });
     }
 
     /**
@@ -98,6 +125,7 @@ final class WorkflowApplicator
      * @throws WorkflowNotFoundException
      * @throws WorkflowTransitionBlockedException when the marking or a guard listener blocks the transition
      * @throws InvalidArgumentException when the subject is not supported or the transition is not defined
+     * @throws WorkflowConflictException when a concurrent write changed the subject (since 1.20; nothing committed)
      */
     public function apply(object $subject, string $workflowSlug, string $transitionName): void
     {
@@ -263,19 +291,127 @@ final class WorkflowApplicator
         $definition = $this->locator?->ensurePinned($subject, $definition) ?? $definition;
         $workflow   = $this->workflowFor($definition);
 
-        // No can() pre-check: apply() evaluates the guards itself, so each guard listener runs once per apply.
-        try {
-            $workflow->apply($subject, $transitionName);
-        } catch (NotEnabledTransitionException $exception) {
-            throw WorkflowTransitionBlockedException::fromNotEnabled($definition->getSlug(), $exception);
-        } catch (UndefinedTransitionException $exception) {
-            throw new InvalidArgumentException(sprintf('Transition "%s" is not defined on workflow "%s".', $transitionName, $definition->getSlug()), 0, $exception);
+        return $this->writeUnit($subject, $definition, function () use ($workflow, $subject, $transitionName, $definition): array {
+            // No can() pre-check: apply() evaluates the guards itself, so each guard listener runs once per apply.
+            try {
+                $workflow->apply($subject, $transitionName);
+            } catch (NotEnabledTransitionException $exception) {
+                throw WorkflowTransitionBlockedException::fromNotEnabled($definition->getSlug(), $exception);
+            } catch (UndefinedTransitionException $exception) {
+                throw new InvalidArgumentException(sprintf('Transition "%s" is not defined on workflow "%s".', $transitionName, $definition->getSlug()), 0, $exception);
+            }
+
+            // The transition itself changed the marking: always flushed, with the automatic ones that followed.
+            return [true, $this->runAutomatic($definition, $workflow, $subject)];
+        });
+    }
+
+    /**
+     * Runs a marking change of the subject under the workflow's concurrency control (REQ-RUNTIME-003) and flushes it
+     * when runtime.flush_after_apply is on (only when something changed).
+     *
+     * - `none`, or a subject that is not a persisted entity: the change, then the flush (the 1.19 behaviour).
+     * - The application owns the unit (flush_after_apply off, or the subject belongs to another manager than the one
+     *   flushed here): the marking is checked first, with a row lock when a transaction is open on its connection
+     *   (held until the application commits), else without one; nothing is flushed here.
+     * - Otherwise one transaction on the subject's connection: check (row lock in `lock` mode), change, flush, commit.
+     *
+     * @param callable(): array{0: bool, 1: list<string>} $change whether the marking changed, and the automatic
+     *                                                            transitions applied
+     *
+     * @throws WorkflowConflictException
+     *
+     * @return list<string> automatic transitions applied
+     */
+    private function writeUnit(object $subject, WorkflowDefinition $definition, callable $change): array
+    {
+        $mode    = $this->concurrency->modeFor($definition->getSlug());
+        $manager = $mode === WorkflowConcurrencyMode::None ? null : $this->markingGuard->managerOf($subject);
+        if (!$manager instanceof EntityManagerInterface) {
+            return $this->flushChanged($change());
         }
 
-        $automatic = $this->runAutomatic($definition, $workflow, $subject);
-        $this->flushIfConfigured();
+        $lock = $mode === WorkflowConcurrencyMode::Lock;
+        if (!$lock && !$this->markingGuard->isVersioned($manager, $subject)) {
+            throw new LogicException(sprintf('Workflow "%s" uses the optimistic concurrency mode, but "%s" has no Doctrine #[Version] field: add one, or use the lock mode.', $definition->getSlug(), $subject::class));
+        }
+        $retryAfter = $this->concurrency->retryAfterSeconds;
 
-        return $automatic;
+        if (!$this->flushAfterApply || $manager !== $this->entityManager) {
+            $connection = $manager->getConnection();
+            try {
+                if ($connection->isTransactionActive()) {
+                    // Inside the application's transaction: in a savepoint of its own, so a failed locking read (a
+                    // lock wait timeout) rolls back to it and never aborts the application's transaction (PostgreSQL
+                    // 25P02). The row lock outlives the released savepoint until the application commits.
+                    DoctrineTransactionRunner::forConnection($connection, $retryAfter)->run(fn (): bool => $this->markingGuard->assertUnchanged($manager, $subject, $definition, $lock, $retryAfter));
+                } else {
+                    $this->markingGuard->assertUnchanged($manager, $subject, $definition, false, $retryAfter);
+                }
+            } catch (Throwable $exception) {
+                throw $this->conflictOf($exception, $definition) ?? $exception;
+            }
+
+            return $this->flushChanged($change());
+        }
+
+        try {
+            $result = DoctrineTransactionRunner::forConnection($manager->getConnection(), $retryAfter)->run(function () use ($manager, $subject, $definition, $lock, $retryAfter, $change): array {
+                $this->markingGuard->assertUnchanged($manager, $subject, $definition, $lock, $retryAfter);
+                $result = $change();
+                if ($result[0]) {
+                    $manager->flush();
+                }
+
+                return $result;
+            });
+        } catch (Throwable $exception) {
+            ClosedEntityManagerResetter::resetIfClosed($this->managerRegistry, $this->entityManager);
+
+            throw $this->conflictOf($exception, $definition) ?? $exception;
+        }
+        // Committed: the audit events it persisted can go out now.
+        $this->audit?->dispatchPending();
+
+        return $result[1];
+    }
+
+    /**
+     * @param array{0: bool, 1: list<string>} $result
+     *
+     * @return list<string>
+     */
+    private function flushChanged(array $result): array
+    {
+        if ($result[0]) {
+            $this->flushIfConfigured();
+        }
+
+        return $result[1];
+    }
+
+    /**
+     * The typed conflict of a lost race: the guard's own refusal, a versioned UPDATE that found a newer version, or a
+     * deadlock / lock wait timeout / serialization failure; null for anything else.
+     */
+    private function conflictOf(Throwable $failure, WorkflowDefinition $definition): ?WorkflowConflictException
+    {
+        $retryAfter = $this->concurrency->retryAfterSeconds;
+        for ($current = $failure; $current instanceof Throwable; $current = $current->getPrevious()) {
+            if ($current instanceof WorkflowConflictException) {
+                return $current;
+            }
+            if ($current instanceof OptimisticLockException) {
+                return WorkflowConflictException::versionChanged($definition->getSlug(), $failure, $retryAfter);
+            }
+            if ($current instanceof TransientStorageFailure) {
+                return WorkflowConflictException::lockConflict($definition->getSlug(), $failure, $current->retryAfterSeconds() ?? $retryAfter);
+            }
+        }
+
+        // A deadlock, lock wait timeout or serialization failure (MySQL 1213 / 1205, MariaDB 1020, PostgreSQL
+        // 40001 / 40P01 / 55P03) of a read or write outside the bundle's runner.
+        return (new TransientFailureClassifier())->isTransient($failure) ? WorkflowConflictException::lockConflict($definition->getSlug(), $failure, $retryAfter) : null;
     }
 
     private function flushIfConfigured(): void
@@ -293,6 +429,17 @@ final class WorkflowApplicator
         }
         // The flush committed: the audit events it persisted can go out now.
         $this->audit?->dispatchPending();
+    }
+
+    private function hasAutomatic(WorkflowDefinition $definition): bool
+    {
+        foreach ($definition->getTransitions() as $transition) {
+            if ($transition->isAutomatic()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
