@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.21.0] - 2026-11-19](#1210---2026-11-19)
 - [[1.20.0] - 2026-11-18](#1200---2026-11-18)
 - [[1.19.0] - 2026-11-13](#1190---2026-11-13)
 - [[1.18.0] - 2026-11-13](#1180---2026-11-13)
@@ -60,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-11-19
+
 ### Added
 
 - SearchKit groups for workflow requests (SearchKit 1.10 or later, PHP 8.3 or later; optional, in `suggest`; `conflict` with SearchKit < 1.10): one group per request type declared under `nowo_workflow.search_kit.subjects` (entity, fields, route, gate, labels, its own group key), in the search palette and the results page, only the requests the viewer may see. Requests are matched on a viewer-neutral `search_text_field` the host maintains (or `title_field`) and on the stored status (a place name or a string-backed enum column). New host ports: `WorkflowRequestSearchGateInterface` (tenant and feature switch), `WorkflowRequestTitleResolverInterface` (the shown titles: one batch with exactly the ids of the shown page, through SearchKit 1.10's `prepareItems()` / `SearchItemContext`) and the optional `WorkflowRequestSearchNarrowerInterface` (SQL conditions for the viewer through `WorkflowRequestSearchCriteria`, so a viewer's own requests stay in the bounded window: `whereIn()` / `whereAny()` on scalar fields, long lists split into IN lists of 1,000, more than `narrower_max_values` (10,000) values in a field over every call, or more bound values in all than the platform allows (60,000; 32,000 on SQLite), fails closed with a warning and no SQL; `none()` gives no group before any SQL runs). `view` is decided by the new `WorkflowRequestAccessCheckEvent` (deny by default, deny wins, one event per search with the subject key, ids and statuses only). Tenant (`tenant_field`, or an explicit `single_tenant: true`), archived rows, excluded statuses and the narrowing are filtered in SQL. A result shows only the title and the status label. Recents ids follow the id column type (digits within the smallint / integer / bigint range). Every subject is `sensitive` by default and then needs a narrower, or an explicit `accept_window_side_channel: true`. With a title resolver, an id it leaves out shows a generic translated title (`search.untitled_request`), never the `title_field` column; the resolver gets the tenant the search decided (the gate is not asked again). Rows have the subject type `workflow_<subject>` in SearchKit's host event. Stateless in FrankenPHP worker mode.
@@ -70,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: coverage and PHPStan run on PHP 8.4 (were 8.2), so the SearchKit group is covered and analysed; the dependency-floor job still runs PHPStan and the tests on 8.2.
 
 - CI: new `deps-floor` job (as in BreadcrumbKit). It checks that the demo lock installs every nowo-tech requirement of the bundle (`.scripts/check-demo-lock.py`), then downgrades nowo-tech/transaction-* to the lowest versions composer.json allows (`composer update 'nowo-tech/transaction-*' --prefer-lowest`) and runs PHPStan and the tests there, so a call to a newer API than the constraint allows fails the pull request.
+
+[1.21.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.21.0
 
 ## [1.20.0] - 2026-11-18
 

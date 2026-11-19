@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.21.0](#to-1210)
 - [To 1.20.0](#to-1200)
   - [Concurrent applies (REQ-RUNTIME-003)](#concurrent-applies-req-runtime-003)
 - [To 1.19.0](#to-1190)
@@ -83,6 +84,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.21.0
+
+From **1.20.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 Nothing to do: the SearchKit groups of workflow requests are new and off by default (`nowo_workflow.search_kit.enabled:
 false`). To use them, install `nowo-tech/search-kit-bundle` 1.10 or later (PHP 8.3 or later), declare each request type
