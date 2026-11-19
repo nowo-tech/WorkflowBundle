@@ -15,18 +15,37 @@ use function sprintf;
 
 /**
  * Conditions a {@see WorkflowRequestSearchNarrowerInterface} adds to one search (since
- * 1.21): framework-free, mapped fields and bound values only. Every call adds one condition; conditions are ANDed;
- * inside one {@see whereAny()} call the fields are ORed. Created for one search and never reused.
+ * 1.21): framework-free, scalar mapped fields and bound values only. Every call adds one condition; conditions are
+ * ANDed; inside one {@see whereAny()} call the fields are ORed. Created for one search and never reused.
+ *
+ * - {@see none()}: the viewer may see nothing — the search gives no group before any SQL runs.
+ * - `whereIn($field, [])`: that field matches nothing (it compiles to `1 = 0` in the query).
+ * - Long lists: the definition splits a field's values into IN lists of {@see CHUNK} values, ORed, each one its own
+ *   bound parameter. More than the subject's `narrower_max_values` values in one field fails closed: no group and a
+ *   logged warning, never a silently cut list.
  */
 final class WorkflowRequestSearchCriteria
 {
-    /** The most values of one field (bounds the bound parameters). */
-    public const MAX_VALUES = 1000;
+    /** Values of one IN list (one bound array parameter). */
+    public const CHUNK = 1000;
+
+    /** Default most values of one field (`narrower_max_values`). */
+    public const DEFAULT_MAX_VALUES = 10000;
 
     /** @var list<array<string, list<int|string>>> */
     private array $conditions = [];
 
-    private bool $nothing = false;
+    private bool $none = false;
+
+    /** @var list<string> fields given more values than allowed */
+    private array $overflow = [];
+
+    /**
+     * @param int $maxValues the most values of one field (the subject's `narrower_max_values`)
+     */
+    public function __construct(public readonly int $maxValues = self::DEFAULT_MAX_VALUES)
+    {
+    }
 
     /**
      * The field holds one of the values. An empty list matches nothing.
@@ -43,7 +62,7 @@ final class WorkflowRequestSearchCriteria
      *
      * @param array<string, array<int|string>|int|string> $fieldValues
      *
-     * @throws InvalidArgumentException for an invalid field name, no field, or too many values
+     * @throws InvalidArgumentException for an invalid field name or no field (a programming error)
      */
     public function whereAny(array $fieldValues): self
     {
@@ -52,9 +71,13 @@ final class WorkflowRequestSearchCriteria
         }
         $condition = [];
         foreach ($fieldValues as $field => $values) {
-            $values = is_array($values) ? array_values($values) : [$values];
-            if (preg_match(WorkflowRequestSearchOptions::FIELD_PATTERN, $field) !== 1 || count($values) > self::MAX_VALUES) {
+            if (preg_match(WorkflowRequestSearchOptions::FIELD_PATTERN, $field) !== 1) {
                 throw new InvalidArgumentException(sprintf('Invalid search condition on "%s".', $field));
+            }
+            $values = is_array($values) ? array_values($values) : [$values];
+            if (count($values) > $this->maxValues) {
+                // @igor-ignore - per-search criteria object, created for one search and never reused (not a service)
+                $this->overflow[] = $field;
             }
             $condition[$field] = $values;
         }
@@ -64,11 +87,11 @@ final class WorkflowRequestSearchCriteria
         return $this;
     }
 
-    /** The viewer finds nothing in this subject. */
-    public function nothing(): self
+    /** The viewer may see nothing of this subject: no group, and no SQL runs. */
+    public function none(): self
     {
         // @igor-ignore - per-search criteria object, created for one search and never reused (not a service)
-        $this->nothing = true;
+        $this->none = true;
 
         return $this;
     }
@@ -83,9 +106,19 @@ final class WorkflowRequestSearchCriteria
         return $this->conditions;
     }
 
-    /** Whether {@see nothing()} was called. */
-    public function isNothing(): bool
+    /** Whether {@see none()} was called. */
+    public function isNone(): bool
     {
-        return $this->nothing;
+        return $this->none;
+    }
+
+    /**
+     * The fields given more than {@see $maxValues} values (the search then fails closed).
+     *
+     * @return list<string>
+     */
+    public function overflowingFields(): array
+    {
+        return $this->overflow;
     }
 }

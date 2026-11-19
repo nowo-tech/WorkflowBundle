@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\DependencyInjection;
 use InvalidArgumentException;
 use Nowo\WorkflowBundle\Enum\CssFramework;
 use Nowo\WorkflowBundle\Enum\IconSet;
+use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\NodeDefinition;
@@ -324,6 +325,7 @@ final class Configuration implements ConfigurationInterface
                             ->scalarNode('gate')->defaultNull()->info('Service id implementing WorkflowRequestSearchGateInterface (the viewer\'s tenant and the feature switch). Required.')->end()
                             ->scalarNode('title_resolver')->defaultNull()->info('Service id implementing WorkflowRequestTitleResolverInterface (the shown titles, one batch of visible ids). Or title_field.')->end()
                             ->scalarNode('narrower')->defaultNull()->info('Service id implementing WorkflowRequestSearchNarrowerInterface (extra SQL conditions for the viewer, e.g. requester or approver).')->end()
+                            ->integerNode('narrower_max_values')->defaultValue(WorkflowRequestSearchCriteria::DEFAULT_MAX_VALUES)->min(1)->max(WorkflowRequestSearchOptions::MAX_NARROWER_VALUES)->info('The most values the narrower may give one field (split into IN lists of 1000). More fails closed: no group and a logged warning.')->end()
                             ->scalarNode('id_field')->defaultValue('id')->cannotBeEmpty()->info('Mapped field of the id used in the URL, the access event, the title resolver and recents.')->end()
                             ->scalarNode('search_text_field')->defaultNull()->info('Mapped field the host maintains with viewer-neutral search text (e.g. person, type, dates). Never health or legal data (attachments, comments, justification, on-behalf reason). Or title_field.')->end()
                             ->scalarNode('title_field')->defaultNull()->info('Mapped field shown as the title (without a title_resolver) and searched (without a search_text_field).')->end()
@@ -343,6 +345,7 @@ final class Configuration implements ConfigurationInterface
                             ->scalarNode('status_label_domain')->defaultNull()->info('Translation domain of the status labels. null = the stored status is shown.')->end()
                             ->scalarNode('status_label_prefix')->defaultValue('')->info('Prefix of the status label keys (key = prefix + stored status).')->end()
                             ->scalarNode('icon')->defaultValue('tabler:checklist')->info('UX Icons name of the rows (null = SearchKit\'s default).')->end()
+                            ->booleanNode('accept_window_side_channel')->defaultFalse()->info('A sensitive subject needs a narrower (SQL filtering of what the viewer may not see). true = accept instead that rows hidden only by the access event take places in the candidate window, so a search can tell they exist (fewer results, an inexact total).')->end()
                             ->booleanNode('sensitive')->defaultTrue()->info('true (default): titles are private (e.g. absences), so the group is off while SearchKit keeps recents in the browser without revalidation.')->end()
                             ->integerNode('max_candidates')->defaultValue(100)->min(1)->max(WorkflowRequestSearchOptions::MAX_CANDIDATES)->info('The most matching requests one search reads and checks (newest first): bounds the access event, the visible total and the deepest results page.')->end()
                             ->integerNode('min_length')->defaultValue(0)->min(0)->info('Shortest text this group searches.')->end()

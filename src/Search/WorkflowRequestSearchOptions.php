@@ -31,8 +31,9 @@ use function str_starts_with;
  */
 final readonly class WorkflowRequestSearchOptions
 {
-    /** A subject key (the config key; carried by the access event and the title resolver). */
-    public const SUBJECT_PATTERN = '/^[a-z][a-z0-9_]{0,63}\z/';
+    /** A subject key (the config key; carried by the access event and the title resolver; at most 55 characters so
+     * the subject type `workflow_<subject>` of SearchKit's host event stays within 64). */
+    public const SUBJECT_PATTERN = '/^[a-z][a-z0-9_]{0,54}\z/';
 
     /** SearchKit group key rule (a lower-case letter, then up to 63 of `a-z`, `0-9`, `_`, `-`). */
     public const GROUP_PATTERN = '/^[a-z][a-z0-9_-]{0,63}\z/';
@@ -51,6 +52,9 @@ final readonly class WorkflowRequestSearchOptions
 
     /** Default group label key, in the bundle's domain. */
     public const DEFAULT_LABEL = 'search.group.workflow_requests';
+
+    /** The largest `narrower_max_values`. */
+    public const MAX_NARROWER_VALUES = 100000;
 
     /** SearchKit's bounds of the candidate window. */
     public const MAX_CANDIDATES = 1000;
@@ -90,6 +94,8 @@ final readonly class WorkflowRequestSearchOptions
         public int $maxCandidates = 100,
         public int $minLength = 0,
         public int $priority = 0,
+        public bool $acceptWindowSideChannel = false,
+        public int $narrowerMaxValues = WorkflowRequestSearchCriteria::DEFAULT_MAX_VALUES,
     ) {
         $this->check(self::SUBJECT_PATTERN, $subject, 'nowo_workflow.search_kit.subjects', 'key');
         $name = 'nowo_workflow.search_kit.subjects.' . $subject;
@@ -118,6 +124,9 @@ final readonly class WorkflowRequestSearchOptions
         if ($tenantField !== null && $singleTenant) {
             throw new InvalidArgumentException(sprintf('%s sets both tenant_field and single_tenant.', $name));
         }
+        if ($sensitive && $narrower === null && !$acceptWindowSideChannel) {
+            throw new InvalidArgumentException(sprintf('%s is sensitive: set a narrower that filters what the viewer may not see in SQL, or accept_window_side_channel: true (rows hidden only by the access event take places in the candidate window, so the results can tell they exist).', $name));
+        }
         foreach (['route' => $route, 'route_id_parameter' => $routeIdParameter, 'see_all_route' => $seeAllRoute] as $option => $value) {
             if ($value !== null) {
                 $this->check(self::ROUTE_PATTERN, $value, $name, $option);
@@ -137,6 +146,9 @@ final readonly class WorkflowRequestSearchOptions
             if ($status === '') {
                 throw new InvalidArgumentException(sprintf('%s: excluded_statuses must not hold an empty status.', $name));
             }
+        }
+        if ($narrowerMaxValues < 1 || $narrowerMaxValues > self::MAX_NARROWER_VALUES) {
+            throw new InvalidArgumentException(sprintf('%s: narrower_max_values must be 1 to %d.', $name, self::MAX_NARROWER_VALUES));
         }
         if ($maxCandidates < 1 || $maxCandidates > self::MAX_CANDIDATES || $minLength < 0) {
             throw new InvalidArgumentException(sprintf('%s: max_candidates must be 1 to %d and min_length at least 0.', $name, self::MAX_CANDIDATES));
@@ -192,6 +204,8 @@ final readonly class WorkflowRequestSearchOptions
             maxCandidates: is_int($config['max_candidates'] ?? null) ? $config['max_candidates'] : 100,
             minLength: is_int($config['min_length'] ?? null) ? $config['min_length'] : 0,
             priority: is_int($config['priority'] ?? null) ? $config['priority'] : 0,
+            acceptWindowSideChannel: ($config['accept_window_side_channel'] ?? false) === true,
+            narrowerMaxValues: is_int($config['narrower_max_values'] ?? null) ? $config['narrower_max_values'] : WorkflowRequestSearchCriteria::DEFAULT_MAX_VALUES,
         );
     }
 
@@ -205,6 +219,12 @@ final readonly class WorkflowRequestSearchOptions
     public function searchField(): string
     {
         return (string) ($this->searchTextField ?? $this->titleField);
+    }
+
+    /** SearchKit's subject type of these rows in its host event: `workflow_<subject>`. */
+    public function subjectType(): string
+    {
+        return 'workflow_' . $this->subject;
     }
 
     /** The candidate window SearchKit reads (1 to 1000). */

@@ -8,11 +8,15 @@ use Nowo\SearchKitBundle\Model\SearchGroup;
 use Nowo\SearchKitBundle\Model\SearchItem;
 use Nowo\SearchKitBundle\Model\SearchReference;
 use Nowo\SearchKitBundle\Provider\Entity\EntitySearchDefinition;
+use Nowo\SearchKitBundle\Provider\Entity\EntitySearchProvider;
 use Nowo\SearchKitBundle\Test\EntitySearchProviderTestCase;
 use Nowo\SearchKitBundle\Test\QueryCounter;
+use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
+use Nowo\WorkflowBundle\Tests\Support\SearchKit\OwnRequestsNarrower;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchKitAbsentTestCase;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchRequestHarness;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchRequestStatus;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 
 use function array_map;
 use function class_alias;
@@ -33,8 +37,9 @@ if (!class_exists(EntitySearchProviderTestCase::class)) {
  * - "purchase": the simple form — the title column is searched and shown, a plain status, string ids and tenant.
  *   Budget 2: the search and the access listener.
  *
- * Visible rows are shared requests of the tenant (no owner); hidden rows belong to another owner (the SQL keeps them,
- * WorkflowRequestAccessCheckEvent hides them); archived rows are archived / soft-deleted (filtered in SQL).
+ * Visible rows are shared requests of the tenant (no owner); hidden rows belong to another owner — for "leave" the
+ * narrower filters them in SQL (and the access event would hide them), for "purchase" only WorkflowRequestAccessCheckEvent
+ * hides them; archived rows are archived / soft-deleted (filtered in SQL).
  */
 abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProviderTestCase
 {
@@ -92,12 +97,37 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
         [$tenant] = $this->tenants();
         $this->actAs($tenant, self::VIEWER_A);
         $provider = $this->provider();
-        foreach (['12abc', '99999999999999999999', '012', 'a b', ''] as $id) {
+        foreach (['12abc', '99999999999999999999', '2147483648', '012', 'a b', ''] as $id) {
             $reference = new SearchReference($this->url($id), $this->definition()->group(), $this->route(), ['id' => $id]);
             self::assertNull($provider->resolve($reference, self::VIEWER_A, null), $id);
         }
         $id = $this->seed($tenant, $this->marker());
         self::assertNotNull($provider->resolve($this->reference($id), self::VIEWER_A, null));
+    }
+
+    /**
+     * A narrower's long list (2,500 values) is split into IN lists of 1,000 (each its own bound parameter), ORed: on
+     * every database the right rows are found, none cut away.
+     */
+    public function testNarrowerSplitsLongValueLists(): void
+    {
+        [$tenant] = $this->tenants();
+        $marker   = $this->marker();
+        $this->actAs($tenant, self::VIEWER_A);
+        $visible = $this->seed($tenant, $marker);
+        $this->seedHidden($tenant, $marker);
+        $values = [];
+        for ($i = 0; $i < 2498; ++$i) {
+            $values[] = 'user' . $i . '@example.com';
+        }
+        $values[] = self::VIEWER_A;
+        $values[] = '';
+        $narrower = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->whereIn('ownerIdentifier', $values));
+
+        $group = (new EntitySearchProvider($this->harness->definition(static::subject(), narrower: $narrower), new EventDispatcher()))->search($this->query($marker));
+
+        self::assertInstanceOf(SearchGroup::class, $group);
+        self::assertSame([$this->url($visible)], array_map(static fn (SearchItem $item): string => $item->url, $group->items));
     }
 
     protected function definition(): EntitySearchDefinition
@@ -161,6 +191,16 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
     protected function queryBudget(): int
     {
         return $this->leave() ? 3 : 2;
+    }
+
+    /**
+     * "leave" (sensitive) narrows in SQL with the access listener's own owner rule, so hidden rows never take places
+     * in the candidate window. "purchase" (not sensitive, no narrower) is the PHP-only subject: its hidden rows are
+     * dropped by the access event alone, so it accepts the window side channel (an inexact total, fewer rows).
+     */
+    protected function hiddenRowsFilteredInSql(): bool
+    {
+        return $this->leave();
     }
 
     protected function prepareItemsBudget(): int

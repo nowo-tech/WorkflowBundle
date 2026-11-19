@@ -10,9 +10,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
+use function str_repeat;
+
 final class WorkflowRequestSearchOptionsTest extends TestCase
 {
-    private const REQUIRED = ['subject_class' => 'App\Leave\LeaveRequest', 'route' => 'leave_show', 'gate' => 'app.gate', 'title_field' => 'title', 'tenant_field' => 'organizationId'];
+    private const REQUIRED = ['subject_class' => 'App\Leave\LeaveRequest', 'route' => 'leave_show', 'gate' => 'app.gate', 'title_field' => 'title', 'tenant_field' => 'organizationId', 'accept_window_side_channel' => true];
 
     #[Test]
     public function defaultsAreSafe(): void
@@ -46,6 +48,9 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
         self::assertSame(100, $options->candidates());
         self::assertSame(0, $options->minLength);
         self::assertSame(0, $options->priority);
+        self::assertTrue($options->acceptWindowSideChannel);
+        self::assertSame(10000, $options->narrowerMaxValues);
+        self::assertSame('workflow_leave', $options->subjectType());
     }
 
     #[Test]
@@ -78,6 +83,7 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
             'max_candidates'      => 50,
             'min_length'          => 2,
             'priority'            => 40,
+            'narrower_max_values' => 2500,
         ]);
 
         self::assertSame('workflow_leave_requests', $options->groupKey());
@@ -98,6 +104,8 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
         self::assertSame(50, $options->candidates());
         self::assertSame(2, $options->minLength);
         self::assertSame(40, $options->priority);
+        self::assertFalse($options->acceptWindowSideChannel);
+        self::assertSame(2500, $options->narrowerMaxValues);
     }
 
     #[Test]
@@ -132,6 +140,9 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
         yield 'too many candidates' => [['max_candidates' => 1001], 'max_candidates must be 1 to 1000'];
         yield 'no candidates' => [['max_candidates' => 0], 'max_candidates'];
         yield 'negative min length' => [['min_length' => -1], 'min_length'];
+        yield 'no narrower values' => [['narrower_max_values' => 0], 'narrower_max_values must be 1 to 100000'];
+        yield 'too many narrower values' => [['narrower_max_values' => 100001], 'narrower_max_values'];
+        yield 'sensitive without a narrower' => [['accept_window_side_channel' => false], 'is sensitive: set a narrower'];
     }
 
     /**
@@ -157,11 +168,30 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
     }
 
     #[Test]
+    public function aSubjectKeyLeavesRoomForTheSubjectType(): void
+    {
+        $longest = 'a' . str_repeat('b', 54);
+        self::assertSame('workflow_' . $longest, WorkflowRequestSearchOptions::fromConfig($longest, self::REQUIRED + ['group' => 'long'])->subjectType());
+
+        $this->expectException(InvalidArgumentException::class);
+        WorkflowRequestSearchOptions::fromConfig($longest . 'c', self::REQUIRED + ['group' => 'long']);
+    }
+
+    #[Test]
+    public function aSensitiveSubjectWithANarrowerOrNotSensitiveNeedsNoAcceptance(): void
+    {
+        $base = ['accept_window_side_channel' => false] + self::REQUIRED;
+
+        self::assertSame('app.narrower', WorkflowRequestSearchOptions::fromConfig('leave', ['narrower' => 'app.narrower'] + $base)->narrower);
+        self::assertFalse(WorkflowRequestSearchOptions::fromConfig('leave', ['sensitive' => false] + $base)->sensitive);
+    }
+
+    #[Test]
     public function anEmptyClassRouteOrGateIsRefused(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('needs subject_class, route and gate');
 
-        new WorkflowRequestSearchOptions('leave', '', 'leave_show', 'app.gate', titleField: 'title', singleTenant: true);
+        new WorkflowRequestSearchOptions('leave', '', 'leave_show', 'app.gate', titleField: 'title', singleTenant: true, acceptWindowSideChannel: true);
     }
 }

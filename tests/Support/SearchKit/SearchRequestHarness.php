@@ -15,6 +15,7 @@ use Nowo\SearchKitBundle\Test\QueryCountingMiddleware;
 use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
 use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchNarrowerInterface;
 use Nowo\WorkflowBundle\Event\WorkflowRequestAccessCheckEvent;
+use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
 use Symfony\Component\EventDispatcher\EventDispatcher;
@@ -54,6 +55,9 @@ final class SearchRequestHarness
 
     public readonly TitleResolver $titles;
 
+    /** The leave subject's narrower: the access listener's owner rule, in SQL (owner = viewer or shared). */
+    public readonly OwnRequestsNarrower $ownerNarrower;
+
     public function __construct(?string $url = null)
     {
         $this->counter = new QueryCounter();
@@ -64,11 +68,14 @@ final class SearchRequestHarness
         }
         $params = is_string($url) ? self::urlParams($url) : ['driver' => 'pdo_sqlite', 'memory' => true];
 
-        $this->em         = new EntityManager(DriverManager::getConnection($params, $config), $config);
-        $this->gate       = new FakeRequestGate();
-        $this->dispatcher = new EventDispatcher();
-        $this->listener   = new OwnerAccessListener($this->em->getConnection());
-        $this->titles     = new TitleResolver($this->em->getConnection());
+        $this->em            = new EntityManager(DriverManager::getConnection($params, $config), $config);
+        $this->gate          = new FakeRequestGate();
+        $this->dispatcher    = new EventDispatcher();
+        $this->listener      = new OwnerAccessListener($this->em->getConnection());
+        $this->titles        = new TitleResolver($this->em->getConnection());
+        $this->ownerNarrower = new OwnRequestsNarrower(static function (WorkflowRequestSearchCriteria $criteria, string $viewer): void {
+            $criteria->whereIn('ownerIdentifier', [$viewer, '']);
+        });
         $this->dispatcher->addListener(WorkflowRequestAccessCheckEvent::class, $this->listener);
         (new SchemaTool($this->em))->updateSchema($this->em->getMetadataFactory()->getAllMetadata());
     }
@@ -102,6 +109,7 @@ final class SearchRequestHarness
                 'route'             => self::ROUTE,
                 'gate'              => 'app.request_gate',
                 'title_resolver'    => 'app.leave_titles',
+                'narrower'          => 'app.leave_narrower',
                 'group'             => 'workflow_leave_requests',
                 'search_text_field' => 'searchText',
                 'tenant_field'      => 'tenantId',
@@ -141,7 +149,7 @@ final class SearchRequestHarness
             $withDispatcher ? $this->dispatcher : null,
             $translator,
             $options->titleResolver === null ? null : $this->titles,
-            $narrower,
+            $narrower ?? ($options->narrower === null ? null : $this->ownerNarrower),
         );
     }
 

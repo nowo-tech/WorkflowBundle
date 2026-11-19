@@ -21,6 +21,7 @@
   - [The gate and the access event](#the-gate-and-the-access-event)
   - [Titles: the title resolver](#titles-the-title-resolver)
   - [Narrowing in SQL (the candidate window)](#narrowing-in-sql-the-candidate-window)
+    - [Sensitive subjects: a narrower, or the side channel accepted](#sensitive-subjects-a-narrower-or-the-side-channel-accepted)
   - [What a result shows](#what-a-result-shows)
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
 - [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
@@ -476,8 +477,9 @@ final class LeaveSearchAccess
 The shown title comes from the subject's `title_resolver`, in **one** batch per results page, with exactly the ids
 shown on that page (after the access event, SearchKit's host event and the page cut), and once per revalidated recent:
 never with an id the viewer may not see. A title may depend on the viewer (*Absent* instead of a medical leave
-type, as on your requests list). Without a resolver, or for an id it leaves out, `title_field` is shown (else an empty
-title). The bundle cuts titles to 200 characters; SearchKit escapes them.
+type, as on your requests list). It **fails closed**: an id it leaves out shows the generic title
+(`search.untitled_request`, *Request*), never the `title_field` column. Without a resolver, `title_field` is shown (the
+generic title when it is empty). The bundle cuts titles to 200 characters; SearchKit escapes them.
 
 ```php
 use Nowo\WorkflowBundle\Contract\WorkflowRequestTitleResolverInterface;
@@ -502,6 +504,8 @@ requests they may not see fill the window, and a full window makes the total a l
 express into the narrower; keep the access event for what it cannot. A `narrower` adds SQL conditions for the viewer first, so their requests stay in the
 window (mapped fields and bound values only; the access event still decides every row):
 
+A leave narrower that mirrors the requests list's rules:
+
 ```php
 use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchNarrowerInterface;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
@@ -510,17 +514,40 @@ final class LeaveSearchNarrower implements WorkflowRequestSearchNarrowerInterfac
 {
     public function narrow(string $subject, WorkflowRequestSearchCriteria $criteria, string $userIdentifier, int|string $tenant): void
     {
-        if ($this->roles->canManageLeave($tenant, $userIdentifier)) {
-            return; // managers: every request of the tenant
+        $viewer = $this->leave->viewer($tenant, $userIdentifier); // permissions in this organization, resolved per call
+        if ($viewer->canManage || $viewer->canViewTeam) {
+            $criteria->whereIn('organizationId', [$tenant]);      // every request of the organization
+        } elseif ($viewer->canApprove) {
+            // their own requests, and those of the workers they approve (their approval chain, plus workers without one)
+            $criteria->whereAny(['userId' => [$viewer->userId, ...$this->approvals->workerIdsFor($viewer)]]);
+        } elseif ($viewer->canRequest) {
+            $criteria->whereIn('userId', [$viewer->userId]);       // only their own requests
+        } else {
+            $criteria->none();                                      // nothing: no group, no SQL
         }
-        $me = $this->users->idOf($userIdentifier);
-        $criteria->whereAny(['requesterId' => $me, 'approverId' => $me]); // requester = me OR approver = me
     }
 }
 ```
 
-`whereAny([...])` ORs its fields, `whereIn($field, $values)` is one field; conditions are ANDed; `nothing()` finds
-nothing.
+- `whereAny([...])` ORs its fields; `whereIn($field, $values)` is one field; conditions are ANDed. Scalar mapped fields
+  only, values bound (never SQL text).
+- `none()`: the viewer may see nothing of the subject. The search gives **no group before any SQL runs** (no
+  candidates, no window places, no title lookup).
+- `whereIn($field, [])`: that field matches nothing (it compiles to `1 = 0`); the query still runs and finds nothing.
+- Long lists: a field's values are split into IN lists of 1,000 values, ORed, each its own bound parameter. More than
+  `narrower_max_values` values in one field (default 10,000) **fails closed**: no group and a logged warning (subject,
+  field and limit; never the values). A list is never cut silently.
+
+The narrower is asked once per search (and once per revalidated recent).
+
+#### Sensitive subjects: a narrower, or the side channel accepted
+
+Rows the access event hides were still read: they take places in the candidate window. A viewer can then notice them
+— fewer results than expected, a total marked inexact — the **window side channel**. So a `sensitive` subject (the
+default) must have a `narrower` that filters in SQL what the viewer may not see, ideally the same rule as the access
+event. When only PHP or a host event can decide (the rule cannot be written as conditions), set
+`accept_window_side_channel: true` on the subject to accept that side channel explicitly; the container refuses a
+sensitive subject with neither.
 
 ### What a result shows
 
@@ -529,8 +556,12 @@ status), linking to `route`. Nothing else: never the body, comments, approver no
 
 Titles of requests can be private (an absence), so every subject is `sensitive` by default: its group is off while
 SearchKit keeps recents in the browser without revalidation (`nowo_search_kit.recent.revalidate: false`). With
-revalidation, a stored recent is checked again: same route, an id of the id column's shape (digits within the integer
-range for an integer column, else letters, digits, `_` or `-`), then the whole flow above.
+revalidation, a stored recent is checked again: same route, an id of the id column's shape (digits within the column
+type's range for a `smallint`, `integer` or `bigint` id — 32767, 2147483647, 9223372036854775807 — else letters,
+digits, `_` or `-`), then the whole flow above.
+
+In SearchKit's own host event (`nowo_search_kit.item_visibility`) the rows of a subject have the subject type
+`workflow_<subject>` (e.g. `workflow_leave`), so a host listener tells the subjects apart.
 
 The definitions are stateless (FrankenPHP worker mode with the kernel reset off): the entity manager, the tenant and
 the viewer are resolved on every call; the titles of one render live in its `SearchItemContext` only.

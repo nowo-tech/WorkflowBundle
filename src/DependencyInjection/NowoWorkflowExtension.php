@@ -54,6 +54,7 @@ use function in_array;
 use function is_array;
 use function is_bool;
 use function is_string;
+use function method_exists;
 use function trigger_deprecation;
 
 /**
@@ -556,6 +557,18 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     }
 
     /**
+     * Since 1.21: whether the installed SearchKit has the 1.10 provider base (EntitySearchDefinition::prepareItems()).
+     * Without it (not installed, or 1.9 despite the composer conflict) no group is registered, so an older SearchKit
+     * never meets a definition it cannot run.
+     *
+     * @param string $definitionClass SearchKit's EntitySearchDefinition (a parameter for the tests)
+     */
+    public static function supportsSearchKit(string $definitionClass = self::SEARCH_KIT_DEFINITION): bool
+    {
+        return class_exists($definitionClass) && method_exists($definitionClass, 'prepareItems');
+    }
+
+    /**
      * Since 1.21: one SearchKit group per `search_kit.subjects` entry ({@see WorkflowRequestSearchDefinition}), only
      * when `search_kit.enabled` and SearchKit >= 1.10 is installed (SearchKit stays optional: it needs PHP >= 8.3).
      * Each definition is tagged for SearchKit's provider pass, which builds its provider.
@@ -564,7 +577,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
      */
     private function registerSearchKit(ContainerBuilder $container, array $searchKit): void
     {
-        if (!$searchKit['enabled'] || !class_exists(self::SEARCH_KIT_DEFINITION)) {
+        if (!$searchKit['enabled'] || !self::supportsSearchKit()) {
             return;
         }
         $optional = static fn (mixed $id): ?Reference => is_string($id) && $id !== '' ? new Reference($id) : null;
@@ -583,6 +596,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
                     new Reference('translator', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                     $optional($config['title_resolver'] ?? null),
                     $optional($config['narrower'] ?? null),
+                    new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 ])
                 ->addTag(self::SEARCH_KIT_DEFINITION_TAG, ['priority' => $config['priority'] ?? 0]);
         }

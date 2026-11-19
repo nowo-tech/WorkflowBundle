@@ -87,7 +87,8 @@
 Nothing to do: the SearchKit groups of workflow requests are new and off by default (`nowo_workflow.search_kit.enabled:
 false`). To use them, install `nowo-tech/search-kit-bundle` 1.10 or later (PHP 8.3 or later), declare each request type
 under `search_kit.subjects` (entity, fields, route, a `WorkflowRequestSearchGateInterface` service, a title resolver or
-`title_field`, `tenant_field` or `single_tenant: true`) and add a listener of `WorkflowRequestAccessCheckEvent` that
+`title_field`, `tenant_field` or `single_tenant: true`, and for a sensitive subject a narrower or
+`accept_window_side_channel: true`) and add a listener of `WorkflowRequestAccessCheckEvent` that
 allows the requests the viewer may see: without one, no request is ever shown (deny by default). Keep the search text
 viewer-neutral and free of health or legal data. See [USAGE](USAGE.md#header-search-the-workflow-requests-searchkit-121).
 

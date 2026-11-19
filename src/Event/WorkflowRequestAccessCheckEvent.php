@@ -10,10 +10,10 @@ use function array_key_exists;
 use function array_values;
 
 /**
- * The host's `view` decision on the requests one search found (since 1.21, SearchKit group `workflow_requests`).
+ * The host's `view` decision on the requests one search found (since 1.21; one SearchKit group per subject of `search_kit.subjects`).
  *
  * Dispatched once per search page, with every candidate the SQL filters kept (tenant, archived rows, excluded
- * statuses), at most `search_kit.max_candidates` of them. **Deny by default**: a request is shown only when a listener
+ * statuses), at most the subject's `max_candidates` of them. **Deny by default**: a request is shown only when a listener
  * allowed it and no listener denied it — deny wins whatever the listener order. The event cannot be stopped, so every
  * listener runs. Load what the decision needs in one query for all {@see requests()} (no N+1).
  *

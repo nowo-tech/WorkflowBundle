@@ -74,6 +74,9 @@
         "symfony/security-core": "^7.4 || ^8.0",
         "vincentlanglet/twig-cs-fixer": "^4.0"
     },
+    "conflict": {
+        "nowo-tech/search-kit-bundle": "<1.10"
+    },
     "autoload": {
         "psr-4": {
             "Nowo\\WorkflowBundle\\": "src/"

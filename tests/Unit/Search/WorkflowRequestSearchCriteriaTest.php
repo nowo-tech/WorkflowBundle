@@ -9,7 +9,6 @@ use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
-use function array_fill;
 use function range;
 
 final class WorkflowRequestSearchCriteriaTest extends TestCase
@@ -21,9 +20,11 @@ final class WorkflowRequestSearchCriteriaTest extends TestCase
             ->whereAny(['requesterId' => 5, 'approverId' => [5, 6]])
             ->whereIn('departmentId', ['a' => 1, 'b' => 2]);
 
-        self::assertFalse($criteria->isNothing());
+        self::assertSame(WorkflowRequestSearchCriteria::DEFAULT_MAX_VALUES, $criteria->maxValues);
+        self::assertFalse($criteria->isNone());
+        self::assertSame([], $criteria->overflowingFields());
         self::assertSame([['requesterId' => [5], 'approverId' => [5, 6]], ['departmentId' => [1, 2]]], $criteria->conditions());
-        self::assertTrue($criteria->nothing()->isNothing());
+        self::assertTrue($criteria->none()->isNone());
     }
 
     #[Test]
@@ -44,18 +45,11 @@ final class WorkflowRequestSearchCriteriaTest extends TestCase
     }
 
     #[Test]
-    public function tooManyValuesAreRefused(): void
+    public function tooManyValuesAreRecordedNeverCut(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $criteria = (new WorkflowRequestSearchCriteria(3))->whereIn('id', [1, 2, 3])->whereAny(['userId' => range(1, 4), 'id' => 1]);
 
-        (new WorkflowRequestSearchCriteria())->whereIn('id', array_fill(0, WorkflowRequestSearchCriteria::MAX_VALUES + 1, 1));
-    }
-
-    #[Test]
-    public function theMostValuesAreAccepted(): void
-    {
-        $criteria = (new WorkflowRequestSearchCriteria())->whereIn('id', range(1, WorkflowRequestSearchCriteria::MAX_VALUES));
-
-        self::assertCount(WorkflowRequestSearchCriteria::MAX_VALUES, $criteria->conditions()[0]['id']);
+        self::assertSame(['userId'], $criteria->overflowingFields());
+        self::assertSame(range(1, 4), $criteria->conditions()[1]['userId'], 'kept whole: the search fails closed instead');
     }
 }

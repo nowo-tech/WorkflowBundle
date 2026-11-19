@@ -258,10 +258,12 @@ See [SECURITY.md](SECURITY.md#protecting-the-crud-ui).
 ## Header search (SearchKit, 1.21)
 
 One SearchKit group per subject ([USAGE](USAGE.md#header-search-the-workflow-requests-searchkit-121)). The groups are
-registered only when `enabled` is true **and** SearchKit 1.10 or later is installed (PHP 8.3 or later). Everything is
-checked when the container is built: every `*_field` is a mapped field (not an association) of `subject_class`, letters,
-digits and `_` (checked again against the entity metadata on every search); group keys start with a lower-case letter,
-never start with `nowo_search_` and are unique across subjects.
+registered only when `enabled` is true **and** SearchKit 1.10 or later is installed (PHP 8.3 or later; composer refuses
+an older SearchKit, and the bundle registers nothing without `prepareItems()`). When the container is built, the
+options are checked by shape: `*_field` names by pattern (letters, digits, `_`), service ids, routes, group keys (a
+lower-case letter first, never `nowo_search_`, unique across subjects), the tenant and side-channel rules. Whether each
+field is really a mapped field (not an association) of `subject_class` is checked against the entity metadata at
+search time: a wrong name fails the search loudly (SearchKit drops the group and logs it).
 
 ```yaml
 nowo_workflow:
@@ -275,6 +277,7 @@ nowo_workflow:
                 gate: ~                  # service id: WorkflowRequestSearchGateInterface, required
                 title_resolver: ~        # service id: WorkflowRequestTitleResolverInterface (or title_field)
                 narrower: ~              # service id: WorkflowRequestSearchNarrowerInterface (optional)
+                narrower_max_values: 10000  # most values per field (IN lists of 1000); more = no group + warning
                 id_field: id             # in the URL, the access event, the resolver and recents
                 search_text_field: ~     # viewer-neutral text the host maintains (or title_field)
                 title_field: ~           # shown without a resolver; searched without a search text
@@ -294,7 +297,8 @@ nowo_workflow:
                 status_label_domain: ~   # null: the stored status is shown
                 status_label_prefix: ''
                 icon: 'tabler:checklist'
-                sensitive: true          # off while recents are kept without revalidation
+                sensitive: true          # off while recents are kept without revalidation; needs a narrower or:
+                accept_window_side_channel: false  # true: hidden rows may take places in the window (see below)
                 max_candidates: 100      # 1–1000: rows read and checked per search (newest first)
                 min_length: 0
 ```
@@ -302,6 +306,11 @@ nowo_workflow:
 A subject needs `search_text_field` or `title_field` (what is searched) and `title_resolver` or `title_field` (what is
 shown). `search_text_field` must be viewer-neutral and never hold attachments, comments, justification, on-behalf
 reasons or any other health or legal data.
+
+A `sensitive` subject (the default) needs a `narrower` that filters in SQL what the viewer may not see, or an explicit
+`accept_window_side_channel: true`: rows hidden only by the access event take places in the bounded candidate window,
+so a viewer can notice them (fewer results, an inexact total). See
+[USAGE](USAGE.md#sensitive-subjects-a-narrower-or-the-side-channel-accepted).
 
 `single_tenant: true` means **every** request of the class is searched for every viewer the gate lets in (the access
 event still decides each row): use it only when the application has one tenant.

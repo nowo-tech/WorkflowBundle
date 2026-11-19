@@ -7,8 +7,10 @@ namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection;
 use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
+use Nowo\WorkflowBundle\Tests\Support\SearchKit110DefinitionStub;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use stdClass;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
@@ -26,6 +28,7 @@ final class SearchKitExtensionTest extends TestCase
         'route'             => 'leave_show',
         'gate'              => 'app.leave_gate',
         'title_resolver'    => 'app.leave_titles',
+        'narrower'          => 'app.leave_narrower',
         'search_text_field' => 'searchText',
         'tenant_field'      => 'organizationId',
         'priority'          => 30,
@@ -38,6 +41,7 @@ final class SearchKitExtensionTest extends TestCase
         'narrower'      => 'app.purchase_narrower',
         'title_field'   => 'title',
         'single_tenant' => true,
+        'sensitive'     => false,
     ];
 
     #[Test]
@@ -55,7 +59,7 @@ final class SearchKitExtensionTest extends TestCase
     {
         $container = $this->load(['enabled' => true, 'subjects' => ['leave' => self::LEAVE, 'purchase' => self::PURCHASE]]);
         $leaveId   = NowoWorkflowExtension::SEARCH_KIT_SERVICE_PREFIX . 'leave';
-        if (!class_exists(NowoWorkflowExtension::SEARCH_KIT_DEFINITION)) {
+        if (!NowoWorkflowExtension::supportsSearchKit()) {
             self::assertFalse($container->hasDefinition($leaveId), 'SearchKit is optional');
 
             return;
@@ -66,7 +70,7 @@ final class SearchKitExtensionTest extends TestCase
         self::assertSame([['priority' => 30]], $leave->getTag(NowoWorkflowExtension::SEARCH_KIT_DEFINITION_TAG));
         self::assertSame('app.leave_gate', (string) $this->reference($leave->getArgument(1)));
         self::assertSame('app.leave_titles', (string) $this->reference($leave->getArgument(6)));
-        self::assertNull($leave->getArgument(7));
+        self::assertSame('app.leave_narrower', (string) $this->reference($leave->getArgument(7)));
 
         $purchase = $container->getDefinition(NowoWorkflowExtension::SEARCH_KIT_SERVICE_PREFIX . 'purchase');
         self::assertSame([['priority' => 0]], $purchase->getTag(NowoWorkflowExtension::SEARCH_KIT_DEFINITION_TAG));
@@ -81,6 +85,24 @@ final class SearchKitExtensionTest extends TestCase
         self::assertIsArray($config);
         self::assertSame('organizationId', $config['tenant_field']);
         self::assertTrue($config['sensitive']);
+    }
+
+    #[Test]
+    public function onlyTheSearchKitProviderBaseOf110IsSupported(): void
+    {
+        self::assertFalse(NowoWorkflowExtension::supportsSearchKit('Nowo\\Missing\\EntitySearchDefinition'), 'not installed');
+        self::assertFalse(NowoWorkflowExtension::supportsSearchKit(stdClass::class), 'no prepareItems(): SearchKit 1.9');
+        self::assertTrue(NowoWorkflowExtension::supportsSearchKit(SearchKit110DefinitionStub::class));
+        self::assertSame(class_exists(NowoWorkflowExtension::SEARCH_KIT_DEFINITION), NowoWorkflowExtension::supportsSearchKit(), 'the installed SearchKit (1.10+ or none)');
+    }
+
+    #[Test]
+    public function aSensitiveSubjectWithoutANarrowerIsRefused(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('subjects.leave is sensitive: set a narrower');
+
+        $this->load(['enabled' => true, 'subjects' => ['leave' => ['narrower' => null] + self::LEAVE]]);
     }
 
     #[Test]

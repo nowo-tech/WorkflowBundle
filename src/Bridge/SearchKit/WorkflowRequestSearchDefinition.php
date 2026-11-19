@@ -24,14 +24,16 @@ use Nowo\WorkflowBundle\Model\WorkflowRequestRef;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Psr\EventDispatcher\EventDispatcherInterface;
+use Psr\Log\LoggerInterface;
 use Stringable;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use WeakMap;
 
+use function array_chunk;
 use function count;
 use function ctype_digit;
 use function implode;
-use function in_array;
 use function is_array;
 use function is_int;
 use function is_object;
@@ -41,8 +43,6 @@ use function mb_substr;
 use function preg_match;
 use function sprintf;
 use function strlen;
-
-use const PHP_INT_MAX;
 
 /**
  * Since 1.21.0: one SearchKit group (SearchKit >= 1.10, {@see EntitySearchDefinition}) per subject of
@@ -65,9 +65,6 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
     /** Query alias of the request entity. */
     public const ALIAS = 'r';
 
-    /** Subject type of the rows in SearchKit's host event. */
-    public const SUBJECT_TYPE = 'workflow_request';
-
     /** The bundle's translation domain (the default group label). */
     public const TRANSLATION_DOMAIN = 'NowoWorkflowBundle';
 
@@ -77,8 +74,14 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
     /** The shape of a string request id in a stored recent (client input). */
     private const REFERENCE_ID_PATTERN = '/^[A-Za-z0-9_-]{1,128}\z/';
 
-    /** Doctrine types of integer id fields: a recent's id must then be digits within the int range. */
-    private const INTEGER_TYPES = [Types::INTEGER, Types::SMALLINT, Types::BIGINT];
+    /** Doctrine integer id types and their largest value: a recent's id must then be digits within that range. */
+    private const INTEGER_MAX = [Types::SMALLINT => '32767', Types::INTEGER => '2147483647', Types::BIGINT => '9223372036854775807'];
+
+    /** Translation key of the generic title of a request without one. */
+    public const UNTITLED = 'search.untitled_request';
+
+    /** @var WeakMap<SearchQuery, WorkflowRequestSearchCriteria> the narrowing of one search, keyed by its query */
+    private readonly WeakMap $criteria;
 
     /** Key of the resolved titles in the SearchItemContext of a render. */
     private const CONTEXT_TITLES = 'workflow_request_titles';
@@ -92,7 +95,9 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         private readonly ?TranslatorInterface $translator = null,
         private readonly ?WorkflowRequestTitleResolverInterface $titleResolver = null,
         private readonly ?WorkflowRequestSearchNarrowerInterface $narrower = null,
+        private readonly ?LoggerInterface $logger = null,
     ) {
+        $this->criteria = new WeakMap();
     }
 
     public function group(): string
@@ -110,9 +115,10 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         return $this->options->icon;
     }
 
+    /** `workflow_<subject>`: a host ITEM_VISIBILITY listener tells the subjects apart. */
     public function subjectType(): string
     {
-        return self::SUBJECT_TYPE;
+        return $this->options->subjectType();
     }
 
     public function tenant(SearchQuery $query): int|string|null
@@ -120,9 +126,31 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         return $this->gate->tenantOf($query->userIdentifier);
     }
 
+    /**
+     * The gate's switch, then the narrowing: a narrower that gives {@see WorkflowRequestSearchCriteria::none()} — or
+     * more values for a field than `narrower_max_values` (logged) — leaves no group, before any SQL runs.
+     */
     public function featureEnabled(int|string $tenant, SearchQuery $query): bool
     {
-        return $this->gate->isEnabled($tenant, $query->userIdentifier);
+        if (!$this->gate->isEnabled($tenant, $query->userIdentifier)) {
+            return false;
+        }
+        $criteria = $this->criteria($tenant, $query);
+        if (!$criteria instanceof WorkflowRequestSearchCriteria) {
+            return true;
+        }
+        if ($criteria->overflowingFields() !== []) {
+            $this->logger?->warning('Workflow request search: the narrower of subject "{subject}" gave more than {max} values for {fields}; no results (fail closed).', [
+                'bundle'  => 'NowoWorkflowBundle',
+                'subject' => $this->options->subject,
+                'max'     => $criteria->maxValues,
+                'fields'  => implode(', ', $criteria->overflowingFields()),
+            ]);
+
+            return false;
+        }
+
+        return !$criteria->isNone();
     }
 
     public function searchableFields(): array
@@ -154,8 +182,9 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         if ($options->excludedStatuses !== []) {
             $qb->andWhere(sprintf('%s NOT IN (:workflow_request_excluded)', $this->field($options->statusField)))->setParameter('workflow_request_excluded', $options->excludedStatuses);
         }
-        if ($this->narrower instanceof WorkflowRequestSearchNarrowerInterface) {
-            $this->narrow($this->narrower, $qb, $metadata, $tenant, $query);
+        $criteria = $this->criteria($tenant, $query);
+        if ($criteria instanceof WorkflowRequestSearchCriteria) {
+            $this->narrow($criteria, $qb, $metadata);
         }
 
         return $qb;
@@ -220,15 +249,23 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         return $this->requestId($row);
     }
 
-    /** The title from this render's resolved titles, else `title_field`; the status label; the subject's route. */
+    /**
+     * The title: with a title resolver, only what it gave for this render (fail closed: an id it left out shows the
+     * generic title, never the `title_field` column); without one, `title_field`. The status label; the route.
+     */
     public function toPreparedItem(array|object $row, SearchQuery $query, SearchItemContext $context): SearchItem
     {
-        $id     = $this->requestId($row);
-        $titles = $context->get(self::CONTEXT_TITLES, []);
-        $title  = is_array($titles) && isset($titles[$id]) ? $titles[$id] : ($this->options->titleField === null ? null : $this->value($row, $this->options->titleField));
+        $id = $this->requestId($row);
+        if ($this->titleResolver instanceof WorkflowRequestTitleResolverInterface) {
+            $titles = $context->get(self::CONTEXT_TITLES, []);
+            $title  = is_array($titles) ? ($titles[$id] ?? null) : null;
+        } else {
+            $title = $this->value($row, (string) $this->options->titleField);
+        }
+        $title = is_string($title) || is_int($title) ? mb_substr((string) $title, 0, self::MAX_TITLE_LENGTH) : '';
 
         return new SearchItem(
-            is_string($title) || is_int($title) ? mb_substr((string) $title, 0, self::MAX_TITLE_LENGTH) : '',
+            $title !== '' ? $title : ($this->translator?->trans(self::UNTITLED, [], self::TRANSLATION_DOMAIN, $query->locale) ?? 'Request'),
             $this->urls->generate($this->options->route, [$this->options->routeIdParameter => $id] + $this->options->routeParameters),
             $this->statusLabel($this->status($row), $query),
         );
@@ -261,7 +298,8 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
 
     /**
      * A stored recent is client input: it must be this subject's route, with an id of the id field's shape (digits
-     * within the int range for an integer column, so PostgreSQL never sees "12abc"; else letters, digits, `_`, `-`).
+     * within the column type's range for a smallint / integer / bigint column, so the database never sees "12abc" or
+     * an out-of-range number; else letters, digits, `_`, `-`).
      */
     public function referenceId(SearchReference $reference): ?string
     {
@@ -269,34 +307,53 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         if ($reference->route !== $this->options->route || !is_string($id)) {
             return null;
         }
-        if (in_array($this->metadata()->getTypeOfField($this->options->idField), self::INTEGER_TYPES, true)) {
-            return $this->isIntegerId($id) ? $id : null;
+        $type = $this->metadata()->getTypeOfField($this->options->idField);
+        if (is_string($type) && isset(self::INTEGER_MAX[$type])) {
+            return $this->isIntegerId($id, self::INTEGER_MAX[$type]) ? $id : null;
         }
 
         return preg_match(self::REFERENCE_ID_PATTERN, $id) === 1 ? $id : null;
     }
 
-    /** Digits only, no leading zero, at most PHP_INT_MAX. */
-    private function isIntegerId(string $id): bool
+    /** Digits only, no leading zero, at most the column type's largest value. */
+    private function isIntegerId(string $id, string $max): bool
     {
         if (!ctype_digit($id) || ($id !== '0' && ltrim($id, '0') !== $id)) {
             return false;
         }
-        $max = (string) PHP_INT_MAX;
 
         return strlen($id) < strlen($max) || (strlen($id) === strlen($max) && $id <= $max);
     }
 
     /**
-     * The host narrowing: every condition (fields ORed) ANDed to the query, values bound.
+     * The narrowing of this search (null without a narrower): asked once per query object and kept with it (a WeakMap
+     * keyed by the query, so featureEnabled() and baseQuery() of one search share it and it goes with the query).
+     */
+    private function criteria(int|string $tenant, SearchQuery $query): ?WorkflowRequestSearchCriteria
+    {
+        if (!$this->narrower instanceof WorkflowRequestSearchNarrowerInterface) {
+            return null;
+        }
+        if (!isset($this->criteria[$query])) {
+            $criteria = new WorkflowRequestSearchCriteria($this->options->narrowerMaxValues);
+            $this->narrower->narrow($this->options->subject, $criteria, $query->userIdentifier, $tenant);
+            // @igor-ignore - keyed by the search's own query object: the entry goes with that query (WeakMap)
+            $this->criteria[$query] = $criteria;
+        }
+
+        return $this->criteria[$query];
+    }
+
+    /**
+     * The host narrowing: every condition (fields ORed) ANDed to the query; a field's values in IN lists of at most
+     * {@see WorkflowRequestSearchCriteria::CHUNK}, ORed, each its own bound parameter. none() or an overflowing field
+     * (featureEnabled() already refused them) leave nothing.
      *
      * @param ClassMetadata<object> $metadata
      */
-    private function narrow(WorkflowRequestSearchNarrowerInterface $narrower, QueryBuilder $qb, ClassMetadata $metadata, int|string $tenant, SearchQuery $query): void
+    private function narrow(WorkflowRequestSearchCriteria $criteria, QueryBuilder $qb, ClassMetadata $metadata): void
     {
-        $criteria = new WorkflowRequestSearchCriteria();
-        $narrower->narrow($this->options->subject, $criteria, $query->userIdentifier, $tenant);
-        if ($criteria->isNothing()) {
+        if ($criteria->isNone() || $criteria->overflowingFields() !== []) {
             $qb->andWhere('1 = 0');
 
             return;
@@ -310,9 +367,11 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
 
                     continue;
                 }
-                $parameter = sprintf('workflow_request_narrow_%d_%d', $index, count($terms));
-                $terms[]   = sprintf('%s IN (:%s)', $this->field($field), $parameter);
-                $qb->setParameter($parameter, $values);
+                foreach (array_chunk($values, WorkflowRequestSearchCriteria::CHUNK) as $chunk) {
+                    $parameter = sprintf('workflow_request_narrow_%d_%d', $index, count($terms));
+                    $terms[]   = sprintf('%s IN (:%s)', $this->field($field), $parameter);
+                    $qb->setParameter($parameter, $chunk);
+                }
             }
             $qb->andWhere('(' . implode(' OR ', $terms) . ')');
         }

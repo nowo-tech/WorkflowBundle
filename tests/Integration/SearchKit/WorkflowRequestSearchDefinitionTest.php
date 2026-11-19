@@ -17,6 +17,7 @@ use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
 use Nowo\WorkflowBundle\Event\WorkflowRequestAccessCheckEvent;
 use Nowo\WorkflowBundle\Model\WorkflowRequestRef;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
+use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\OwnRequestsNarrower;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\PurchaseRequest;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchRequest;
@@ -35,6 +36,7 @@ use function bin2hex;
 use function class_exists;
 use function mb_strlen;
 use function random_bytes;
+use function range;
 use function sort;
 use function str_repeat;
 
@@ -98,7 +100,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
 
         $group = $this->search($marker);
         self::assertInstanceOf(SearchGroup::class, $group);
-        self::assertSame(['Leave: Ana — Holiday', ''], array_map(static fn (SearchItem $item): string => $item->title, $group->items));
+        self::assertSame(['Leave: Ana — Holiday', 'Request'], array_map(static fn (SearchItem $item): string => $item->title, $group->items));
         self::assertCount(1, $this->harness->titles->calls, 'one batch per search');
         $call = $this->harness->titles->calls[0];
         $ids  = $call['ids'];
@@ -109,18 +111,36 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     }
 
     #[Test]
-    public function aTitleFieldIsTheFallbackOfTheResolver(): void
+    public function aResolverThatLeavesAnIdOutFailsClosed(): void
     {
-        $id         = $this->harness->insert(self::TENANT, 'x', title: null);
+        $id         = $this->harness->insert(self::TENANT, 'raw column text', title: null);
         $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['title_field' => 'searchText']));
         $query      = $this->query('x');
         $context    = new SearchItemContext();
 
         $definition->prepareItems([$this->find($id), $this->find($id)], $query, $context);
         self::assertSame([(string) $id], $this->harness->titles->calls[0]['ids'], 'one id once');
-        self::assertSame('x', $definition->toPreparedItem($this->find($id), $query, $context)->title, 'the resolver gave none');
-        self::assertSame('x', $definition->toPreparedItem($this->find($id), $query, new SearchItemContext())->title, 'nothing prepared');
+        self::assertSame('Request', $definition->toPreparedItem($this->find($id), $query, $context)->title, 'never the title_field column');
+        self::assertSame('Request', $definition->toPreparedItem($this->find($id), $query, new SearchItemContext())->title, 'nothing prepared');
         self::assertCount(1, $this->harness->titles->calls, 'toPreparedItem() never calls the resolver');
+
+        $translator = new Translator('es');
+        $translator->addLoader('array', new ArrayLoader());
+        $translator->addResource('array', ['search.untitled_request' => 'Solicitud'], 'es', WorkflowRequestSearchDefinition::TRANSLATION_DOMAIN);
+        $spanish = $this->harness->definition(translator: $translator);
+        self::assertSame('Solicitud', $spanish->toPreparedItem($this->find($id), new SearchQuery('x', null, 10, userIdentifier: self::VIEWER, locale: 'es'), new SearchItemContext())->title);
+    }
+
+    #[Test]
+    public function withoutAResolverAnEmptyTitleColumnShowsTheGenericTitle(): void
+    {
+        $this->harness->gate->tenant = 'acme';
+        $this->harness->insertPurchase('acme', '');
+        $definition = $this->harness->definition('purchase');
+        $row        = $this->harness->em->getRepository(PurchaseRequest::class)->findOneBy(['title' => '']);
+        self::assertInstanceOf(PurchaseRequest::class, $row);
+
+        self::assertSame('Request', $definition->toPreparedItem($row, $this->query('x'), new SearchItemContext())->title);
     }
 
     #[Test]
@@ -253,7 +273,8 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
 
         self::assertSame('workflow_leave_requests', $definition->group());
         self::assertSame('tabler:beach', $definition->icon());
-        self::assertSame('workflow_request', $definition->subjectType());
+        self::assertSame('workflow_leave', $definition->subjectType());
+        self::assertSame('workflow_purchase', $this->harness->definition('purchase')->subjectType());
         self::assertSame(['r.searchText', 'r.status'], $definition->searchableFields());
         self::assertSame(['r.title', 'r.place'], $this->harness->definition('purchase')->searchableFields());
         self::assertSame(2, $definition->minLength());
@@ -278,7 +299,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         $purchase = $this->harness->definition('purchase');
         $ref      = static fn (string $route, mixed $id): SearchReference => new SearchReference('/x', 'k', $route, ['id' => $id]);
 
-        foreach (['12' => '12', '0' => '0', '9223372036854775807' => '9223372036854775807', '12abc' => null, '012' => null, '9223372036854775808' => null, '99999999999999999999' => null, '' => null, '-1' => null] as $id => $expected) {
+        foreach (['12' => '12', '0' => '0', '2147483647' => '2147483647', '2147483648' => null, '9223372036854775807' => null, '12abc' => null, '012' => null, '99999999999999999999' => null, '' => null, '-1' => null] as $id => $expected) {
             self::assertSame($expected, $leave->referenceId($ref(SearchRequestHarness::ROUTE, (string) $id)), 'integer id ' . $id);
         }
         self::assertNull($leave->referenceId($ref(SearchRequestHarness::ROUTE, 12)), 'not a string');
@@ -296,7 +317,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         for ($i = 0; $i < 25; ++$i) {
             $this->harness->insert(self::TENANT, 'Theirs ' . $marker, owner: 'bob@example.com');
         }
-        $newestFirst = SearchRequestHarness::options('leave', ['order_field' => null]);
+        $newestFirst = SearchRequestHarness::options('leave', ['order_field' => null, 'narrower' => null, 'accept_window_side_channel' => true]);
         self::assertNull((new EntitySearchProvider($this->harness->definition(options: $newestFirst), new EventDispatcher()))->search($this->query($marker)), 'newest first: 20 hidden rows fill the window (starvation)');
 
         $narrower = new OwnRequestsNarrower(static function (WorkflowRequestSearchCriteria $criteria, string $viewer): void {
@@ -309,16 +330,46 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     }
 
     #[Test]
-    public function theNarrowerCanLeaveNothing(): void
+    public function noneLeavesNoGroupBeforeAnySql(): void
     {
         $marker = $this->marker();
         $this->harness->insert(self::TENANT, 'A ' . $marker);
-        $nothing = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->nothing());
-        $empty   = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->whereIn('ownerIdentifier', []));
+        $none       = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->none());
+        $definition = $this->harness->definition(narrower: $none);
 
-        foreach ([$nothing, $empty] as $narrower) {
-            self::assertNull((new EntitySearchProvider($this->harness->definition(narrower: $narrower), new EventDispatcher()))->search($this->query($marker)));
-        }
+        $this->harness->counter->reset();
+        self::assertNull((new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker)));
+        self::assertSame(0, $this->harness->counter->count(), 'no SQL at all');
+        self::assertSame([], $this->harness->titles->calls);
+        self::assertCount(1, $none->calls, 'asked once per search');
+        self::assertStringContainsString('1 = 0', $definition->baseQuery(self::TENANT, $this->query($marker))->getDQL(), 'a direct baseQuery() finds nothing either');
+    }
+
+    #[Test]
+    public function anEmptyListMatchesNothing(): void
+    {
+        $marker = $this->marker();
+        $this->harness->insert(self::TENANT, 'A ' . $marker);
+        $empty = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->whereIn('ownerIdentifier', []));
+
+        self::assertNull((new EntitySearchProvider($this->harness->definition(narrower: $empty), new EventDispatcher()))->search($this->query($marker)));
+    }
+
+    #[Test]
+    public function tooManyValuesFailClosedWithAWarning(): void
+    {
+        $marker = $this->marker();
+        $this->harness->insert(self::TENANT, 'A ' . $marker);
+        $logger     = new RecordingLogger();
+        $narrower   = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->whereIn('ownerIdentifier', ['', ...array_map('strval', range(1, 1000))]));
+        $definition = new WorkflowRequestSearchDefinition(new TestManagerRegistry($this->harness->em), $this->harness->gate, SearchRequestHarness::urls(), SearchRequestHarness::options('leave', ['narrower_max_values' => 1000]), $this->harness->dispatcher, null, $this->harness->titles, $narrower, $logger);
+
+        $this->harness->counter->reset();
+        self::assertNull((new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker)));
+        self::assertSame(0, $this->harness->counter->count());
+        self::assertStringContainsString('more than {max} values', $logger->records[0]['message'] ?? '');
+        self::assertSame(['leave', 1000, 'ownerIdentifier'], [$logger->records[0]['context']['subject'], $logger->records[0]['context']['max'], $logger->records[0]['context']['fields']]);
+        self::assertStringContainsString('1 = 0', $definition->baseQuery(self::TENANT, $this->query($marker))->getDQL(), 'a direct baseQuery() finds nothing either');
     }
 
     #[Test]

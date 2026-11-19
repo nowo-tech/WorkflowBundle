@@ -294,3 +294,4 @@ scope:
 search:
   group:
     workflow_requests: Demandes
+  untitled_request: Demande
