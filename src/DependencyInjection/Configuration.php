@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
+use InvalidArgumentException;
 use Nowo\WorkflowBundle\Enum\CssFramework;
 use Nowo\WorkflowBundle\Enum\IconSet;
+use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\NodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
 use function array_key_exists;
 use function in_array;
@@ -161,6 +164,7 @@ final class Configuration implements ConfigurationInterface
                 ->end()
                 ->append($this->tenancyNode())
                 ->append($this->guardsNode())
+                ->append($this->searchKitNode())
                 ->arrayNode('audit')
                     ->info('Since 1.15: WorkflowTransitionAppliedEvent after the commit of every applied transition (ids only; forward it to an audit log). Requires doctrine/dbal 4.')
                     ->addDefaultsIfNotSet()
@@ -292,6 +296,57 @@ final class Configuration implements ConfigurationInterface
                     ->min(0)
                     ->max(100)
                 ->end()
+            ->end();
+
+        return $node;
+    }
+
+    /**
+     * Since 1.21: the SearchKit group of the workflow requests (docs/USAGE.md, "Header search").
+     */
+    private function searchKitNode(): ArrayNodeDefinition
+    {
+        $node = (new TreeBuilder('search_kit'))->getRootNode();
+        $node
+            ->info('Since 1.21: the SearchKit group "workflow_requests" (SearchKit >= 1.9, PHP >= 8.3): the host\'s workflow requests by title and status, only those the viewer may see (WorkflowRequestAccessCheckEvent, deny by default). Registered only when enabled and SearchKit is installed; reorder or switch it off with nowo_search_kit.groups.<group>.')
+            ->addDefaultsIfNotSet()
+            ->children()
+                ->booleanNode('enabled')->defaultFalse()->info('true = register the group (needs subject_class, route and gate).')->end()
+                ->scalarNode('group')->defaultValue(WorkflowRequestSearchOptions::DEFAULT_GROUP)->cannotBeEmpty()->info('SearchKit group key.')->end()
+                ->integerNode('priority')->defaultValue(0)->info('Tag priority of the group among the SearchKit providers.')->end()
+                ->scalarNode('subject_class')->defaultNull()->info('The request entity (Doctrine ORM), e.g. App\\Leave\\LeaveRequest.')->end()
+                ->append($this->serviceIdNode('gate', 'Service id implementing WorkflowRequestSearchGateInterface (the viewer\'s tenant and the feature switch). Required when enabled.'))
+                ->scalarNode('id_field')->defaultValue('id')->cannotBeEmpty()->info('Mapped field of the id used in the request URL (and in the access event).')->end()
+                ->scalarNode('title_field')->defaultValue('title')->cannotBeEmpty()->info('Mapped field searched and shown as the title.')->end()
+                ->scalarNode('status_field')->defaultValue('status')->cannotBeEmpty()->info('Mapped field of the marking (a place name, or a backed enum): searched and shown as the status.')->end()
+                ->scalarNode('tenant_field')->defaultNull()->info('Mapped field compared with the gate\'s tenant in SQL. null = no tenant condition.')->end()
+                ->scalarNode('archived_field')->defaultNull()->info('Nullable mapped field: a request where it is not null (archived, deleted) is never searched.')->end()
+                ->scalarNode('order_field')->defaultNull()->info('Mapped field ordering the results, newest first. null = id_field.')->end()
+                ->arrayNode('excluded_statuses')->scalarPrototype()->cannotBeEmpty()->end()->defaultValue([])->info('Statuses never searched (e.g. draft, cancelled).')->end()
+                ->scalarNode('route')->defaultNull()->info('Route of one request (the result URL). Required when enabled.')->end()
+                ->scalarNode('route_id_parameter')->defaultValue('id')->cannotBeEmpty()->info('Parameter of that route holding id_field.')->end()
+                ->arrayNode('route_parameters')->useAttributeAsKey('name')->scalarPrototype()->end()->defaultValue([])->info('Fixed parameters of that route.')->end()
+                ->scalarNode('see_all_route')->defaultNull()->info('The requests list route that filters by the "q" parameter (the "see all" link). null = no link.')->end()
+                ->arrayNode('see_all_parameters')->useAttributeAsKey('name')->scalarPrototype()->end()->defaultValue([])->info('Fixed parameters of that route.')->end()
+                ->scalarNode('status_label_domain')->defaultNull()->info('Translation domain of the status labels. null = the place name is shown.')->end()
+                ->scalarNode('status_label_prefix')->defaultValue('')->info('Prefix of the status label keys (key = prefix + place name).')->end()
+                ->scalarNode('icon')->defaultValue('tabler:checklist')->info('UX Icons name of the rows (null = SearchKit\'s default).')->end()
+                ->booleanNode('sensitive')->defaultTrue()->info('true (default): titles are private (e.g. absences), so the group is off while SearchKit keeps recents in the browser without revalidation.')->end()
+                ->integerNode('max_candidates')->defaultValue(100)->min(1)->max(WorkflowRequestSearchOptions::MAX_CANDIDATES)->info('The most matching requests one search reads and checks: bounds the access event, the visible total and the deepest results page.')->end()
+                ->integerNode('min_length')->defaultValue(0)->min(0)->info('Shortest text this group searches.')->end()
+            ->end()
+            ->validate()
+                ->always(static function (array $v): array {
+                    if ($v['enabled'] === true) {
+                        try {
+                            WorkflowRequestSearchOptions::fromConfig($v);
+                        } catch (InvalidArgumentException $e) {
+                            throw new InvalidConfigurationException($e->getMessage(), 0, $e);
+                        }
+                    }
+
+                    return $v;
+                })
             ->end();
 
         return $node;

@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\DependencyInjection;
 use Nowo\UiKitBundle\Theme\ThemeSlots;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
+use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
 use Nowo\WorkflowBundle\Collation\WorkflowExactKeyColumns;
 use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
@@ -24,6 +25,7 @@ use Nowo\WorkflowBundle\EventListener\WorkflowUiRouteContextSubscriber;
 use Nowo\WorkflowBundle\EventListener\WorkflowUnitOfWorkSubscriber;
 use Nowo\WorkflowBundle\Http\WorkflowUiTenancy;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\DemoSeedService;
 use Nowo\WorkflowBundle\Service\WorkflowApplicator;
@@ -47,6 +49,7 @@ use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
 
 use function array_key_exists;
+use function class_exists;
 use function in_array;
 use function is_array;
 use function is_bool;
@@ -72,6 +75,12 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
      * Directory of the XML mapping of the bundle entities (1.14, same tables and columns as the attributes).
      */
     public const XML_MAPPING_DIR = __DIR__ . '/../Resources/config/doctrine';
+
+    /** Since 1.21: SearchKit's `EntitySearchDefinition` (a string: SearchKit is optional). */
+    public const SEARCH_KIT_DEFINITION = 'Nowo\\SearchKitBundle\\Provider\\Entity\\EntitySearchDefinition';
+
+    /** Since 1.21: SearchKit's `EntitySearchDefinition::TAG`. */
+    public const SEARCH_KIT_DEFINITION_TAG = 'nowo_search_kit.entity_definition';
 
     /**
      * Prepends Doctrine mappings, translator paths, the asset package and FormKit / UiKit defaults.
@@ -375,6 +384,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
 
         $this->registerTenancy($container, $config);
         $this->registerExactKeyColumns($container);
+        $this->registerSearchKit($container, $config['search_kit']);
 
         $container->setParameter(Configuration::ALIAS . '.security.access_roles', $config['security']['access_roles']);
         $container->setParameter(Configuration::ALIAS . '.security.access_checker', $config['security']['access_checker']);
@@ -540,6 +550,33 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArguments([new Reference(AfterCommitDispatcher::class), new Reference(TenancyContext::class)])
             ->addTag('kernel.event_subscriber');
         $container->getDefinition(WorkflowApplicator::class)->setArgument('$audit', new Reference(AfterCommitDispatcher::class));
+    }
+
+    /**
+     * Since 1.21: the SearchKit group of the workflow requests ({@see WorkflowRequestSearchDefinition}), only when
+     * `search_kit.enabled` and SearchKit >= 1.9 is installed (SearchKit stays optional: it needs PHP >= 8.3). The
+     * definition is tagged for SearchKit's provider pass, which builds its provider.
+     *
+     * @param array<string, mixed> $searchKit
+     */
+    private function registerSearchKit(ContainerBuilder $container, array $searchKit): void
+    {
+        if ($searchKit['enabled'] !== true || !class_exists(self::SEARCH_KIT_DEFINITION)) {
+            return;
+        }
+        $container->register(WorkflowRequestSearchOptions::class, WorkflowRequestSearchOptions::class)
+            ->setFactory([WorkflowRequestSearchOptions::class, 'fromConfig'])
+            ->setArguments([$searchKit]);
+        $container->register(WorkflowRequestSearchDefinition::class, WorkflowRequestSearchDefinition::class)
+            ->setArguments([
+                new Reference('doctrine'),
+                new Reference((string) $searchKit['gate']),
+                new Reference('router'),
+                new Reference(WorkflowRequestSearchOptions::class),
+                new Reference('event_dispatcher', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                new Reference('translator', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            ])
+            ->addTag(self::SEARCH_KIT_DEFINITION_TAG, ['priority' => $searchKit['priority']]);
     }
 
     /**

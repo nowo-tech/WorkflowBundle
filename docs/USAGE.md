@@ -16,6 +16,9 @@
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
   - [Keep the domain in charge](#keep-the-domain-in-charge)
   - [Known limitations](#known-limitations)
+- [Header search: the workflow requests (SearchKit, 1.21)](#header-search-the-workflow-requests-searchkit-121)
+  - [The gate and the access event](#the-gate-and-the-access-event)
+  - [What a result shows](#what-a-result-shows)
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
 - [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
 - [Overriding translations (REQ-I18N-001)](#overriding-translations-req-i18n-001)
@@ -351,6 +354,101 @@ final readonly class ApproveExpense
   `Model\WorkflowDefinitionRef` and returns a `Model\WorkflowDefinitionView`, never the definition entity, and adds
   the entity-free reads `currentVersion()`, `draftVersion()` and `versions()`. See
   [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Header search: the workflow requests (SearchKit, 1.21)
+
+With [SearchKit](https://github.com/nowo-tech/SearchKitBundle) 1.9 or later installed (it needs PHP 8.3 or later; it
+stays optional), the bundle adds the group `workflow_requests` to the search palette and the results page: your
+workflow requests (leave requests, purchase requests…) by **title and status**, only those the viewer may see.
+
+The requests are **your** Doctrine ORM entity, the subject of a state machine whose marking property holds the
+status. Point the bundle at it ([CONFIGURATION](CONFIGURATION.md#header-search-searchkit-121)):
+
+```yaml
+# config/packages/nowo_workflow.yaml
+nowo_workflow:
+    search_kit:
+        enabled: true
+        subject_class: App\Leave\LeaveRequest
+        gate: App\Leave\LeaveSearchGate          # WorkflowRequestSearchGateInterface
+        id_field: uuid                              # in the URL and in the access event
+        title_field: title
+        status_field: status                        # the marking (a place name or a backed enum)
+        tenant_field: organizationId                # compared with the gate's tenant in SQL
+        archived_field: deletedAt                   # not null = never searched
+        order_field: updatedAt                      # newest first
+        excluded_statuses: [draft]
+        route: leave_request_show
+        route_id_parameter: uuid
+        see_all_route: leave_request_index          # filters by ?q=
+        status_label_domain: messages
+        status_label_prefix: 'leave.status.'
+```
+
+One search runs, in order: the group switch (`nowo_search_kit.groups.workflow_requests`), the gate's tenant and
+feature switch, **one SQL query** (tenant, archived rows and excluded statuses filtered there; an escaped
+`LOWER(field) LIKE … ESCAPE '!'` of every word over the title and the status; at most `max_candidates` rows), then
+**one** `WorkflowRequestAccessCheckEvent` for all candidates, then SearchKit's own host event. Any refusal gives no
+group at all: no count, no hint.
+
+### The gate and the access event
+
+The gate gives the viewer's tenant and the feature switch, on every search (never cached):
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchGateInterface;
+
+final class LeaveSearchGate implements WorkflowRequestSearchGateInterface
+{
+    public function tenantOf(string $userIdentifier): int|string|null
+    {
+        return $this->organizations->current($userIdentifier)?->getId(); // null: no results
+    }
+
+    public function isEnabled(int|string $tenant, string $userIdentifier): bool
+    {
+        return $this->features->leaveEnabled($tenant) && $this->members->isMember($tenant, $userIdentifier);
+    }
+}
+```
+
+Whether the viewer may see each request is **your** access rule, applied in a listener of
+`WorkflowRequestAccessCheckEvent`. It is **deny by default**: a request is shown only when a listener allowed it and
+no listener denied it (deny wins, whatever the order; the event cannot be stopped). The event carries ids and
+statuses only; load what the rule needs in **one** query for all of them:
+
+```php
+use Nowo\WorkflowBundle\Event\WorkflowRequestAccessCheckEvent;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+#[AsEventListener]
+final class LeaveSearchAccess
+{
+    public function __invoke(WorkflowRequestAccessCheckEvent $event): void
+    {
+        if ($event->subjectClass !== LeaveRequest::class) {
+            return;
+        }
+        $ids = array_map(static fn ($request) => $request->id, $event->requests());
+        foreach ($this->leaveVisibility->visibleIds($ids, $event->userIdentifier, $event->tenant) as $id) {
+            $event->allow($id); // the same rule as the requests list
+        }
+    }
+}
+```
+
+### What a result shows
+
+The title (at most 200 characters) and the status label (`status_label_domain` / `status_label_prefix`, else the
+place name), linking to `route`. Nothing else: never the body, comments, approver notes or any other field, and only
+the title and status fields are searched. SearchKit escapes what it shows.
+
+Titles of requests can be private (an absence), so the group is `sensitive` by default: it is off while SearchKit
+keeps recents in the browser without revalidation (`nowo_search_kit.recent.revalidate: false`). With revalidation, a
+stored recent is checked again (same route, an id of letters, digits, `_` or `-`, then the whole flow above).
+
+The definition is stateless (FrankenPHP worker mode with the kernel reset off): the entity manager, the tenant and
+the viewer are resolved on every call.
 
 ## FrankenPHP / long-running workers
 

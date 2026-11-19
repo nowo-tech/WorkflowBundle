@@ -84,6 +84,12 @@
 
 ## Unreleased
 
+Nothing to do: the SearchKit group `workflow_requests` is new and off by default (`nowo_workflow.search_kit.enabled:
+false`). To use it, install `nowo-tech/search-kit-bundle` 1.9 or later (PHP 8.3 or later), set `search_kit` (request
+entity, fields, route and a `WorkflowRequestSearchGateInterface` service) and add a listener of
+`WorkflowRequestAccessCheckEvent` that allows the requests the viewer may see: without one, no request is ever shown
+(deny by default). See [USAGE](USAGE.md#header-search-the-workflow-requests-searchkit-121).
+
 ## To 1.20.0
 
 From **1.19.0**:

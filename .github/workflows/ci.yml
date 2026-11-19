@@ -70,6 +70,11 @@ jobs:
       - name: Override Composer platform PHP (composer.json pins the minimum PHP for the lock)
         run: composer config platform.php "${{ matrix.php }}.99"
 
+      # Since 1.21.0: SearchKit (PHP >= 8.3) is added on 8.3+ only (never in composer.json / composer.lock); the 8.2 cells
+      # skip the SearchKit group's tests.
+      - name: SearchKit (PHP >= 8.3)
+        run: bash .github/ci/search-kit.sh
+
       - name: Install dependencies with Symfony ${{ matrix.symfony }}
         run: |
           composer require --dev \
@@ -97,7 +102,7 @@ jobs:
               composer require doctrine/doctrine-bundle:^2.13 --no-interaction --no-update
               ;;
           esac
-          composer update symfony/* doctrine/doctrine-bundle --with-all-dependencies --no-interaction --prefer-dist --no-progress
+          composer update symfony/* doctrine/doctrine-bundle ${SEARCH_KIT_PACKAGES:-} --with-all-dependencies --no-interaction --prefer-dist --no-progress
       - name: Composer audit (Critical/High)
         run: composer audit --locked
 
@@ -107,8 +112,9 @@ jobs:
           SYMFONY_DEPRECATIONS_HELPER: max[direct]=0
         run: composer test
 
-      - name: Run tests with coverage (PHP 8.2 + Symfony 7.4 only; fails below 100%, REQ-TEST-003)
-        if: matrix.php == '8.2' && matrix.symfony == '7.4'
+      # Since 1.21.0 on PHP 8.4 (was 8.2): SearchKit is installed there, so the SearchKit group counts.
+      - name: Run tests with coverage (PHP 8.4 + Symfony 7.4 only; fails below 100%, REQ-TEST-003)
+        if: matrix.php == '8.4' && matrix.symfony == '7.4'
         env:
           SYMFONY_DEPRECATIONS_HELPER: max[direct]=0
         run: composer test-coverage-100
@@ -275,6 +281,76 @@ jobs:
           ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.test }}
 
+  search-kit-databases:
+    # Since 1.21.0: SearchKit's provider contract for the "workflow_requests" group on real servers (visibility, other
+    # tenants, archived rows, the access event, LIKE escaping, the query budget). SearchKit needs PHP >= 8.3.
+    name: SearchKit databases (${{ matrix.db.image }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        db:
+          - image: 'mysql:8.4'
+            port: 3306
+            health: 'mysqladmin ping -h 127.0.0.1 -proot'
+            url_var: NOWO_WORKFLOW_TEST_MYSQL_URL
+            url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
+            test: tests/Integration/SearchKit/WorkflowRequestSearchMySqlContractTest.php
+          - image: 'mariadb:11.4'
+            port: 3306
+            health: 'healthcheck.sh --connect --innodb_initialized'
+            url_var: NOWO_WORKFLOW_TEST_MYSQL_URL
+            url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
+            test: tests/Integration/SearchKit/WorkflowRequestSearchMySqlContractTest.php
+          - image: 'postgres:16'
+            port: 5432
+            health: 'pg_isready -U postgres'
+            url_var: NOWO_WORKFLOW_TEST_PGSQL_URL
+            url: 'pdo-pgsql://postgres@127.0.0.1:5432/workflow'
+            test: tests/Integration/SearchKit/WorkflowRequestSearchPostgreSqlContractTest.php
+
+    services:
+      database:
+        image: ${{ matrix.db.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: workflow
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: workflow
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: workflow
+        ports:
+          - ${{ matrix.db.port }}:${{ matrix.db.port }}
+        options: >-
+          --health-cmd="${{ matrix.db.health }}"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, pdo_pgsql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: SearchKit (PHP >= 8.3)
+        run: bash .github/ci/search-kit.sh --install
+
+      - name: SearchKit contract
+        env:
+          ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.test }}
+
   cs-check:
     name: Code Style Check
     runs-on: ubuntu-latest
@@ -307,11 +383,15 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          # Since 1.21.0: 8.4, so the SearchKit group is analysed (the dependency-floor job still runs PHPStan on 8.2).
+          php-version: '8.4'
           tools: composer:v2
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: SearchKit (PHP >= 8.3)
+        run: bash .github/ci/search-kit.sh --install
 
       - name: PHPStan (level and ignoreErrors from phpstan.neon.dist; fails the build on any error)
         run: composer phpstan --no-interaction

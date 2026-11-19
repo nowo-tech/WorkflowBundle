@@ -9,6 +9,7 @@
   - [Deprecated keys (since 1.9, removed in 2.0)](#deprecated-keys-since-19-removed-in-20)
 - [Host layout integration (REQ-UI-003)](#host-layout-integration-req-ui-003)
 - [Protecting the CRUD UI (REQ-UI-002)](#protecting-the-crud-ui-req-ui-002)
+- [Header search (SearchKit, 1.21)](#header-search-searchkit-121)
 
 ```yaml
 # config/packages/nowo_workflow.yaml
@@ -253,3 +254,41 @@ security:
 ```
 
 See [SECURITY.md](SECURITY.md#protecting-the-crud-ui).
+
+## Header search (SearchKit, 1.21)
+
+The SearchKit group `workflow_requests` ([USAGE](USAGE.md#header-search-the-workflow-requests-searchkit-121)). It is
+registered only when `enabled` is true **and** SearchKit 1.9 or later is installed (PHP 8.3 or later). Every
+`*_field` is a mapped field (not an association) of `subject_class`: letters, digits and `_`, checked when the
+container is built and against the entity metadata on every search.
+
+```yaml
+nowo_workflow:
+    search_kit:
+        enabled: false               # true needs subject_class, route and gate
+        group: workflow_requests     # SearchKit group key
+        priority: 0                  # tag priority among the SearchKit providers
+        subject_class: ~             # the request entity (Doctrine ORM)
+        gate: ~                      # service id: WorkflowRequestSearchGateInterface
+        id_field: id                 # in the URL, the access event and recents
+        title_field: title           # searched and shown
+        status_field: status         # the marking: searched and shown as the status
+        tenant_field: ~              # compared with the gate's tenant in SQL (null: no tenant condition)
+        archived_field: ~            # nullable: not null = never searched
+        order_field: ~               # newest first (null: id_field)
+        excluded_statuses: []        # never searched (e.g. draft, cancelled)
+        route: ~                     # one request (required)
+        route_id_parameter: id
+        route_parameters: {}
+        see_all_route: ~             # the requests list filtered by ?q= (null: no "see all")
+        see_all_parameters: {}
+        status_label_domain: ~       # null: the place name is shown
+        status_label_prefix: ''
+        icon: 'tabler:checklist'
+        sensitive: true              # off while recents are kept without revalidation
+        max_candidates: 100          # 1–1000: rows read and checked per search
+        min_length: 0
+```
+
+Switch the group off or reorder it for every provider with SearchKit's own
+`nowo_search_kit.groups.workflow_requests: { enabled: false, priority: 60 }`.

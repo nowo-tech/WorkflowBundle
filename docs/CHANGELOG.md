@@ -60,7 +60,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- SearchKit group `workflow_requests` (SearchKit 1.9 or later, PHP 8.3 or later; optional, in `suggest`): the host's workflow requests by title and status in the search palette and the results page, only those the viewer may see. Configure it with `nowo_workflow.search_kit` (request entity, fields, route, "see all" route, status labels). The tenant and the feature switch come from the new host port `WorkflowRequestSearchGateInterface`; `view` is decided by the new `WorkflowRequestAccessCheckEvent` (deny by default, deny wins, one event per search with ids and statuses only), so the host's own access rules apply. Tenant, archived rows and excluded statuses are filtered in SQL; one query per search plus the host's check. A result shows only the title and the status label. The group is `sensitive` by default (off while recents are kept in the browser without revalidation). Stateless in FrankenPHP worker mode.
+- CI: `.github/ci/search-kit.sh` adds SearchKit on PHP 8.3 or later only; new `search-kit-databases` job runs SearchKit's provider contract on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16.
+
 ### Changed
+
+- CI: coverage and PHPStan run on PHP 8.4 (were 8.2), so the SearchKit group is covered and analysed; the dependency-floor job still runs PHPStan and the tests on 8.2.
 
 - CI: new `deps-floor` job (as in BreadcrumbKit). It checks that the demo lock installs every nowo-tech requirement of the bundle (`.scripts/check-demo-lock.py`), then downgrades nowo-tech/transaction-* to the lowest versions composer.json allows (`composer update 'nowo-tech/transaction-*' --prefer-lowest`) and runs PHPStan and the tests there, so a call to a newer API than the constraint allows fails the pull request.
 

@@ -33,6 +33,9 @@ services:
             - '../../EventListener/WorkflowUiRouteContextSubscriber.php'
             - '../../Service/WorkflowVersioning.php'
             - '../../Service/WorkflowVersionManager.php'
+            # Since 1.21: the SearchKit group (registered by the extension only with SearchKit) and its options VO.
+            - '../../Bridge/'
+            - '../../Search/'
 
     # Routes stay opt-in (REQ-SF-004 rule 7): controllers are not autoconfigured, so the #[Route] classes never get
     # the `routing.controller` tag and a host `routing.controllers` import does not mount them without the prefix.
