@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Integration\SearchKit;
 
+use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Nowo\SearchKitBundle\Model\SearchGroup;
 use Nowo\SearchKitBundle\Model\SearchItem;
 use Nowo\SearchKitBundle\Model\SearchReference;
@@ -132,9 +133,9 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
     }
 
     /**
-     * The bound narrower values of one search are capped at 60,000 in all (PostgreSQL allows 65,535 parameters): at
-     * the cap the query runs and finds the right rows; one more value, or several fields over it together, fail
-     * closed before any SQL with the documented warning.
+     * The bound narrower values of one search are capped in all by platform — 60,000 (PostgreSQL allows 65,535
+     * parameters), 32,000 on SQLite (32,766 variables): at the cap the query runs and finds the right rows; one more
+     * value, or several fields over it together, fail closed before any SQL with the documented warning.
      */
     public function testNarrowerValuesAreCappedInAll(): void
     {
@@ -161,16 +162,18 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
             return (new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker));
         };
 
+        $limit  = $this->harness->em->getConnection()->getDatabasePlatform() instanceof SQLitePlatform ? WorkflowRequestSearchCriteria::SQLITE_MAX_TOTAL_VALUES : WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES;
         $logger = new RecordingLogger();
-        $group  = $search(static fn (WorkflowRequestSearchCriteria $c): WorkflowRequestSearchCriteria => $c->whereIn('ownerIdentifier', $owners(60000)), $logger);
+        $group  = $search(static fn (WorkflowRequestSearchCriteria $c): WorkflowRequestSearchCriteria => $c->whereIn('ownerIdentifier', $owners($limit)), $logger);
         self::assertInstanceOf(SearchGroup::class, $group, 'at the cap');
         self::assertSame([$this->url($visible)], array_map(static fn (SearchItem $item): string => $item->url, $group->items));
         self::assertSame([], $logger->records);
 
         foreach ([
-            'one over the cap' => static fn (WorkflowRequestSearchCriteria $c): WorkflowRequestSearchCriteria => $c->whereIn('ownerIdentifier', $owners(60001)),
-            'several fields'   => static function (WorkflowRequestSearchCriteria $c) use ($owners): void {
-                for ($i = 0; $i < 7; ++$i) {
+            'one over the cap' => static fn (WorkflowRequestSearchCriteria $c): WorkflowRequestSearchCriteria => $c->whereIn('ownerIdentifier', $owners($limit + 1)),
+            'several fields'   => static function (WorkflowRequestSearchCriteria $c) use ($owners, $limit): void {
+                $c->whereAny(['ownerIdentifier' => $owners(10000), 'title' => 'x']);
+                for ($i = 10001; $i <= $limit + 1; $i += 10000) {
                     $c->whereIn('ownerIdentifier', $owners(10000));
                 }
             },
@@ -178,8 +181,8 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
             $logger = new RecordingLogger();
             self::assertNull($search($rule, $logger), $case);
             self::assertSame(0, $this->harness->counter->count(), $case . ': no SQL');
-            self::assertSame(60000, $logger->records[0]['context']['limit'] ?? null, $case . ': the documented warning');
-            self::assertGreaterThan(60000, $logger->records[0]['context']['total']);
+            self::assertSame($limit, $logger->records[0]['context']['limit'] ?? null, $case . ': the documented warning');
+            self::assertGreaterThan($limit, $logger->records[0]['context']['total']);
         }
     }
 

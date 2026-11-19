@@ -25,7 +25,8 @@ interface WorkflowRequestTitleResolverInterface
      * @param int|string $tenant the gate's tenant of the search
      * @param string|null $locale the search locale
      *
-     * @return array<string, string> id => title; an id left out falls back to `title_field`, else an empty title
+     * @return array<string, string> id => title; an id left out shows the generic translated title
+     *                               (`search.untitled_request`), never the `title_field` column (fail closed)
      */
     public function titles(string $subject, array $ids, string $userIdentifier, int|string $tenant, ?string $locale): array;
 }

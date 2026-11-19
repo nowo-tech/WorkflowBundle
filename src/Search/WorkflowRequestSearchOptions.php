@@ -233,6 +233,19 @@ final readonly class WorkflowRequestSearchOptions
         return max(1, min($this->maxCandidates, self::MAX_CANDIDATES));
     }
 
+    /**
+     * A configured value as a string (an int such as a status `0` or a route year `2026` included); anything else is
+     * refused, never dropped.
+     */
+    private static function scalar(mixed $value, string $key): string
+    {
+        if (is_string($value) || is_int($value)) {
+            return (string) $value;
+        }
+
+        throw new InvalidArgumentException(sprintf('nowo_workflow.search_kit.subjects: %s must hold strings or integers.', $key));
+    }
+
     private function check(string $pattern, string $value, string $name, string $option): void
     {
         if (preg_match($pattern, $value) !== 1) {
@@ -261,9 +274,7 @@ final readonly class WorkflowRequestSearchOptions
     {
         $values = [];
         foreach (is_array($config[$key] ?? null) ? $config[$key] : [] as $value) {
-            if (is_string($value)) {
-                $values[] = $value;
-            }
+            $values[] = self::scalar($value, $key);
         }
 
         return $values;
@@ -278,9 +289,7 @@ final readonly class WorkflowRequestSearchOptions
     {
         $values = [];
         foreach (is_array($config[$key] ?? null) ? $config[$key] : [] as $name => $value) {
-            if (is_string($name) && is_string($value)) {
-                $values[$name] = $value;
-            }
+            $values[(string) $name] = self::scalar($value, $key);
         }
 
         return $values;

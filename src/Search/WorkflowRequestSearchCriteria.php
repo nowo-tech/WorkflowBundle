@@ -9,6 +9,7 @@ use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchNarrowerInterface;
 
 use function array_values;
 use function count;
+use function in_array;
 use function is_array;
 use function preg_match;
 use function sprintf;
@@ -21,9 +22,9 @@ use function sprintf;
  * - {@see none()}: the viewer may see nothing — the search gives no group before any SQL runs.
  * - `whereIn($field, [])`: that field matches nothing (it compiles to `1 = 0` in the query).
  * - Long lists: the definition splits a field's values into IN lists of {@see CHUNK} values, ORed, each one its own
- *   bound parameter. More than the subject's `narrower_max_values` values in one field, or more than
- *   {@see MAX_TOTAL_VALUES} values in all, fails closed: no group, no SQL and a logged warning, never a silently cut
- *   list.
+ *   bound parameter. More than the subject's `narrower_max_values` values in one field (over every call), or more
+ *   bound values in all than the platform allows ({@see MAX_TOTAL_VALUES}, {@see SQLITE_MAX_TOTAL_VALUES} on SQLite),
+ *   fails closed: no group, no SQL and a logged warning, never a silently cut list.
  */
 final class WorkflowRequestSearchCriteria
 {
@@ -36,6 +37,9 @@ final class WorkflowRequestSearchCriteria
     /** The most values of all fields together (bound parameters of one query stay under the 65535 of PostgreSQL). */
     public const MAX_TOTAL_VALUES = 60000;
 
+    /** The same on SQLite, which allows 32766 variables per statement. */
+    public const SQLITE_MAX_TOTAL_VALUES = 32000;
+
     /** @var list<array<string, list<int|string>>> */
     private array $conditions = [];
 
@@ -45,6 +49,9 @@ final class WorkflowRequestSearchCriteria
 
     /** @var list<string> fields given more values than allowed */
     private array $overflow = [];
+
+    /** @var array<string, int> values given so far per field, over every call */
+    private array $fieldValues = [];
 
     /**
      * @param int $maxValues the most values of one field (the subject's `narrower_max_values`)
@@ -83,7 +90,9 @@ final class WorkflowRequestSearchCriteria
             $values = is_array($values) ? array_values($values) : [$values];
             // @igor-ignore - per-search criteria object, created for one search and never reused (not a service)
             $this->total += count($values);
-            if (count($values) > $this->maxValues) {
+            // @igor-ignore - per-search criteria object, created for one search and never reused (not a service)
+            $this->fieldValues[$field] = ($this->fieldValues[$field] ?? 0) + count($values);
+            if ($this->fieldValues[$field] > $this->maxValues && !in_array($field, $this->overflow, true)) {
                 // @igor-ignore - per-search criteria object, created for one search and never reused (not a service)
                 $this->overflow[] = $field;
             }
@@ -126,14 +135,8 @@ final class WorkflowRequestSearchCriteria
         return $this->total;
     }
 
-    /** Whether one field has more than {@see $maxValues} values, or all of them more than {@see MAX_TOTAL_VALUES}. */
-    public function exceedsLimits(): bool
-    {
-        return $this->overflow !== [] || $this->total > self::MAX_TOTAL_VALUES;
-    }
-
     /**
-     * The fields given more than {@see $maxValues} values (the search then fails closed).
+     * The fields given more than {@see $maxValues} values over all calls (the search then fails closed).
      *
      * @return list<string>
      */

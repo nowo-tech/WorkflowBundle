@@ -71,7 +71,7 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
             'order_field'         => 'updatedAt',
             'excluded_statuses'   => ['draft', 7, 'cancelled'],
             'route_id_parameter'  => 'uuid',
-            'route_parameters'    => ['area' => 'leave', 0 => 'ignored', 'n' => 1],
+            'route_parameters'    => ['area' => 'leave', 'year' => 2026],
             'see_all_route'       => 'leave_index',
             'see_all_parameters'  => ['tab' => 'mine'],
             'label'               => 'search.leave',
@@ -91,9 +91,9 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
         self::assertSame(['uuid', 'searchText', null, 'workflowPlace', null, 'deletedAt', 'updatedAt'], [$options->idField, $options->searchTextField, $options->titleField, $options->statusField, $options->tenantField, $options->archivedField, $options->orderField]);
         self::assertSame('searchText', $options->searchField());
         self::assertTrue($options->singleTenant);
-        self::assertSame(['draft', 'cancelled'], $options->excludedStatuses);
+        self::assertSame(['draft', '7', 'cancelled'], $options->excludedStatuses, 'an integer status is kept as a string');
         self::assertSame('uuid', $options->routeIdParameter);
-        self::assertSame(['area' => 'leave'], $options->routeParameters);
+        self::assertSame(['area' => 'leave', 'year' => '2026'], $options->routeParameters, 'an integer parameter is kept as a string');
         self::assertSame('leave_index', $options->seeAllRoute);
         self::assertSame(['tab' => 'mine'], $options->seeAllParameters);
         self::assertSame(['search.leave', 'messages'], [$options->label, $options->labelDomain]);
@@ -137,6 +137,8 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
         yield 'see-all parameter name' => [['see_all_parameters' => ['a b' => 'x']], 'route parameter is not valid'];
         yield 'label with a space' => [['label' => 'a b'], 'label is not valid'];
         yield 'empty excluded status' => [['excluded_statuses' => ['']], 'must not hold an empty status'];
+        yield 'non-scalar excluded status' => [['excluded_statuses' => [['draft']]], 'excluded_statuses must hold strings or integers'];
+        yield 'non-scalar route parameter' => [['route_parameters' => ['year' => 20.26]], 'route_parameters must hold strings or integers'];
         yield 'too many candidates' => [['max_candidates' => 1001], 'max_candidates must be 1 to 1000'];
         yield 'no candidates' => [['max_candidates' => 0], 'max_candidates'];
         yield 'negative min length' => [['min_length' => -1], 'min_length'];

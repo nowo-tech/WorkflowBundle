@@ -117,6 +117,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['title_field' => 'searchText']));
         $query      = $this->query('x');
         $context    = new SearchItemContext();
+        self::assertTrue($definition->featureEnabled(self::TENANT, $query));
 
         $definition->prepareItems([$this->find($id), $this->find($id)], $query, $context);
         self::assertSame([(string) $id], $this->harness->titles->calls[0]['ids'], 'one id once');
@@ -144,17 +145,37 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     }
 
     #[Test]
-    public function noTenantOrNoRowsNoTitleLookup(): void
+    public function noDecidedSearchOrNoRowsNoTitleLookup(): void
     {
-        $id      = $this->harness->insert(self::TENANT, 'x');
-        $context = new SearchItemContext();
-        $this->harness->definition()->prepareItems([], $this->query('x'), $context);
-        $this->harness->gate->viewer = 'someone-else';
-        $this->harness->definition()->prepareItems([$this->find($id)], $this->query('x'), $context);
-        $this->harness->definition('purchase')->prepareItems([$this->find($id)], $this->query('x'), $context);
+        $id         = $this->harness->insert(self::TENANT, 'x');
+        $context    = new SearchItemContext();
+        $definition = $this->harness->definition();
+        $query      = $this->query('x');
+
+        $definition->prepareItems([$this->find($id)], $query, $context);
+        self::assertSame('Request', $definition->toPreparedItem($this->find($id), $query, $context)->title, 'no search decided a tenant: generic title');
+        self::assertTrue($definition->featureEnabled(self::TENANT, $query));
+        $definition->prepareItems([], $query, $context);
+        $this->harness->definition('purchase')->prepareItems([$this->find($id)], $query, $context);
 
         self::assertSame([], $this->harness->titles->calls);
         self::assertFalse($context->has('workflow_request_titles'));
+    }
+
+    #[Test]
+    public function titlesUseTheTenantTheSearchDecidedNotAGateAskedAgain(): void
+    {
+        $id         = $this->harness->insert(self::TENANT, 'x');
+        $definition = $this->harness->definition();
+        $query      = $this->query('x');
+        self::assertTrue($definition->featureEnabled(self::TENANT, $query));
+        $definition->baseQuery(self::TENANT, $query);
+
+        $this->harness->gate->tenant = self::TENANT + 1; // the gate changes its answer mid-search
+        $this->harness->gate->viewer = 'someone-else';
+        $definition->prepareItems([$this->find($id)], $query, new SearchItemContext());
+
+        self::assertSame([['leave', self::TENANT]], array_map(static fn (array $call): array => [$call['subject'], $call['tenant']], $this->harness->titles->calls));
     }
 
     #[Test]
@@ -236,6 +257,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['route_parameters' => ['tab' => 'details']]));
         $query      = $this->query('x');
         $context    = new SearchItemContext();
+        self::assertTrue($definition->featureEnabled(self::TENANT, $query));
         $definition->prepareItems([$this->find($id)], $query, $context);
 
         $item = $definition->toPreparedItem($this->find($id), $query, $context);
@@ -357,6 +379,18 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         self::assertCount(1, $narrower->calls);
         $definition->baseQuery(self::TENANT + 1, $query);
         self::assertSame([self::TENANT, self::TENANT + 1], array_map(static fn (array $call): int|string => $call[2], $narrower->calls), 'another tenant asks again');
+    }
+
+    #[Test]
+    public function sqliteHasTheLowerTotalLimit(): void
+    {
+        $values     = array_map('strval', range(1, WorkflowRequestSearchCriteria::SQLITE_MAX_TOTAL_VALUES + 1));
+        $logger     = new RecordingLogger();
+        $narrower   = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->whereIn('ownerIdentifier', $values));
+        $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['narrower_max_values' => 60000]), narrower: $narrower, logger: $logger);
+
+        self::assertFalse($definition->featureEnabled(self::TENANT, $this->query('x')), '32001 values on SQLite (32766 variables)');
+        self::assertSame(WorkflowRequestSearchCriteria::SQLITE_MAX_TOTAL_VALUES, $logger->records[0]['context']['limit']);
     }
 
     #[Test]

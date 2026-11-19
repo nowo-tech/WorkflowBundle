@@ -277,7 +277,7 @@ nowo_workflow:
                 gate: ~                  # service id: WorkflowRequestSearchGateInterface, required
                 title_resolver: ~        # service id: WorkflowRequestTitleResolverInterface (or title_field)
                 narrower: ~              # service id: WorkflowRequestSearchNarrowerInterface (optional)
-                narrower_max_values: 10000  # most values per field (IN lists of 1000; at most 60000, and 60000 in all); more = no group + warning
+                narrower_max_values: 10000  # most values per field over every call (IN lists of 1000; at most 60000; 60000 in all, 32000 on SQLite); more = no group + warning
                 id_field: id             # in the URL, the access event, the resolver and recents
                 search_text_field: ~     # viewer-neutral text the host maintains (or title_field)
                 title_field: ~           # shown without a resolver; searched without a search text
@@ -286,10 +286,10 @@ nowo_workflow:
                 single_tenant: false     # true: no tenant condition (never with tenant_field)
                 archived_field: ~        # nullable: not null = never searched
                 order_field: ~           # newest first (null: id_field)
-                excluded_statuses: []    # stored statuses never searched (e.g. draft, cancelled)
+                excluded_statuses: []    # stored statuses never searched (e.g. draft, cancelled; strings or integers)
                 route: ~                 # one request, required
                 route_id_parameter: id
-                route_parameters: {}
+                route_parameters: {}     # fixed parameters (strings or integers, e.g. {year: 2026})
                 see_all_route: ~         # the requests list filtered by ?q= (null: no "see all")
                 see_all_parameters: {}
                 label: search.group.workflow_requests  # group label key

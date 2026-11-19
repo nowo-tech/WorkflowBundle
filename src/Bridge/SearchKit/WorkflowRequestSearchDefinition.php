@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Bridge\SearchKit;
 
+use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
@@ -80,8 +81,8 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
     /** Translation key of the generic title of a request without one. */
     public const UNTITLED = 'search.untitled_request';
 
-    /** @var WeakMap<SearchQuery, array{tenant: int|string, criteria: WorkflowRequestSearchCriteria}> the narrowing of one search, keyed by its query (and its tenant) */
-    private readonly WeakMap $criteria;
+    /** @var WeakMap<SearchQuery, array{tenant: int|string, criteria: ?WorkflowRequestSearchCriteria}> one search's decided tenant and narrowing, keyed by its query */
+    private readonly WeakMap $searches;
 
     /** Key of the resolved titles in the SearchItemContext of a render. */
     private const CONTEXT_TITLES = 'workflow_request_titles';
@@ -97,7 +98,7 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         private readonly ?WorkflowRequestSearchNarrowerInterface $narrower = null,
         private readonly ?LoggerInterface $logger = null,
     ) {
-        $this->criteria = new WeakMap();
+        $this->searches = new WeakMap();
     }
 
     public function group(): string
@@ -128,24 +129,25 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
 
     /**
      * The gate's switch, then the narrowing: a narrower that gives {@see WorkflowRequestSearchCriteria::none()} — or
-     * more values for a field than `narrower_max_values`, or more than
-     * {@see WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES} in all (logged) — leaves no group, before any SQL runs.
+     * more values for a field than `narrower_max_values`, or more bound values in all than the platform allows
+     * ({@see totalLimit()}; logged) — leaves no group, before any SQL runs. The decided tenant is recorded for the
+     * search (its query), so prepareItems() resolves titles for that tenant.
      */
     public function featureEnabled(int|string $tenant, SearchQuery $query): bool
     {
         if (!$this->gate->isEnabled($tenant, $query->userIdentifier)) {
             return false;
         }
-        $criteria = $this->criteria($tenant, $query);
+        $criteria = $this->narrowing($tenant, $query);
         if (!$criteria instanceof WorkflowRequestSearchCriteria) {
             return true;
         }
-        if ($criteria->exceedsLimits()) {
+        if ($this->exceedsLimits($criteria)) {
             $this->logger?->warning('Workflow request search: the narrower of subject "{subject}" gave too many values ({total} in all, limit {limit}; more than {max} for: {fields}); no results (fail closed).', [
                 'bundle'  => 'NowoWorkflowBundle',
                 'subject' => $this->options->subject,
                 'total'   => $criteria->totalValues(),
-                'limit'   => WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES,
+                'limit'   => $this->totalLimit($criteria),
                 'max'     => $criteria->maxValues,
                 'fields'  => implode(', ', $criteria->overflowingFields()),
             ]);
@@ -185,7 +187,7 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         if ($options->excludedStatuses !== []) {
             $qb->andWhere(sprintf('%s NOT IN (:workflow_request_excluded)', $this->field($options->statusField)))->setParameter('workflow_request_excluded', $options->excludedStatuses);
         }
-        $criteria = $this->criteria($tenant, $query);
+        $criteria = $this->narrowing($tenant, $query);
         if ($criteria instanceof WorkflowRequestSearchCriteria) {
             $this->narrow($criteria, $qb, $metadata);
         }
@@ -224,19 +226,20 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
      * kept in this render's context. SearchKit calls it once per page with exactly the shown rows (after the access
      * event, SearchKit's host event and the page cut) and once per resolved recent: never with a hidden row.
      *
+     * The tenant is the one this search decided (featureEnabled() / baseQuery() of the same query), never asked again:
+     * without one (no such search) the resolver is not called and the rows show the generic title (fail closed).
+     *
      * @param list<array<string, mixed>|object> $shownRows
      */
     public function prepareItems(array $shownRows, SearchQuery $query, SearchItemContext $context): void
     {
-        if (!$this->titleResolver instanceof WorkflowRequestTitleResolverInterface || $shownRows === []) {
+        $search = $this->searches[$query] ?? null;
+        if (!$this->titleResolver instanceof WorkflowRequestTitleResolverInterface || $shownRows === [] || $search === null) {
             return;
         }
-        $tenant = $this->gate->tenantOf($query->userIdentifier);
-        if ($tenant === null) {
-            return;
-        }
-        $ids  = [];
-        $seen = [];
+        $tenant = $search['tenant'];
+        $ids    = [];
+        $seen   = [];
         foreach ($shownRows as $row) {
             $id = $this->requestId($row);
             if (!isset($seen[$id])) {
@@ -329,25 +332,47 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
     }
 
     /**
-     * The narrowing of this search (null without a narrower): asked once per query object and tenant, and kept with
-     * the query (a WeakMap keyed by it, so featureEnabled() and baseQuery() of one search share it and it goes with the
-     * query; another tenant asks again).
+     * Records the tenant this search decided and returns its narrowing (null without a narrower): asked once per query
+     * object and tenant, and kept with the query (a WeakMap keyed by it: featureEnabled(), baseQuery() and
+     * prepareItems() of one search share it and it goes with the query; another tenant asks again).
      */
-    private function criteria(int|string $tenant, SearchQuery $query): ?WorkflowRequestSearchCriteria
+    private function narrowing(int|string $tenant, SearchQuery $query): ?WorkflowRequestSearchCriteria
     {
-        if (!$this->narrower instanceof WorkflowRequestSearchNarrowerInterface) {
-            return null;
+        $search = $this->searches[$query] ?? null;
+        if ($search !== null && $search['tenant'] === $tenant) {
+            return $search['criteria'];
         }
-        $memo = $this->criteria[$query] ?? null;
-        if ($memo !== null && $memo['tenant'] === $tenant) {
-            return $memo['criteria'];
+        $criteria = null;
+        if ($this->narrower instanceof WorkflowRequestSearchNarrowerInterface) {
+            $criteria = new WorkflowRequestSearchCriteria($this->options->narrowerMaxValues);
+            $this->narrower->narrow($this->options->subject, $criteria, $query->userIdentifier, $tenant);
         }
-        $criteria = new WorkflowRequestSearchCriteria($this->options->narrowerMaxValues);
-        $this->narrower->narrow($this->options->subject, $criteria, $query->userIdentifier, $tenant);
         // @igor-ignore - keyed by the search's own query object: the entry goes with that query (WeakMap)
-        $this->criteria[$query] = ['tenant' => $tenant, 'criteria' => $criteria];
+        $this->searches[$query] = ['tenant' => $tenant, 'criteria' => $criteria];
 
         return $criteria;
+    }
+
+    /** Whether the narrowing breaks a per-field limit or the platform's total limit. */
+    private function exceedsLimits(WorkflowRequestSearchCriteria $criteria): bool
+    {
+        return $criteria->overflowingFields() !== [] || $criteria->totalValues() > $this->totalLimit($criteria);
+    }
+
+    /**
+     * The most bound narrower values of one query on this connection: {@see WorkflowRequestSearchCriteria::SQLITE_MAX_TOTAL_VALUES}
+     * on SQLite (32766 variables), else {@see WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES} (PostgreSQL: 65535). The
+     * platform is only read when the total could exceed the lower limit.
+     */
+    private function totalLimit(WorkflowRequestSearchCriteria $criteria): int
+    {
+        if ($criteria->totalValues() <= WorkflowRequestSearchCriteria::SQLITE_MAX_TOTAL_VALUES) {
+            return WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES;
+        }
+
+        return $this->entityManager()->getConnection()->getDatabasePlatform() instanceof SQLitePlatform
+            ? WorkflowRequestSearchCriteria::SQLITE_MAX_TOTAL_VALUES
+            : WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES;
     }
 
     /**
@@ -359,7 +384,7 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
      */
     private function narrow(WorkflowRequestSearchCriteria $criteria, QueryBuilder $qb, ClassMetadata $metadata): void
     {
-        if ($criteria->isNone() || $criteria->exceedsLimits()) {
+        if ($criteria->isNone() || $this->exceedsLimits($criteria)) {
             $qb->andWhere('1 = 0');
 
             return;

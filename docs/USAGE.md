@@ -361,7 +361,7 @@ final readonly class ApproveExpense
 
 ## Header search: the workflow requests (SearchKit, 1.21)
 
-With [SearchKit](https://github.com/nowo-tech/SearchKitBundle) 1.9 or later installed (it needs PHP 8.3 or later; it
+With [SearchKit](https://github.com/nowo-tech/SearchKitBundle) 1.10 or later installed (it needs PHP 8.3 or later; it
 stays optional), the bundle adds one group to the search palette and the results page **per request type** you
 declare: your workflow requests (leave requests, purchase requests…), only those the viewer may see.
 
@@ -399,6 +399,7 @@ nowo_workflow:
                 subject_class: App\Purchase\PurchaseRequest
                 gate: App\Purchase\PurchaseSearchGate
                 title_field: title                            # searched and shown
+                sensitive: false                              # purchase titles are not private (no narrower needed)
                 status_field: place
                 tenant_field: companyId
                 route: purchase_show
@@ -476,7 +477,8 @@ final class LeaveSearchAccess
 
 The shown title comes from the subject's `title_resolver`, in **one** batch per results page, with exactly the ids
 shown on that page (after the access event, SearchKit's host event and the page cut), and once per revalidated recent:
-never with an id the viewer may not see. A title may depend on the viewer (*Absent* instead of a medical leave
+never with an id the viewer may not see. It gets the tenant that search decided (the gate is not asked again); a
+render without a decided search shows the generic title. A title may depend on the viewer (*Absent* instead of a medical leave
 type, as on your requests list). It **fails closed**: an id it leaves out shows the generic title
 (`search.untitled_request`, *Request*), never the `title_field` column. Without a resolver, `title_field` is shown (the
 generic title when it is empty). The bundle cuts titles to 200 characters; SearchKit escapes them.
@@ -535,8 +537,9 @@ final class LeaveSearchNarrower implements WorkflowRequestSearchNarrowerInterfac
   candidates, no window places, no title lookup).
 - `whereIn($field, [])`: that field matches nothing (it compiles to `1 = 0`); the query still runs and finds nothing.
 - Long lists: a field's values are split into IN lists of 1,000 values, ORed, each its own bound parameter. More than
-  `narrower_max_values` values in one field (default 10,000, at most 60,000), or more than 60,000 values in all the
-  conditions together (a query's bound parameters stay under PostgreSQL's 65,535), **fails closed**: no group, no SQL
+  `narrower_max_values` values in one field (default 10,000, at most 60,000; counted over every call), or more bound
+  values in all the conditions together than the platform allows (60,000, under PostgreSQL's 65,535 parameters; 32,000
+  on SQLite, which allows 32,766), **fails closed**: no group, no SQL
   and a logged warning (subject, total and limits; never the values). A list is never cut silently.
 
 The narrower is asked once per search (and once per revalidated recent).

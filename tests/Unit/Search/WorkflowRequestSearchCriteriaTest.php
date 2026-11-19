@@ -24,7 +24,6 @@ final class WorkflowRequestSearchCriteriaTest extends TestCase
         self::assertFalse($criteria->isNone());
         self::assertSame([], $criteria->overflowingFields());
         self::assertSame(5, $criteria->totalValues());
-        self::assertFalse($criteria->exceedsLimits());
         self::assertSame([['requesterId' => [5], 'approverId' => [5, 6]], ['departmentId' => [1, 2]]], $criteria->conditions());
         self::assertTrue($criteria->none()->isNone());
     }
@@ -51,22 +50,27 @@ final class WorkflowRequestSearchCriteriaTest extends TestCase
     {
         $criteria = (new WorkflowRequestSearchCriteria(3))->whereIn('id', [1, 2, 3])->whereAny(['userId' => range(1, 4), 'id' => 1]);
 
-        self::assertSame(['userId'], $criteria->overflowingFields());
+        self::assertSame(['userId', 'id'], $criteria->overflowingFields(), 'id: 3 + 1 over two calls');
         self::assertSame(range(1, 4), $criteria->conditions()[1]['userId'], 'kept whole: the search fails closed instead');
         self::assertSame(8, $criteria->totalValues());
-        self::assertTrue($criteria->exceedsLimits());
     }
 
     #[Test]
-    public function theTotalOfAllFieldsIsCapped(): void
+    public function aFieldIsCountedOverEveryCall(): void
     {
-        $atCap = new WorkflowRequestSearchCriteria(30000);
-        $atCap->whereIn('userId', range(1, 30000))->whereAny(['userId' => range(1, 29999), 'approverId' => 1]);
-        self::assertSame(WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES, $atCap->totalValues());
-        self::assertFalse($atCap->exceedsLimits());
+        $criteria = (new WorkflowRequestSearchCriteria(10))->whereIn('userId', range(1, 6))->whereAny(['userId' => range(1, 4), 'id' => 1]);
+        self::assertSame([], $criteria->overflowingFields(), 'exactly 10');
 
-        $over = $atCap->whereIn('approverId', [2]);
-        self::assertSame([], $over->overflowingFields());
-        self::assertTrue($over->exceedsLimits());
+        $criteria->whereIn('userId', [11])->whereIn('userId', [12]);
+        self::assertSame(['userId'], $criteria->overflowingFields(), 'listed once');
+    }
+
+    #[Test]
+    public function theTotalOfAllFieldsIsCounted(): void
+    {
+        $criteria = (new WorkflowRequestSearchCriteria(30000))->whereIn('userId', range(1, 30000))->whereAny(['approverId' => range(1, 29999), 'id' => 1]);
+
+        self::assertSame(WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES, $criteria->totalValues());
+        self::assertSame([], $criteria->overflowingFields());
     }
 }
