@@ -9,6 +9,7 @@
   - [Deprecated keys (since 1.9, removed in 2.0)](#deprecated-keys-since-19-removed-in-20)
 - [Host layout integration (REQ-UI-003)](#host-layout-integration-req-ui-003)
 - [Protecting the CRUD UI (REQ-UI-002)](#protecting-the-crud-ui-req-ui-002)
+- [Header search (SearchKit, 1.21)](#header-search-searchkit-121)
 
 ```yaml
 # config/packages/nowo_workflow.yaml
@@ -253,3 +254,66 @@ security:
 ```
 
 See [SECURITY.md](SECURITY.md#protecting-the-crud-ui).
+
+## Header search (SearchKit, 1.21)
+
+One SearchKit group per subject ([USAGE](USAGE.md#header-search-the-workflow-requests-searchkit-121)). The groups are
+registered only when `enabled` is true **and** SearchKit 1.10 or later is installed (PHP 8.3 or later; composer refuses
+an older SearchKit, and the bundle registers nothing without `prepareItems()`). When the container is built, the
+options are checked by shape: `*_field` names by pattern (letters, digits, `_`), service ids, routes, group keys (a
+lower-case letter first, never `nowo_search_`, unique across subjects), the tenant and side-channel rules. Whether each
+field is really a mapped field (not an association) of `subject_class` is checked against the entity metadata at
+search time: a wrong name fails the search loudly (SearchKit drops the group and logs it).
+
+```yaml
+nowo_workflow:
+    search_kit:
+        enabled: false                   # true needs at least one subject
+        subjects:
+            <subject>:                   # key: a lower-case letter, then a-z, 0-9, _ (in the event and the resolver)
+                group: ~                 # SearchKit group key (default workflow_<subject>)
+                priority: 0              # tag priority among the SearchKit providers
+                subject_class: ~         # the request entity (Doctrine ORM), required
+                gate: ~                  # service id: WorkflowRequestSearchGateInterface, required
+                title_resolver: ~        # service id: WorkflowRequestTitleResolverInterface (or title_field)
+                narrower: ~              # service id: WorkflowRequestSearchNarrowerInterface (optional)
+                narrower_max_values: 10000  # most values per field over every call (IN lists of 1000; at most 60000; 60000 in all, 32000 on SQLite); more = no group + warning
+                id_field: id             # in the URL, the access event, the resolver and recents
+                search_text_field: ~     # viewer-neutral text the host maintains (or title_field)
+                title_field: ~           # shown without a resolver; searched without a search text
+                status_field: status     # a place name or a string-backed enum column (its stored value is matched)
+                tenant_field: ~          # compared with the gate's tenant in SQL (required unless single_tenant)
+                single_tenant: false     # true: no tenant condition (never with tenant_field)
+                archived_field: ~        # nullable: not null = never searched
+                order_field: ~           # newest first (null: id_field)
+                excluded_statuses: []    # stored statuses never searched (e.g. draft, cancelled; strings or integers)
+                route: ~                 # one request, required
+                route_id_parameter: id
+                route_parameters: {}     # fixed parameters (strings or integers, e.g. {year: 2026})
+                see_all_route: ~         # the requests list filtered by ?q= (null: no "see all")
+                see_all_parameters: {}
+                label: search.group.workflow_requests  # group label key
+                label_domain: ~          # null: NowoWorkflowBundle
+                status_label_domain: ~   # null: the stored status is shown
+                status_label_prefix: ''
+                icon: 'tabler:checklist'
+                sensitive: true          # off while recents are kept without revalidation; needs a narrower or:
+                accept_window_side_channel: false  # true: hidden rows may take places in the window (see below)
+                max_candidates: 100      # 1–1000: rows read and checked per search (newest first)
+                min_length: 0
+```
+
+A subject needs `search_text_field` or `title_field` (what is searched) and `title_resolver` or `title_field` (what is
+shown). `search_text_field` must be viewer-neutral and never hold attachments, comments, justification, on-behalf
+reasons or any other health or legal data.
+
+A `sensitive` subject (the default) needs a `narrower` that filters in SQL what the viewer may not see, or an explicit
+`accept_window_side_channel: true`: rows hidden only by the access event take places in the bounded candidate window,
+so a viewer can notice them (fewer results, an inexact total). See
+[USAGE](USAGE.md#sensitive-subjects-a-narrower-or-the-side-channel-accepted).
+
+`single_tenant: true` means **every** request of the class is searched for every viewer the gate lets in (the access
+event still decides each row): use it only when the application has one tenant.
+
+Switch a group off or reorder it for every provider with SearchKit's own
+`nowo_search_kit.groups.<group>: { enabled: false, priority: 60 }`.

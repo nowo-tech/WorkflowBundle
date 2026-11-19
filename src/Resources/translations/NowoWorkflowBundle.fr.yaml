@@ -289,3 +289,9 @@ workflow_transition:
 scope:
   global: 'Modèle global'
   tenant: 'Cette organisation'
+
+# Since 1.21.0: the SearchKit group of the workflow requests (nowo_workflow.search_kit).
+search:
+  group:
+    workflow_requests: Demandes
+  untitled_request: Demande

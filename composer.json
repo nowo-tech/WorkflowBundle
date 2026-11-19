@@ -74,6 +74,9 @@
         "symfony/security-core": "^7.4 || ^8.0",
         "vincentlanglet/twig-cs-fixer": "^4.0"
     },
+    "conflict": {
+        "nowo-tech/search-kit-bundle": "<1.10"
+    },
     "autoload": {
         "psr-4": {
             "Nowo\\WorkflowBundle\\": "src/"
@@ -143,6 +146,7 @@
     },
     "suggest": {
         "nowo-tech/migrations-kit-bundle": "Runs nowo:migrations:check-key-collations, which asserts the declared identity key columns against the live schema (REQ-SEC-006)",
+        "nowo-tech/search-kit-bundle": "Since 1.21: the header search groups of workflow requests (SearchKit >= 1.10, PHP >= 8.3).",
         "symfony/flex": "For automatic recipe installation",
         "symfony/security-bundle": "Required for the private Workflow CRUD UI (or set security.allow_unauthenticated for local demos only)"
     }

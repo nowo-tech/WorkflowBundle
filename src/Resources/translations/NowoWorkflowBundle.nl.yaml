@@ -289,3 +289,9 @@ workflow_transition:
 scope:
   global: 'Globaal sjabloon'
   tenant: 'Deze organisatie'
+
+# Since 1.21.0: the SearchKit group of the workflow requests (nowo_workflow.search_kit).
+search:
+  group:
+    workflow_requests: Aanvragen
+  untitled_request: Aanvraag

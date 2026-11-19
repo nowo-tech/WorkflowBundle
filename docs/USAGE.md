@@ -16,6 +16,13 @@
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
   - [Keep the domain in charge](#keep-the-domain-in-charge)
   - [Known limitations](#known-limitations)
+- [Header search: the workflow requests (SearchKit, 1.21)](#header-search-the-workflow-requests-searchkit-121)
+  - [What is searched: the search text](#what-is-searched-the-search-text)
+  - [The gate and the access event](#the-gate-and-the-access-event)
+  - [Titles: the title resolver](#titles-the-title-resolver)
+  - [Narrowing in SQL (the candidate window)](#narrowing-in-sql-the-candidate-window)
+    - [Sensitive subjects: a narrower, or the side channel accepted](#sensitive-subjects-a-narrower-or-the-side-channel-accepted)
+  - [What a result shows](#what-a-result-shows)
 - [FrankenPHP / long-running workers](#frankenphp--long-running-workers)
 - [Overriding Twig templates (REQ-TWIG-001)](#overriding-twig-templates-req-twig-001)
 - [Overriding translations (REQ-I18N-001)](#overriding-translations-req-i18n-001)
@@ -351,6 +358,217 @@ final readonly class ApproveExpense
   `Model\WorkflowDefinitionRef` and returns a `Model\WorkflowDefinitionView`, never the definition entity, and adds
   the entity-free reads `currentVersion()`, `draftVersion()` and `versions()`. See
   [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Header search: the workflow requests (SearchKit, 1.21)
+
+With [SearchKit](https://github.com/nowo-tech/SearchKitBundle) 1.10 or later installed (it needs PHP 8.3 or later; it
+stays optional), the bundle adds one group to the search palette and the results page **per request type** you
+declare: your workflow requests (leave requests, purchase requests…), only those the viewer may see.
+
+Each request type is a **subject**: your Doctrine ORM entity, its fields, route, gate and labels
+([CONFIGURATION](CONFIGURATION.md#header-search-searchkit-121)). The subject key travels with the access event and the
+title resolver, so the host always knows which entity an id belongs to.
+
+```yaml
+# config/packages/nowo_workflow.yaml
+nowo_workflow:
+    search_kit:
+        enabled: true
+        subjects:
+            leave:
+                group: workflow_leave_requests              # the SearchKit group key
+                subject_class: App\Leave\LeaveRequest
+                gate: App\Leave\LeaveSearchGate             # WorkflowRequestSearchGateInterface
+                title_resolver: App\Leave\LeaveSearchTitles # WorkflowRequestTitleResolverInterface
+                narrower: App\Leave\LeaveSearchNarrower     # optional, WorkflowRequestSearchNarrowerInterface
+                id_field: uuid                                # in the URL, the event, the resolver, recents
+                search_text_field: searchText                 # viewer-neutral text the host maintains
+                status_field: status                          # a place name or a string-backed enum column
+                tenant_field: organizationId                  # compared with the gate's tenant in SQL
+                archived_field: deletedAt                     # not null = never searched
+                order_field: updatedAt                        # newest first
+                excluded_statuses: [draft]
+                route: leave_request_show
+                route_id_parameter: uuid
+                see_all_route: leave_request_index            # filters by ?q=
+                label: search.group.leave                     # group label key (label_domain: messages)
+                label_domain: messages
+                status_label_domain: messages
+                status_label_prefix: 'leave.status.'
+            purchase:                                         # the simple form: one title column
+                subject_class: App\Purchase\PurchaseRequest
+                gate: App\Purchase\PurchaseSearchGate
+                title_field: title                            # searched and shown
+                sensitive: false                              # purchase titles are not private (no narrower needed)
+                status_field: place
+                tenant_field: companyId
+                route: purchase_show
+```
+
+One search of a subject runs, in order: the group switch (`nowo_search_kit.groups.<group>`), the gate's tenant and
+feature switch, **one SQL query** (tenant, archived rows, excluded statuses and the narrowing as conditions; an
+escaped `LOWER(field) LIKE … ESCAPE '!'` of every word over the search text and the status; at most `max_candidates`
+rows, newest first), then **one** `WorkflowRequestAccessCheckEvent` for all candidates, SearchKit's own host event,
+then **one** title resolver call for the shown page. Any refusal gives no group at all: no count, no hint.
+
+Every subject needs a tenant: `tenant_field`, or `single_tenant: true` when every request of the class belongs to the
+one tenant (an application without tenants). The container refuses a subject with neither.
+
+### What is searched: the search text
+
+`search_text_field` is a column **you** maintain (on every change of the request, its person or its type), e.g. the
+person's display name, the leave type and the date range: `Ana García Holiday 2027-03-03 2027-03-07`. Without it,
+`title_field` is searched. The status is matched too, on its **stored** value: the place name (`pending`) or the
+backing value of a string-backed enum column (`LeaveStatus::Pending` → `pending`), never its translated label.
+
+The search text must be **viewer-neutral**: nothing that only some viewers may see. Anyone the access event lets see
+a request can find it by any word of its search text, so a word only managers may know (a medical leave type, a
+salary band) tells whoever finds the row by it. Health and legal data never go into it: **no attachments, comments,
+justification or on-behalf reason**, no approver notes, no request body. Put the viewer-dependent parts in the title
+resolver instead.
+
+### The gate and the access event
+
+The gate gives the viewer's tenant and the feature switch, on every search (never cached):
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchGateInterface;
+
+final class LeaveSearchGate implements WorkflowRequestSearchGateInterface
+{
+    public function tenantOf(string $userIdentifier): int|string|null
+    {
+        return $this->organizations->current($userIdentifier)?->getId(); // null: no results
+    }
+
+    public function isEnabled(int|string $tenant, string $userIdentifier): bool
+    {
+        return $this->features->leaveEnabled($tenant) && $this->members->isMember($tenant, $userIdentifier);
+    }
+}
+```
+
+Whether the viewer may see each request is **your** access rule, applied in a listener of
+`WorkflowRequestAccessCheckEvent`. It is **deny by default**: a request is shown only when a listener allowed it and
+no listener denied it (deny wins, whatever the order; the event cannot be stopped). The event carries the subject key
+and the ids and stored statuses only; load what the rule needs in **one** query for all of them:
+
+```php
+use Nowo\WorkflowBundle\Event\WorkflowRequestAccessCheckEvent;
+use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+
+#[AsEventListener]
+final class LeaveSearchAccess
+{
+    public function __invoke(WorkflowRequestAccessCheckEvent $event): void
+    {
+        if ($event->subject !== 'leave') {
+            return;
+        }
+        $ids = array_map(static fn ($request) => $request->id, $event->requests());
+        foreach ($this->leaveVisibility->visibleIds($ids, $event->userIdentifier, $event->tenant) as $id) {
+            $event->allow($id); // the same rule as the requests list
+        }
+    }
+}
+```
+
+### Titles: the title resolver
+
+The shown title comes from the subject's `title_resolver`, in **one** batch per results page, with exactly the ids
+shown on that page (after the access event, SearchKit's host event and the page cut), and once per revalidated recent:
+never with an id the viewer may not see. It gets the tenant that search decided (the gate is not asked again); a
+render without a decided search shows the generic title. A title may depend on the viewer (*Absent* instead of a medical leave
+type, as on your requests list). It **fails closed**: an id it leaves out shows the generic title
+(`search.untitled_request`, *Request*), never the `title_field` column. Without a resolver, `title_field` is shown (the
+generic title when it is empty). The bundle cuts titles to 200 characters; SearchKit escapes them.
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowRequestTitleResolverInterface;
+
+final class LeaveSearchTitles implements WorkflowRequestTitleResolverInterface
+{
+    public function titles(string $subject, array $ids, string $userIdentifier, int|string $tenant, ?string $locale): array
+    {
+        return $this->leaveList->titlesFor($ids, $userIdentifier, $locale); // one query, id => title
+    }
+}
+```
+
+The titles of a render are kept in SearchKit's per-render `SearchItemContext` (`prepareItems()` /
+`toPreparedItem()`), never on the definition, so nothing reaches another viewer or request in worker mode.
+
+### Narrowing in SQL (the candidate window)
+
+One search reads at most `max_candidates` matching requests (newest first), then the access event decides **in PHP**.
+A viewer who may see only a few requests among many (e.g. only their own) can find **none** of them when newer
+requests they may not see fill the window, and a full window makes the total a lower bound. Push every rule SQL can
+express into the narrower; keep the access event for what it cannot. A `narrower` adds SQL conditions for the viewer first, so their requests stay in the
+window (mapped fields and bound values only; the access event still decides every row):
+
+A leave narrower that mirrors the requests list's rules:
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchNarrowerInterface;
+use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
+
+final class LeaveSearchNarrower implements WorkflowRequestSearchNarrowerInterface
+{
+    public function narrow(string $subject, WorkflowRequestSearchCriteria $criteria, string $userIdentifier, int|string $tenant): void
+    {
+        $viewer = $this->leave->viewer($tenant, $userIdentifier); // permissions in this organization, resolved per call
+        if ($viewer->canManage || $viewer->canViewTeam) {
+            $criteria->whereIn('organizationId', [$tenant]);      // every request of the organization
+        } elseif ($viewer->canApprove) {
+            // their own requests, and those of the workers they approve (their approval chain, plus workers without one)
+            $criteria->whereAny(['userId' => [$viewer->userId, ...$this->approvals->workerIdsFor($viewer)]]);
+        } elseif ($viewer->canRequest) {
+            $criteria->whereIn('userId', [$viewer->userId]);       // only their own requests
+        } else {
+            $criteria->none();                                      // nothing: no group, no SQL
+        }
+    }
+}
+```
+
+- `whereAny([...])` ORs its fields; `whereIn($field, $values)` is one field; conditions are ANDed. Scalar mapped fields
+  only, values bound (never SQL text).
+- `none()`: the viewer may see nothing of the subject. The search gives **no group before any SQL runs** (no
+  candidates, no window places, no title lookup).
+- `whereIn($field, [])`: that field matches nothing (it compiles to `1 = 0`); the query still runs and finds nothing.
+- Long lists: a field's values are split into IN lists of 1,000 values, ORed, each its own bound parameter. More than
+  `narrower_max_values` values in one field (default 10,000, at most 60,000; counted over every call), or more bound
+  values in all the conditions together than the platform allows (60,000, under PostgreSQL's 65,535 parameters; 32,000
+  on SQLite, which allows 32,766), **fails closed**: no group, no SQL
+  and a logged warning (subject, total and limits; never the values). A list is never cut silently.
+
+The narrower is asked once per search (and once per revalidated recent).
+
+#### Sensitive subjects: a narrower, or the side channel accepted
+
+Rows the access event hides were still read: they take places in the candidate window. A viewer can then notice them
+— fewer results than expected, a total marked inexact — the **window side channel**. So a `sensitive` subject (the
+default) must have a `narrower` that filters in SQL what the viewer may not see, ideally the same rule as the access
+event. When only PHP or a host event can decide (the rule cannot be written as conditions), set
+`accept_window_side_channel: true` on the subject to accept that side channel explicitly; the container refuses a
+sensitive subject with neither.
+
+### What a result shows
+
+The title and the status label (`status_label_domain` / `status_label_prefix` + the stored status, else the stored
+status), linking to `route`. Nothing else: never the body, comments, approver notes or any other field.
+
+Titles of requests can be private (an absence), so every subject is `sensitive` by default: its group is off while
+SearchKit keeps recents in the browser without revalidation (`nowo_search_kit.recent.revalidate: false`). With
+revalidation, a stored recent is checked again: same route, an id of the id column's shape (digits within the column
+type's range for a `smallint`, `integer` or `bigint` id — 32767, 2147483647, 9223372036854775807 — else letters,
+digits, `_` or `-`), then the whole flow above.
+
+In SearchKit's own host event (`nowo_search_kit.item_visibility`) the rows of a subject have the subject type
+`workflow_<subject>` (e.g. `workflow_leave`), so a host listener tells the subjects apart.
+
+The definitions are stateless (FrankenPHP worker mode with the kernel reset off): the entity manager, the tenant and
+the viewer are resolved on every call; the titles of one render live in its `SearchItemContext` only.
 
 ## FrankenPHP / long-running workers
 
