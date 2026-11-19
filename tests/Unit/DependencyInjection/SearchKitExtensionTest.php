@@ -16,17 +16,28 @@ use Symfony\Component\DependencyInjection\Reference;
 use function class_exists;
 
 /**
- * Since 1.21.0: `nowo_workflow.search_kit` — the group is registered only when enabled and SearchKit is installed.
+ * Since 1.21.0: `nowo_workflow.search_kit.subjects` — one group per subject, registered only when enabled and
+ * SearchKit is installed; everything validated when the container is built.
  */
 final class SearchKitExtensionTest extends TestCase
 {
-    private const ENABLED = [
-        'enabled'       => true,
-        'subject_class' => 'App\Leave\LeaveRequest',
-        'route'         => 'leave_show',
-        'gate'          => 'app.leave_gate',
-        'priority'      => 30,
-        'tenant_field'  => 'organizationId',
+    private const LEAVE = [
+        'subject_class'     => 'App\Leave\LeaveRequest',
+        'route'             => 'leave_show',
+        'gate'              => 'app.leave_gate',
+        'title_resolver'    => 'app.leave_titles',
+        'search_text_field' => 'searchText',
+        'tenant_field'      => 'organizationId',
+        'priority'          => 30,
+    ];
+
+    private const PURCHASE = [
+        'subject_class' => 'App\Purchase\PurchaseRequest',
+        'route'         => 'purchase_show',
+        'gate'          => 'app.purchase_gate',
+        'narrower'      => 'app.purchase_narrower',
+        'title_field'   => 'title',
+        'single_tenant' => true,
     ];
 
     #[Test]
@@ -34,51 +45,88 @@ final class SearchKitExtensionTest extends TestCase
     {
         $container = $this->load([]);
 
-        self::assertFalse($container->hasDefinition(WorkflowRequestSearchDefinition::class));
-        self::assertFalse($container->hasDefinition(WorkflowRequestSearchOptions::class));
+        self::assertFalse($container->hasDefinition(NowoWorkflowExtension::SEARCH_KIT_SERVICE_PREFIX . 'leave'));
+        $config = $this->load(['subjects' => ['leave' => self::LEAVE]]);
+        self::assertFalse($config->hasDefinition(NowoWorkflowExtension::SEARCH_KIT_SERVICE_PREFIX . 'leave'), 'subjects without enabled register nothing');
     }
 
     #[Test]
-    public function enabledRegistersTheTaggedDefinitionWhenSearchKitIsInstalled(): void
+    public function oneTaggedDefinitionPerSubjectWhenSearchKitIsInstalled(): void
     {
-        $container = $this->load(self::ENABLED);
+        $container = $this->load(['enabled' => true, 'subjects' => ['leave' => self::LEAVE, 'purchase' => self::PURCHASE]]);
+        $leaveId   = NowoWorkflowExtension::SEARCH_KIT_SERVICE_PREFIX . 'leave';
         if (!class_exists(NowoWorkflowExtension::SEARCH_KIT_DEFINITION)) {
-            self::assertFalse($container->hasDefinition(WorkflowRequestSearchDefinition::class), 'SearchKit is optional');
+            self::assertFalse($container->hasDefinition($leaveId), 'SearchKit is optional');
 
             return;
         }
 
-        $definition = $container->getDefinition(WorkflowRequestSearchDefinition::class);
-        self::assertSame([['priority' => 30]], $definition->getTag(NowoWorkflowExtension::SEARCH_KIT_DEFINITION_TAG));
-        $gate = $definition->getArgument(1);
-        self::assertInstanceOf(Reference::class, $gate);
-        self::assertSame('app.leave_gate', (string) $gate);
+        $leave = $container->getDefinition($leaveId);
+        self::assertSame(WorkflowRequestSearchDefinition::class, $leave->getClass());
+        self::assertSame([['priority' => 30]], $leave->getTag(NowoWorkflowExtension::SEARCH_KIT_DEFINITION_TAG));
+        self::assertSame('app.leave_gate', (string) $this->reference($leave->getArgument(1)));
+        self::assertSame('app.leave_titles', (string) $this->reference($leave->getArgument(6)));
+        self::assertNull($leave->getArgument(7));
 
-        $options = $container->getDefinition(WorkflowRequestSearchOptions::class);
+        $purchase = $container->getDefinition(NowoWorkflowExtension::SEARCH_KIT_SERVICE_PREFIX . 'purchase');
+        self::assertSame([['priority' => 0]], $purchase->getTag(NowoWorkflowExtension::SEARCH_KIT_DEFINITION_TAG));
+        self::assertNull($purchase->getArgument(6));
+        self::assertSame('app.purchase_narrower', (string) $this->reference($purchase->getArgument(7)));
+
+        $options = $container->getDefinition($leaveId . '.options');
+        self::assertSame(WorkflowRequestSearchOptions::class, $options->getClass());
         self::assertSame([WorkflowRequestSearchOptions::class, 'fromConfig'], $options->getFactory());
-        $config = $options->getArgument(0);
+        self::assertSame('leave', $options->getArgument(0));
+        $config = $options->getArgument(1);
         self::assertIsArray($config);
         self::assertSame('organizationId', $config['tenant_field']);
-        self::assertSame('workflow_requests', $config['group']);
         self::assertTrue($config['sensitive']);
     }
 
     #[Test]
-    public function enabledWithoutTheRequiredOptionsIsRefused(): void
+    public function enabledWithoutSubjectsIsRefused(): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage('set subject_class, route, gate');
+        $this->expectExceptionMessage('add at least one entry under subjects');
 
         $this->load(['enabled' => true]);
+    }
+
+    #[Test]
+    public function aSubjectWithoutTheRequiredOptionsIsRefused(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('subjects.leave: set subject_class, route, gate');
+
+        $this->load(['enabled' => true, 'subjects' => ['leave' => ['title_field' => 'title']]]);
     }
 
     #[Test]
     public function anInvalidFieldIsRefused(): void
     {
         $this->expectException(InvalidConfigurationException::class);
-        $this->expectExceptionMessage('title_field is not valid');
+        $this->expectExceptionMessage('search_text_field is not valid');
 
-        $this->load(['title_field' => 'title) OR (1=1'] + self::ENABLED);
+        $this->load(['enabled' => true, 'subjects' => ['leave' => ['search_text_field' => 'text) OR (1=1'] + self::LEAVE]]);
+    }
+
+    #[Test]
+    public function twoSubjectsCannotShareAGroup(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('the subjects "leave" and "purchase" both use the group "workflow_requests"');
+
+        $this->load(['enabled' => true, 'subjects' => [
+            'leave'    => ['group' => 'workflow_requests'] + self::LEAVE,
+            'purchase' => ['group' => 'workflow_requests'] + self::PURCHASE,
+        ]]);
+    }
+
+    private function reference(mixed $argument): Reference
+    {
+        self::assertInstanceOf(Reference::class, $argument);
+
+        return $argument;
     }
 
     /**

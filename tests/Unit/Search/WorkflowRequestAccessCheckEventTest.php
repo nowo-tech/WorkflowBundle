@@ -16,12 +16,13 @@ final class WorkflowRequestAccessCheckEventTest extends TestCase
     #[Test]
     public function denyByDefaultAndDenyWins(): void
     {
-        $event = new WorkflowRequestAccessCheckEvent('App\LeaveRequest', 'alice', 7, [
+        $event = new WorkflowRequestAccessCheckEvent('leave', 'App\LeaveRequest', 'alice', 7, [
             new WorkflowRequestRef('1', 'pending'),
             new WorkflowRequestRef('2', 'approved'),
             new WorkflowRequestRef('3', 'pending'),
         ]);
 
+        self::assertSame('leave', $event->subject);
         self::assertSame('App\LeaveRequest', $event->subjectClass);
         self::assertSame('alice', $event->userIdentifier);
         self::assertSame(7, $event->tenant);

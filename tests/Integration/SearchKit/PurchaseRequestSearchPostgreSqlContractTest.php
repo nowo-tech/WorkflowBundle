@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Nowo\WorkflowBundle\Tests\Integration\SearchKit;
+
+use PHPUnit\Framework\Attributes\Group;
+
+/**
+ * Since 1.21.0: the SearchKit contract of subject "purchase" on `NOWO_WORKFLOW_TEST_PGSQL_URL` (skipped without it; the "SearchKit databases" CI job sets it).
+ */
+#[Group('database')]
+#[Group('searchkit-pgsql')]
+final class PurchaseRequestSearchPostgreSqlContractTest extends WorkflowRequestSearchContractTestCase
+{
+    protected static function subject(): string
+    {
+        return 'purchase';
+    }
+
+    protected static function urlVariable(): string
+    {
+        return 'NOWO_WORKFLOW_TEST_PGSQL_URL';
+    }
+}

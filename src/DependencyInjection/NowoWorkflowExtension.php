@@ -82,6 +82,9 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     /** Since 1.21: SearchKit's `EntitySearchDefinition::TAG`. */
     public const SEARCH_KIT_DEFINITION_TAG = 'nowo_search_kit.entity_definition';
 
+    /** Since 1.21: service id prefix of the SearchKit definitions (`nowo_workflow.search_kit.<subject>`). */
+    public const SEARCH_KIT_SERVICE_PREFIX = 'nowo_workflow.search_kit.';
+
     /**
      * Prepends Doctrine mappings, translator paths, the asset package and FormKit / UiKit defaults.
      */
@@ -553,30 +556,36 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     }
 
     /**
-     * Since 1.21: the SearchKit group of the workflow requests ({@see WorkflowRequestSearchDefinition}), only when
-     * `search_kit.enabled` and SearchKit >= 1.9 is installed (SearchKit stays optional: it needs PHP >= 8.3). The
-     * definition is tagged for SearchKit's provider pass, which builds its provider.
+     * Since 1.21: one SearchKit group per `search_kit.subjects` entry ({@see WorkflowRequestSearchDefinition}), only
+     * when `search_kit.enabled` and SearchKit >= 1.9 is installed (SearchKit stays optional: it needs PHP >= 8.3).
+     * Each definition is tagged for SearchKit's provider pass, which builds its provider.
      *
-     * @param array<string, mixed> $searchKit
+     * @param array{enabled: bool, subjects: array<string, array<string, mixed>>} $searchKit
      */
     private function registerSearchKit(ContainerBuilder $container, array $searchKit): void
     {
-        if ($searchKit['enabled'] !== true || !class_exists(self::SEARCH_KIT_DEFINITION)) {
+        if (!$searchKit['enabled'] || !class_exists(self::SEARCH_KIT_DEFINITION)) {
             return;
         }
-        $container->register(WorkflowRequestSearchOptions::class, WorkflowRequestSearchOptions::class)
-            ->setFactory([WorkflowRequestSearchOptions::class, 'fromConfig'])
-            ->setArguments([$searchKit]);
-        $container->register(WorkflowRequestSearchDefinition::class, WorkflowRequestSearchDefinition::class)
-            ->setArguments([
-                new Reference('doctrine'),
-                new Reference((string) $searchKit['gate']),
-                new Reference('router'),
-                new Reference(WorkflowRequestSearchOptions::class),
-                new Reference('event_dispatcher', ContainerInterface::NULL_ON_INVALID_REFERENCE),
-                new Reference('translator', ContainerInterface::NULL_ON_INVALID_REFERENCE),
-            ])
-            ->addTag(self::SEARCH_KIT_DEFINITION_TAG, ['priority' => $searchKit['priority']]);
+        $optional = static fn (mixed $id): ?Reference => is_string($id) && $id !== '' ? new Reference($id) : null;
+        foreach ($searchKit['subjects'] as $subject => $config) {
+            $optionsId = self::SEARCH_KIT_SERVICE_PREFIX . $subject . '.options';
+            $container->register($optionsId, WorkflowRequestSearchOptions::class)
+                ->setFactory([WorkflowRequestSearchOptions::class, 'fromConfig'])
+                ->setArguments([(string) $subject, $config]);
+            $container->register(self::SEARCH_KIT_SERVICE_PREFIX . $subject, WorkflowRequestSearchDefinition::class)
+                ->setArguments([
+                    new Reference('doctrine'),
+                    new Reference((string) $config['gate']),
+                    new Reference('router'),
+                    new Reference($optionsId),
+                    new Reference('event_dispatcher', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    new Reference('translator', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                    $optional($config['title_resolver'] ?? null),
+                    $optional($config['narrower'] ?? null),
+                ])
+                ->addTag(self::SEARCH_KIT_DEFINITION_TAG, ['priority' => $config['priority'] ?? 0]);
+        }
     }
 
     /**

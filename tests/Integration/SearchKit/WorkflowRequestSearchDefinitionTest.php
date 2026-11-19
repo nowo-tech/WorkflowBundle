@@ -15,6 +15,9 @@ use Nowo\SearchKitBundle\Provider\Entity\EntitySearchProvider;
 use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
 use Nowo\WorkflowBundle\Event\WorkflowRequestAccessCheckEvent;
 use Nowo\WorkflowBundle\Model\WorkflowRequestRef;
+use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
+use Nowo\WorkflowBundle\Tests\Support\SearchKit\OwnRequestsNarrower;
+use Nowo\WorkflowBundle\Tests\Support\SearchKit\PurchaseRequest;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchRequest;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchRequestHarness;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchRequestStatus;
@@ -31,11 +34,13 @@ use function bin2hex;
 use function class_exists;
 use function mb_strlen;
 use function random_bytes;
+use function sort;
 use function str_repeat;
 
 /**
- * Since 1.21.0: the `workflow_requests` group beyond SearchKit's contract kit — status search, excluded statuses,
- * the access event, what a result shows (never the body or the approver note), labels, links and recents ids.
+ * Since 1.21.0: the workflow request groups beyond SearchKit's contract kit — search text and status matching,
+ * excluded statuses, the access event, the title resolver (visible ids only, one batch), the host narrowing, what a
+ * result shows (never the body or the approver note), labels, links and recents ids.
  */
 final class WorkflowRequestSearchDefinitionTest extends TestCase
 {
@@ -56,11 +61,11 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     }
 
     #[Test]
-    public function findsRequestsByTitleAndByStatusOnlyThroughTheirFields(): void
+    public function matchesTheSearchTextAndTheStatusOnly(): void
     {
         $marker   = $this->marker();
-        $pending  = $this->harness->insert(self::TENANT, 'Holiday ' . $marker, body: 'secret-body ' . $marker);
-        $approved = $this->harness->insert(self::TENANT, 'Trip ' . $marker, status: SearchRequestStatus::Approved);
+        $pending  = $this->harness->insert(self::TENANT, 'Ana ' . $marker, body: 'secret-body ' . $marker, title: 'Holiday');
+        $approved = $this->harness->insert(self::TENANT, 'Bea ' . $marker, status: SearchRequestStatus::Approved);
         $this->harness->insert(self::TENANT, 'Draft ' . $marker, status: SearchRequestStatus::Draft);
         $this->harness->insert(self::TENANT, 'Archived ' . $marker, archived: true);
         $this->harness->insert(self::TENANT + 1, 'Elsewhere ' . $marker);
@@ -72,12 +77,63 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         self::assertSame(['/requests/' . $pending, '/requests/' . $mine], $this->urls($marker . ' PEND'));
         self::assertSame([], $this->urls('secret-body'), 'the body is never searched');
         self::assertSame([], $this->urls('approver note'), 'nor the approver note');
+        self::assertSame([], $this->urls('Holiday'), 'with a search text, the title column is not searched');
         self::assertSame([], $this->urls($marker . ' draft'), 'excluded statuses are filtered in SQL');
-        self::assertSame([[self::TENANT, self::VIEWER]], [$this->harness->gate->enabledCalls[0]]);
+        self::assertSame([self::TENANT, self::VIEWER], $this->harness->gate->enabledCalls[0]);
     }
 
     #[Test]
-    public function oneAccessEventCarriesIdsAndStatusesOnly(): void
+    public function titlesComeFromTheResolverInOneBatchOfVisibleIdsOnly(): void
+    {
+        $marker  = $this->marker();
+        $shown   = $this->harness->insert(self::TENANT, 'A ' . $marker, title: 'Ana — Holiday');
+        $hidden  = $this->harness->insert(self::TENANT, 'B ' . $marker, owner: 'bob@example.com', title: 'Bob — Sick leave');
+        $denied  = $this->harness->insert(self::TENANT, 'C ' . $marker, title: 'Cid — Holiday');
+        $untitle = $this->harness->insert(self::TENANT, 'D ' . $marker, title: null);
+        $this->harness->insert(self::TENANT + 1, 'E ' . $marker, title: 'Other tenant');
+        $this->harness->dispatcher->addListener(WorkflowRequestAccessCheckEvent::class, static function (WorkflowRequestAccessCheckEvent $event) use ($denied): void {
+            $event->deny((string) $denied);
+        }, -10);
+
+        $group = $this->search($marker);
+        self::assertInstanceOf(SearchGroup::class, $group);
+        self::assertSame(['Leave: Ana — Holiday', ''], array_map(static fn (SearchItem $item): string => $item->title, $group->items));
+        self::assertCount(1, $this->harness->titles->calls, 'one batch per search');
+        $call = $this->harness->titles->calls[0];
+        $ids  = $call['ids'];
+        sort($ids);
+        self::assertSame([(string) $shown, (string) $untitle], $ids, 'never a hidden, denied or other-tenant id');
+        self::assertSame(['leave', self::VIEWER, self::TENANT], [$call['subject'], $call['user'], $call['tenant']]);
+        self::assertNotContains((string) $hidden, $call['ids']);
+    }
+
+    #[Test]
+    public function aTitleFieldIsTheFallbackOfTheResolver(): void
+    {
+        $id         = $this->harness->insert(self::TENANT, 'x', title: null);
+        $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['title_field' => 'searchText']));
+        $query      = $this->query('x');
+
+        self::assertSame('x', $definition->toItem($this->find($id), $query)->title, 'the resolver gave none');
+        self::assertCount(1, $this->harness->titles->calls, 'toItem() outside a search resolves its own row');
+        $definition->toItem($this->find($id), $query);
+        self::assertCount(1, $this->harness->titles->calls, 'once per query');
+    }
+
+    #[Test]
+    public function noTenantNoTitleLookup(): void
+    {
+        $id                          = $this->harness->insert(self::TENANT, 'x');
+        $this->harness->gate->viewer = 'someone-else';
+
+        $this->harness->definition()->prepareItems([$this->find($id)], $this->query('x'));
+        $this->harness->definition()->prepareItems([], $this->query('x'));
+
+        self::assertSame([], $this->harness->titles->calls);
+    }
+
+    #[Test]
+    public function oneAccessEventCarriesTheSubjectIdsAndStatusesOnly(): void
     {
         $marker = $this->marker();
         $first  = $this->harness->insert(self::TENANT, 'A ' . $marker);
@@ -91,6 +147,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
 
         self::assertSame(['/requests/' . $first], $this->urls($marker), 'a host deny wins over the owner rule');
         self::assertCount(1, $events);
+        self::assertSame('leave', $events[0]->subject);
         self::assertSame(SearchRequest::class, $events[0]->subjectClass);
         self::assertSame(self::VIEWER, $events[0]->userIdentifier);
         self::assertSame(self::TENANT, $events[0]->tenant);
@@ -107,59 +164,78 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         self::assertNull((new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker)));
         self::assertSame([], $definition->filterVisible([], self::TENANT, $this->query($marker)));
 
-        $empty               = new SearchRequestHarness();
-        $empty->gate->tenant = self::TENANT;
-        $empty->gate->viewer = self::VIEWER;
-        $empty->insert(self::TENANT, 'A ' . $marker);
-        $definition = new WorkflowRequestSearchDefinition(new TestManagerRegistry($empty->em), $empty->gate, SearchRequestHarness::urls(), SearchRequestHarness::options(), new EventDispatcher());
+        $definition = new WorkflowRequestSearchDefinition(new TestManagerRegistry($this->harness->em), $this->harness->gate, SearchRequestHarness::urls(), SearchRequestHarness::options(), new EventDispatcher());
         self::assertNull((new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker)), 'no listener: deny by default');
+    }
+
+    #[Test]
+    public function aPurchaseIsSearchedAndShownByItsTitleWithAPlainStatus(): void
+    {
+        $this->harness->gate->tenant = 'acme';
+        $marker                      = $this->marker();
+        $open                        = $this->harness->insertPurchase('acme', 'Laptop ' . $marker);
+        $ordered                     = $this->harness->insertPurchase('acme', 'Desk ' . $marker, place: 'ordered');
+        $this->harness->insertPurchase('acme', 'Chair ' . $marker, deleted: true);
+        $this->harness->insertPurchase('globex', 'Other ' . $marker);
+        $definition = $this->harness->definition('purchase');
+
+        $group = (new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker));
+        self::assertInstanceOf(SearchGroup::class, $group);
+        self::assertSame('workflow_purchase', $group->key);
+        $items = array_map(static fn (SearchItem $i): array => [$i->url, $i->title, $i->subtitle], $group->items);
+        sort($items);
+        $expected = [['/purchases/' . $open, 'Laptop ' . $marker, 'open'], ['/purchases/' . $ordered, 'Desk ' . $marker, 'ordered']];
+        sort($expected);
+        self::assertSame($expected, $items, 'same created_at: any order');
+        self::assertSame(['purchase'], $this->harness->listener->subjects);
+        self::assertSame([], $this->harness->titles->calls, 'no resolver for this subject');
     }
 
     #[Test]
     public function anItemShowsTheTitleTheStatusAndTheRouteOnly(): void
     {
-        $marker     = $this->marker();
-        $id         = $this->harness->insert(self::TENANT, str_repeat('x', 180) . ' ' . $marker . str_repeat('y', 9), body: 'secret');
-        $nullId     = $this->harness->insert(self::TENANT, null, status: SearchRequestStatus::Approved);
-        $definition = $this->harness->definition(SearchRequestHarness::options(['route_id_parameter' => 'id', 'route_parameters' => ['tab' => 'details']]));
-        $query      = $this->query($marker);
+        $id         = $this->harness->insert(self::TENANT, 'x', body: 'secret', title: str_repeat('x', 250));
+        $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['route_parameters' => ['tab' => 'details']]));
+        $query      = $this->query('x');
 
         $item = $definition->toItem($this->find($id), $query);
         self::assertSame(WorkflowRequestSearchDefinition::MAX_TITLE_LENGTH, mb_strlen($item->title));
         self::assertSame('/requests/' . $id . '?tab=details', $item->url);
         self::assertSame('pending', $item->subtitle);
-        self::assertSame('', $definition->toItem($this->find($nullId), $query)->title);
         self::assertSame('Requests', $definition->label($query));
         self::assertSame((string) $id, $definition->subjectId($this->find($id)));
     }
 
     #[Test]
-    public function labelsAreTranslated(): void
+    public function labelsAreTranslatedPerSubject(): void
     {
         $translator = new Translator('es');
         $translator->addLoader('array', new ArrayLoader());
         $translator->addResource('array', ['search.group.workflow_requests' => 'Solicitudes'], 'es', WorkflowRequestSearchDefinition::TRANSLATION_DOMAIN);
+        $translator->addResource('array', ['search.purchases' => 'Compras'], 'es', 'app');
         $translator->addResource('array', ['leave.status.pending' => 'Pendiente'], 'es', 'leave');
         $id    = $this->harness->insert(self::TENANT, 'A');
         $query = new SearchQuery('a', null, 10, userIdentifier: self::VIEWER, locale: 'es');
 
-        $translated = $this->harness->definition(SearchRequestHarness::options(['status_label_domain' => 'leave', 'status_label_prefix' => 'leave.status.']), $translator);
+        $translated = $this->harness->definition(options: SearchRequestHarness::options('leave', ['status_label_domain' => 'leave', 'status_label_prefix' => 'leave.status.']), translator: $translator);
         self::assertSame('Solicitudes', $translated->label($query));
         self::assertSame('Pendiente', $translated->toItem($this->find($id), $query)->subtitle);
+        self::assertSame('Compras', $this->harness->definition('purchase', translator: $translator)->label($query));
 
-        $noTranslator = $this->harness->definition(SearchRequestHarness::options(['status_label_domain' => 'leave']));
+        $noTranslator = $this->harness->definition(options: SearchRequestHarness::options('leave', ['status_label_domain' => 'leave']));
         self::assertSame('pending', $noTranslator->toItem($this->find($id), $query)->subtitle);
     }
 
     #[Test]
     public function hooksFollowTheOptions(): void
     {
-        $definition = $this->harness->definition(SearchRequestHarness::options(['group' => 'leave_requests', 'icon' => 'tabler:beach', 'min_length' => 2, 'sensitive' => false, 'id_field' => 'id']));
+        $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['icon' => 'tabler:beach', 'min_length' => 2, 'sensitive' => false]));
 
-        self::assertSame('leave_requests', $definition->group());
+        self::assertSame('workflow_leave_requests', $definition->group());
         self::assertSame('tabler:beach', $definition->icon());
         self::assertSame('workflow_request', $definition->subjectType());
-        self::assertSame(['r.title', 'r.status'], $definition->searchableFields());
+        self::assertSame(['r.searchText', 'r.status'], $definition->searchableFields());
+        self::assertSame(['r.title', 'r.place'], $this->harness->definition('purchase')->searchableFields());
         self::assertSame(2, $definition->minLength());
         self::assertSame(20, $definition->maxCandidates());
         self::assertFalse($definition->sensitive());
@@ -171,42 +247,78 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     #[Test]
     public function seeAllLinksToTheListWithTheText(): void
     {
-        self::assertSame('/requests?view=all&q=holiday', $this->harness->definition(SearchRequestHarness::options(['see_all_parameters' => ['view' => 'all']]))->seeAllUrl($this->query('holiday')));
-        self::assertNull($this->harness->definition(SearchRequestHarness::options(['see_all_route' => null]))->seeAllUrl($this->query('holiday')));
+        self::assertSame('/requests?view=all&q=holiday', $this->harness->definition(options: SearchRequestHarness::options('leave', ['see_all_parameters' => ['view' => 'all']]))->seeAllUrl($this->query('holiday')));
+        self::assertNull($this->harness->definition('purchase')->seeAllUrl($this->query('holiday')));
     }
 
     #[Test]
-    public function recentsOnlyResolveThisGroupsRouteAndIdShape(): void
+    public function recentIdsFollowTheIdColumnType(): void
     {
-        $definition = $this->harness->definition();
+        $leave    = $this->harness->definition();
+        $purchase = $this->harness->definition('purchase');
+        $ref      = static fn (string $route, mixed $id): SearchReference => new SearchReference('/x', 'k', $route, ['id' => $id]);
 
-        self::assertSame('12', $definition->referenceId(new SearchReference('/requests/12', 'workflow_requests', SearchRequestHarness::ROUTE, ['id' => '12'])));
-        self::assertNull($definition->referenceId(new SearchReference('/x/12', 'workflow_requests', 'other_route', ['id' => '12'])));
-        self::assertNull($definition->referenceId(new SearchReference('/requests/12', 'workflow_requests', SearchRequestHarness::ROUTE, ['id' => 12])));
-        self::assertNull($definition->referenceId(new SearchReference('/requests/12', 'workflow_requests', SearchRequestHarness::ROUTE, ['id' => '1 OR 1'])));
-        self::assertNull($definition->referenceId(new SearchReference('/requests', 'workflow_requests', SearchRequestHarness::ROUTE, [])));
+        foreach (['12' => '12', '0' => '0', '9223372036854775807' => '9223372036854775807', '12abc' => null, '012' => null, '9223372036854775808' => null, '99999999999999999999' => null, '' => null, '-1' => null] as $id => $expected) {
+            self::assertSame($expected, $leave->referenceId($ref(SearchRequestHarness::ROUTE, (string) $id)), 'integer id ' . $id);
+        }
+        self::assertNull($leave->referenceId($ref(SearchRequestHarness::ROUTE, 12)), 'not a string');
+        self::assertNull($leave->referenceId($ref('other_route', '12')));
+        self::assertNull($leave->referenceId(new SearchReference('/x', 'k', SearchRequestHarness::ROUTE, [])));
+        self::assertSame('p12ab', $purchase->referenceId($ref(SearchRequestHarness::PURCHASE_ROUTE, 'p12ab')));
+        self::assertNull($purchase->referenceId($ref(SearchRequestHarness::PURCHASE_ROUTE, 'p 1')));
     }
 
     #[Test]
-    public function withoutATenantFieldTheAccessEventAloneSeparatesTenants(): void
+    public function theNarrowerKeepsTheViewersOwnRequestsInTheWindow(): void
     {
-        $marker     = $this->marker();
-        $here       = $this->harness->insert(self::TENANT, 'A ' . $marker);
-        $there      = $this->harness->insert(self::TENANT + 1, 'B ' . $marker);
-        $definition = $this->harness->definition(SearchRequestHarness::options(['tenant_field' => null, 'archived_field' => null, 'order_field' => null, 'excluded_statuses' => []]));
-        $group      = (new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker));
+        $marker = $this->marker();
+        $mine   = $this->harness->insert(self::TENANT, 'Mine ' . $marker, owner: self::VIEWER);
+        for ($i = 0; $i < 25; ++$i) {
+            $this->harness->insert(self::TENANT, 'Theirs ' . $marker, owner: 'bob@example.com');
+        }
+        $newestFirst = SearchRequestHarness::options('leave', ['order_field' => null]);
+        self::assertNull((new EntitySearchProvider($this->harness->definition(options: $newestFirst), new EventDispatcher()))->search($this->query($marker)), 'newest first: 20 hidden rows fill the window (starvation)');
 
+        $narrower = new OwnRequestsNarrower(static function (WorkflowRequestSearchCriteria $criteria, string $viewer): void {
+            $criteria->whereAny(['ownerIdentifier' => [$viewer, ''], 'tenantId' => -1])->whereIn('status', ['pending', 'approved']);
+        });
+        $group = (new EntitySearchProvider($this->harness->definition(options: $newestFirst, narrower: $narrower), new EventDispatcher()))->search($this->query($marker));
         self::assertInstanceOf(SearchGroup::class, $group);
-        self::assertSame(['/requests/' . $there, '/requests/' . $here], array_map(static fn (SearchItem $item): string => $item->url, $group->items));
+        self::assertSame(['/requests/' . $mine], array_map(static fn (SearchItem $item): string => $item->url, $group->items));
+        self::assertSame([['leave', self::VIEWER, self::TENANT]], $narrower->calls);
+    }
+
+    #[Test]
+    public function theNarrowerCanLeaveNothing(): void
+    {
+        $marker = $this->marker();
+        $this->harness->insert(self::TENANT, 'A ' . $marker);
+        $nothing = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->nothing());
+        $empty   = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->whereIn('ownerIdentifier', []));
+
+        foreach ([$nothing, $empty] as $narrower) {
+            self::assertNull((new EntitySearchProvider($this->harness->definition(narrower: $narrower), new EventDispatcher()))->search($this->query($marker)));
+        }
+    }
+
+    #[Test]
+    public function theNarrowerOnlyNamesMappedFields(): void
+    {
+        $narrower = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->whereIn('requester', [1]));
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('"requester" is not a mapped field');
+
+        $this->harness->definition(narrower: $narrower)->baseQuery(self::TENANT, $this->query('a'));
     }
 
     #[Test]
     public function anUnmappedFieldFailsLoudly(): void
     {
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('"missing" is not a mapped field');
+        $this->expectExceptionMessage('subjects.leave: "missing" is not a mapped field');
 
-        $this->harness->definition(SearchRequestHarness::options(['archived_field' => 'missing']))->baseQuery(self::TENANT, $this->query('a'));
+        $this->harness->definition(options: SearchRequestHarness::options('leave', ['archived_field' => 'missing']))->baseQuery(self::TENANT, $this->query('a'));
     }
 
     #[Test]
@@ -245,7 +357,20 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     {
         $this->expectException(LogicException::class);
 
-        $this->harness->definition()->toItem(['id' => 1, 'title' => 'x'], $this->query('a'));
+        $this->harness->definition('purchase')->toItem(['id' => 1, 'title' => 'x'], $this->query('a'));
+    }
+
+    #[Test]
+    public function aPurchaseRowIsNotALeaveRow(): void
+    {
+        $this->expectException(LogicException::class);
+
+        $this->harness->definition()->subjectId(new PurchaseRequest('p1', 'acme', 'x'));
+    }
+
+    private function search(string $text): ?SearchGroup
+    {
+        return (new EntitySearchProvider($this->harness->definition(), new EventDispatcher()))->search($this->query($text));
     }
 
     /**
@@ -253,7 +378,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
      */
     private function urls(string $text): array
     {
-        $group = (new EntitySearchProvider($this->harness->definition(), new EventDispatcher()))->search($this->query($text));
+        $group = $this->search($text);
 
         return $group instanceof SearchGroup ? array_map(static fn (SearchItem $item): string => $item->url, $group->items) : [];
     }

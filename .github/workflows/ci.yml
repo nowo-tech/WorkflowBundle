@@ -282,8 +282,9 @@ jobs:
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.test }}
 
   search-kit-databases:
-    # Since 1.21.0: SearchKit's provider contract for the "workflow_requests" group on real servers (visibility, other
-    # tenants, archived rows, the access event, LIKE escaping, the query budget). SearchKit needs PHP >= 8.3.
+    # Since 1.21.0: SearchKit's provider contract for every test subject (a string-backed enum status and a plain one)
+    # on real servers: visibility, other tenants, archived rows, the access event, LIKE escaping, the query budget,
+    # status matching and recents ids. SearchKit needs PHP >= 8.3.
     name: SearchKit databases (${{ matrix.db.image }})
     runs-on: ubuntu-latest
 
@@ -296,19 +297,19 @@ jobs:
             health: 'mysqladmin ping -h 127.0.0.1 -proot'
             url_var: NOWO_WORKFLOW_TEST_MYSQL_URL
             url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
-            test: tests/Integration/SearchKit/WorkflowRequestSearchMySqlContractTest.php
+            group: searchkit-mysql
           - image: 'mariadb:11.4'
             port: 3306
             health: 'healthcheck.sh --connect --innodb_initialized'
             url_var: NOWO_WORKFLOW_TEST_MYSQL_URL
             url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
-            test: tests/Integration/SearchKit/WorkflowRequestSearchMySqlContractTest.php
+            group: searchkit-mysql
           - image: 'postgres:16'
             port: 5432
             health: 'pg_isready -U postgres'
             url_var: NOWO_WORKFLOW_TEST_PGSQL_URL
             url: 'pdo-pgsql://postgres@127.0.0.1:5432/workflow'
-            test: tests/Integration/SearchKit/WorkflowRequestSearchPostgreSqlContractTest.php
+            group: searchkit-pgsql
 
     services:
       database:
@@ -349,7 +350,7 @@ jobs:
       - name: SearchKit contract
         env:
           ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
-        run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.test }}
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped --group ${{ matrix.db.group }} tests/Integration/SearchKit
 
   cs-check:
     name: Code Style Check

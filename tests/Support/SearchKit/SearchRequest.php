@@ -8,9 +8,10 @@ use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * A host's workflow request (e.g. a leave request) for the SearchKit group tests: a title, a marking, a tenant, an
- * owner the host's access rule reads, a private body and comment that must never be searched or shown, and an
- * archive date.
+ * Subject "leave" of the SearchKit tests (a leave request): a viewer-neutral search text the host maintains, a
+ * title the host's title resolver reads, a string-backed enum status column, an integer tenant and id, an owner the
+ * host's access rule reads, a private body and approver note that must never be searched or shown, and an archive
+ * date.
  */
 #[ORM\Entity]
 #[ORM\Table(name: 'wfsk_search_request')]
@@ -30,8 +31,10 @@ class SearchRequest
     public function __construct(
         #[ORM\Column(name: 'tenant_id')]
         private int $tenantId,
+        #[ORM\Column(name: 'search_text', length: 255)]
+        private string $searchText,
         #[ORM\Column(length: 190, nullable: true)]
-        private ?string $title,
+        private ?string $title = null,
         #[ORM\Column(length: 16, enumType: SearchRequestStatus::class)]
         private SearchRequestStatus $status = SearchRequestStatus::Pending,
         #[ORM\Column(name: 'owner_identifier', length: 64)]
@@ -56,6 +59,6 @@ class SearchRequest
 
     public function body(): string
     {
-        return $this->body . $this->approverNote . $this->ownerIdentifier . $this->tenantId . ($this->title ?? '') . $this->status->value . $this->updatedAt->format('c') . ($this->archivedAt?->format('c') ?? '');
+        return $this->body . $this->approverNote . $this->ownerIdentifier . $this->tenantId . $this->searchText . ($this->title ?? '') . $this->status->value . $this->updatedAt->format('c') . ($this->archivedAt?->format('c') ?? '');
     }
 }

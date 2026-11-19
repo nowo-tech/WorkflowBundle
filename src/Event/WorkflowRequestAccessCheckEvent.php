@@ -30,12 +30,14 @@ final class WorkflowRequestAccessCheckEvent
     private array $decisions = [];
 
     /**
-     * @param string $subjectClass the configured request class (`search_kit.subject_class`)
+     * @param string $subject the subject key (`search_kit.subjects.<subject>`): which request type the ids belong to
+     * @param string $subjectClass the subject's request class
      * @param string $userIdentifier the signed-in user of the search
      * @param int|string $tenant the gate's tenant of the search
      * @param list<WorkflowRequestRef> $requests the candidates
      */
     public function __construct(
+        public readonly string $subject,
         public readonly string $subjectClass,
         public readonly string $userIdentifier,
         public readonly int|string $tenant,

@@ -39,7 +39,7 @@ This bundle is **FrankenPHP worker mode friendly**.
 - UI translations for `en`, `es`, `fr`, `it`, `de`, `nl`, `pt` (enable extra locales in `web_ui.locales`)
 - Runtime resolution via `DatabaseWorkflowRegistry` (Symfony Workflow component)
 - `WorkflowApplicator` helper to apply transitions and flush subjects
-- Optional header search (SearchKit 1.9+, PHP 8.3+): the group `workflow_requests` finds your workflow requests by title and status, only those your access rules let the viewer see — see [Usage](docs/USAGE.md#header-search-the-workflow-requests-searchkit-121)
+- Optional header search (SearchKit 1.9+, PHP 8.3+): one group per request type finds your workflow requests by a search text and their status, only those your access rules let the viewer see — see [Usage](docs/USAGE.md#header-search-the-workflow-requests-searchkit-121)
 - Demo with order approval (state machine) and document review (parallel workflow)
 - FrankenPHP worker mode: Supported (including kernel not reset between requests; see [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md) and [Worker audit](docs/FRANKENPHP-WORKER-AUDIT.md))
 

@@ -13,6 +13,7 @@ use Doctrine\ORM\Tools\SchemaTool;
 use Nowo\SearchKitBundle\Test\QueryCounter;
 use Nowo\SearchKitBundle\Test\QueryCountingMiddleware;
 use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
+use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchNarrowerInterface;
 use Nowo\WorkflowBundle\Event\WorkflowRequestAccessCheckEvent;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
@@ -23,12 +24,14 @@ use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
+use function bin2hex;
 use function is_string;
+use function random_bytes;
 
 use const PHP_VERSION_ID;
 
 /**
- * Builds the SearchKit group under test on SQLite (in memory) or on a real server (a DSN), with the query counter on
+ * Builds the SearchKit groups under test (subjects "leave" and "purchase") on SQLite (in memory) or on a real server (a DSN), with the query counter on
  * the connection, the test host's gate and its access listener.
  */
 final class SearchRequestHarness
@@ -36,6 +39,8 @@ final class SearchRequestHarness
     public const ROUTE = 'app_request_show';
 
     public const LIST_ROUTE = 'app_request_index';
+
+    public const PURCHASE_ROUTE = 'app_purchase_show';
 
     public readonly EntityManagerInterface $em;
 
@@ -46,6 +51,8 @@ final class SearchRequestHarness
     public readonly EventDispatcher $dispatcher;
 
     public readonly OwnerAccessListener $listener;
+
+    public readonly TitleResolver $titles;
 
     public function __construct(?string $url = null)
     {
@@ -61,6 +68,7 @@ final class SearchRequestHarness
         $this->gate       = new FakeRequestGate();
         $this->dispatcher = new EventDispatcher();
         $this->listener   = new OwnerAccessListener($this->em->getConnection());
+        $this->titles     = new TitleResolver($this->em->getConnection());
         $this->dispatcher->addListener(WorkflowRequestAccessCheckEvent::class, $this->listener);
         (new SchemaTool($this->em))->updateSchema($this->em->getMetadataFactory()->getAllMetadata());
     }
@@ -81,34 +89,59 @@ final class SearchRequestHarness
     }
 
     /**
-     * The options of the tests: every SQL filter on, a small window.
+     * The options of a test subject: "leave" (search text, title resolver, enum status, integer ids and tenant, every
+     * SQL filter) or "purchase" (title field only, plain status, string ids and tenant). A small window.
      *
      * @param array<string, mixed> $override
      */
-    public static function options(array $override = []): WorkflowRequestSearchOptions
+    public static function options(string $subject = 'leave', array $override = []): WorkflowRequestSearchOptions
     {
-        return WorkflowRequestSearchOptions::fromConfig($override + [
-            'subject_class'     => SearchRequest::class,
-            'route'             => self::ROUTE,
-            'gate'              => 'app.request_gate',
-            'tenant_field'      => 'tenantId',
-            'archived_field'    => 'archivedAt',
-            'order_field'       => 'updatedAt',
-            'excluded_statuses' => ['draft'],
-            'see_all_route'     => self::LIST_ROUTE,
-            'max_candidates'    => 20,
-        ]);
+        $base = $subject === 'leave'
+            ? [
+                'subject_class'     => SearchRequest::class,
+                'route'             => self::ROUTE,
+                'gate'              => 'app.request_gate',
+                'title_resolver'    => 'app.leave_titles',
+                'group'             => 'workflow_leave_requests',
+                'search_text_field' => 'searchText',
+                'tenant_field'      => 'tenantId',
+                'archived_field'    => 'archivedAt',
+                'order_field'       => 'updatedAt',
+                'excluded_statuses' => ['draft'],
+                'see_all_route'     => self::LIST_ROUTE,
+                'max_candidates'    => 20,
+            ]
+            : [
+                'subject_class'  => PurchaseRequest::class,
+                'route'          => self::PURCHASE_ROUTE,
+                'gate'           => 'app.request_gate',
+                'title_field'    => 'title',
+                'status_field'   => 'place',
+                'tenant_field'   => 'tenantKey',
+                'archived_field' => 'deletedAt',
+                'order_field'    => 'createdAt',
+                'label'          => 'search.purchases',
+                'label_domain'   => 'app',
+                'sensitive'      => false,
+                'max_candidates' => 20,
+            ];
+
+        return WorkflowRequestSearchOptions::fromConfig($subject, $override + $base);
     }
 
-    public function definition(?WorkflowRequestSearchOptions $options = null, ?TranslatorInterface $translator = null, bool $withDispatcher = true): WorkflowRequestSearchDefinition
+    public function definition(string $subject = 'leave', ?WorkflowRequestSearchOptions $options = null, ?TranslatorInterface $translator = null, bool $withDispatcher = true, ?WorkflowRequestSearchNarrowerInterface $narrower = null): WorkflowRequestSearchDefinition
     {
+        $options ??= self::options($subject);
+
         return new WorkflowRequestSearchDefinition(
             new TestManagerRegistry($this->em),
             $this->gate,
             self::urls(),
-            $options ?? self::options(),
+            $options,
             $withDispatcher ? $this->dispatcher : null,
             $translator,
+            $options->titleResolver === null ? null : $this->titles,
+            $narrower,
         );
     }
 
@@ -117,13 +150,14 @@ final class SearchRequestHarness
         $routes = new RouteCollection();
         $routes->add(self::ROUTE, new Route('/requests/{id}'));
         $routes->add(self::LIST_ROUTE, new Route('/requests'));
+        $routes->add(self::PURCHASE_ROUTE, new Route('/purchases/{id}'));
 
         return new UrlGenerator($routes, new RequestContext());
     }
 
-    public function insert(int|string $tenant, ?string $title, string $owner = '', bool $archived = false, SearchRequestStatus $status = SearchRequestStatus::Pending, string $body = ''): int
+    public function insert(int|string $tenant, string $searchText, string $owner = '', bool $archived = false, SearchRequestStatus $status = SearchRequestStatus::Pending, string $body = '', ?string $title = 'title'): int
     {
-        $request = new SearchRequest((int) $tenant, $title, $status, $owner, $body, 'approver note ' . $body);
+        $request = new SearchRequest((int) $tenant, $searchText, $title, $status, $owner, $body, 'approver note ' . $body);
         if ($archived) {
             $request->archive();
         }
@@ -132,5 +166,18 @@ final class SearchRequestHarness
         $this->em->clear();
 
         return (int) $request->getId();
+    }
+
+    public function insertPurchase(int|string $tenant, string $title, string $owner = '', bool $deleted = false, string $place = 'open'): string
+    {
+        $request = new PurchaseRequest('p' . bin2hex(random_bytes(8)), (string) $tenant, $title, $place, $owner);
+        if ($deleted) {
+            $request->delete();
+        }
+        $this->em->persist($request);
+        $this->em->flush();
+        $this->em->clear();
+
+        return $request->getId();
     }
 }
