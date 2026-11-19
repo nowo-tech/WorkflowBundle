@@ -140,8 +140,8 @@ final class WorkflowRequestSearchOptionsTest extends TestCase
         yield 'too many candidates' => [['max_candidates' => 1001], 'max_candidates must be 1 to 1000'];
         yield 'no candidates' => [['max_candidates' => 0], 'max_candidates'];
         yield 'negative min length' => [['min_length' => -1], 'min_length'];
-        yield 'no narrower values' => [['narrower_max_values' => 0], 'narrower_max_values must be 1 to 100000'];
-        yield 'too many narrower values' => [['narrower_max_values' => 100001], 'narrower_max_values'];
+        yield 'no narrower values' => [['narrower_max_values' => 0], 'narrower_max_values must be 1 to 60000'];
+        yield 'too many narrower values' => [['narrower_max_values' => 60001], 'narrower_max_values'];
         yield 'sensitive without a narrower' => [['accept_window_side_channel' => false], 'is sensitive: set a narrower'];
     }
 

@@ -12,6 +12,7 @@ use Nowo\SearchKitBundle\Provider\Entity\EntitySearchProvider;
 use Nowo\SearchKitBundle\Test\EntitySearchProviderTestCase;
 use Nowo\SearchKitBundle\Test\QueryCounter;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
+use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\OwnRequestsNarrower;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchKitAbsentTestCase;
 use Nowo\WorkflowBundle\Tests\Support\SearchKit\SearchRequestHarness;
@@ -128,6 +129,58 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
 
         self::assertInstanceOf(SearchGroup::class, $group);
         self::assertSame([$this->url($visible)], array_map(static fn (SearchItem $item): string => $item->url, $group->items));
+    }
+
+    /**
+     * The bound narrower values of one search are capped at 60,000 in all (PostgreSQL allows 65,535 parameters): at
+     * the cap the query runs and finds the right rows; one more value, or several fields over it together, fail
+     * closed before any SQL with the documented warning.
+     */
+    public function testNarrowerValuesAreCappedInAll(): void
+    {
+        [$tenant] = $this->tenants();
+        $marker   = $this->marker();
+        $this->actAs($tenant, self::VIEWER_A);
+        $visible = $this->seed($tenant, $marker);
+        $this->seedHidden($tenant, $marker);
+        $options = $this->leave()
+            ? SearchRequestHarness::options('leave', ['narrower_max_values' => 60000])
+            : SearchRequestHarness::options('purchase', ['narrower_max_values' => 60000]);
+        $owners = static function (int $count): array {
+            $values = ['', self::VIEWER_A];
+            for ($i = 2; $i < $count; ++$i) {
+                $values[] = 'user' . $i . '@example.com';
+            }
+
+            return $values;
+        };
+        $search = function (callable $rule, RecordingLogger $logger) use ($options, $marker): ?SearchGroup {
+            $definition = $this->harness->definition(static::subject(), $options, narrower: new OwnRequestsNarrower($rule(...)), logger: $logger);
+            $this->harness->counter->reset();
+
+            return (new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker));
+        };
+
+        $logger = new RecordingLogger();
+        $group  = $search(static fn (WorkflowRequestSearchCriteria $c): WorkflowRequestSearchCriteria => $c->whereIn('ownerIdentifier', $owners(60000)), $logger);
+        self::assertInstanceOf(SearchGroup::class, $group, 'at the cap');
+        self::assertSame([$this->url($visible)], array_map(static fn (SearchItem $item): string => $item->url, $group->items));
+        self::assertSame([], $logger->records);
+
+        foreach ([
+            'one over the cap' => static fn (WorkflowRequestSearchCriteria $c): WorkflowRequestSearchCriteria => $c->whereIn('ownerIdentifier', $owners(60001)),
+            'several fields'   => static function (WorkflowRequestSearchCriteria $c) use ($owners): void {
+                for ($i = 0; $i < 7; ++$i) {
+                    $c->whereIn('ownerIdentifier', $owners(10000));
+                }
+            },
+        ] as $case => $rule) {
+            $logger = new RecordingLogger();
+            self::assertNull($search($rule, $logger), $case);
+            self::assertSame(0, $this->harness->counter->count(), $case . ': no SQL');
+            self::assertSame(60000, $logger->records[0]['context']['limit'] ?? null, $case . ': the documented warning');
+            self::assertGreaterThan(60000, $logger->records[0]['context']['total']);
+        }
     }
 
     protected function definition(): EntitySearchDefinition

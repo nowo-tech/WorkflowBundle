@@ -21,8 +21,9 @@ use function sprintf;
  * - {@see none()}: the viewer may see nothing — the search gives no group before any SQL runs.
  * - `whereIn($field, [])`: that field matches nothing (it compiles to `1 = 0` in the query).
  * - Long lists: the definition splits a field's values into IN lists of {@see CHUNK} values, ORed, each one its own
- *   bound parameter. More than the subject's `narrower_max_values` values in one field fails closed: no group and a
- *   logged warning, never a silently cut list.
+ *   bound parameter. More than the subject's `narrower_max_values` values in one field, or more than
+ *   {@see MAX_TOTAL_VALUES} values in all, fails closed: no group, no SQL and a logged warning, never a silently cut
+ *   list.
  */
 final class WorkflowRequestSearchCriteria
 {
@@ -32,10 +33,15 @@ final class WorkflowRequestSearchCriteria
     /** Default most values of one field (`narrower_max_values`). */
     public const DEFAULT_MAX_VALUES = 10000;
 
+    /** The most values of all fields together (bound parameters of one query stay under the 65535 of PostgreSQL). */
+    public const MAX_TOTAL_VALUES = 60000;
+
     /** @var list<array<string, list<int|string>>> */
     private array $conditions = [];
 
     private bool $none = false;
+
+    private int $total = 0;
 
     /** @var list<string> fields given more values than allowed */
     private array $overflow = [];
@@ -75,6 +81,8 @@ final class WorkflowRequestSearchCriteria
                 throw new InvalidArgumentException(sprintf('Invalid search condition on "%s".', $field));
             }
             $values = is_array($values) ? array_values($values) : [$values];
+            // @igor-ignore - per-search criteria object, created for one search and never reused (not a service)
+            $this->total += count($values);
             if (count($values) > $this->maxValues) {
                 // @igor-ignore - per-search criteria object, created for one search and never reused (not a service)
                 $this->overflow[] = $field;
@@ -110,6 +118,18 @@ final class WorkflowRequestSearchCriteria
     public function isNone(): bool
     {
         return $this->none;
+    }
+
+    /** The values of every condition together (bound parameters of the query). */
+    public function totalValues(): int
+    {
+        return $this->total;
+    }
+
+    /** Whether one field has more than {@see $maxValues} values, or all of them more than {@see MAX_TOTAL_VALUES}. */
+    public function exceedsLimits(): bool
+    {
+        return $this->overflow !== [] || $this->total > self::MAX_TOTAL_VALUES;
     }
 
     /**

@@ -23,6 +23,8 @@ final class WorkflowRequestSearchCriteriaTest extends TestCase
         self::assertSame(WorkflowRequestSearchCriteria::DEFAULT_MAX_VALUES, $criteria->maxValues);
         self::assertFalse($criteria->isNone());
         self::assertSame([], $criteria->overflowingFields());
+        self::assertSame(5, $criteria->totalValues());
+        self::assertFalse($criteria->exceedsLimits());
         self::assertSame([['requesterId' => [5], 'approverId' => [5, 6]], ['departmentId' => [1, 2]]], $criteria->conditions());
         self::assertTrue($criteria->none()->isNone());
     }
@@ -51,5 +53,20 @@ final class WorkflowRequestSearchCriteriaTest extends TestCase
 
         self::assertSame(['userId'], $criteria->overflowingFields());
         self::assertSame(range(1, 4), $criteria->conditions()[1]['userId'], 'kept whole: the search fails closed instead');
+        self::assertSame(8, $criteria->totalValues());
+        self::assertTrue($criteria->exceedsLimits());
+    }
+
+    #[Test]
+    public function theTotalOfAllFieldsIsCapped(): void
+    {
+        $atCap = new WorkflowRequestSearchCriteria(30000);
+        $atCap->whereIn('userId', range(1, 30000))->whereAny(['userId' => range(1, 29999), 'approverId' => 1]);
+        self::assertSame(WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES, $atCap->totalValues());
+        self::assertFalse($atCap->exceedsLimits());
+
+        $over = $atCap->whereIn('approverId', [2]);
+        self::assertSame([], $over->overflowingFields());
+        self::assertTrue($over->exceedsLimits());
     }
 }

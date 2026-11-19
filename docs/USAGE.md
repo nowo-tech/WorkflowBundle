@@ -535,8 +535,9 @@ final class LeaveSearchNarrower implements WorkflowRequestSearchNarrowerInterfac
   candidates, no window places, no title lookup).
 - `whereIn($field, [])`: that field matches nothing (it compiles to `1 = 0`); the query still runs and finds nothing.
 - Long lists: a field's values are split into IN lists of 1,000 values, ORed, each its own bound parameter. More than
-  `narrower_max_values` values in one field (default 10,000) **fails closed**: no group and a logged warning (subject,
-  field and limit; never the values). A list is never cut silently.
+  `narrower_max_values` values in one field (default 10,000, at most 60,000), or more than 60,000 values in all the
+  conditions together (a query's bound parameters stay under PostgreSQL's 65,535), **fails closed**: no group, no SQL
+  and a logged warning (subject, total and limits; never the values). A list is never cut silently.
 
 The narrower is asked once per search (and once per revalidated recent).
 

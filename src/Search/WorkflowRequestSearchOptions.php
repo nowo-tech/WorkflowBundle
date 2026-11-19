@@ -54,7 +54,7 @@ final readonly class WorkflowRequestSearchOptions
     public const DEFAULT_LABEL = 'search.group.workflow_requests';
 
     /** The largest `narrower_max_values`. */
-    public const MAX_NARROWER_VALUES = 100000;
+    public const MAX_NARROWER_VALUES = WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES;
 
     /** SearchKit's bounds of the candidate window. */
     public const MAX_CANDIDATES = 1000;

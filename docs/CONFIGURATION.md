@@ -277,7 +277,7 @@ nowo_workflow:
                 gate: ~                  # service id: WorkflowRequestSearchGateInterface, required
                 title_resolver: ~        # service id: WorkflowRequestTitleResolverInterface (or title_field)
                 narrower: ~              # service id: WorkflowRequestSearchNarrowerInterface (optional)
-                narrower_max_values: 10000  # most values per field (IN lists of 1000); more = no group + warning
+                narrower_max_values: 10000  # most values per field (IN lists of 1000; at most 60000, and 60000 in all); more = no group + warning
                 id_field: id             # in the URL, the access event, the resolver and recents
                 search_text_field: ~     # viewer-neutral text the host maintains (or title_field)
                 title_field: ~           # shown without a resolver; searched without a search text

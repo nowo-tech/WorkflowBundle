@@ -18,6 +18,7 @@ use Nowo\WorkflowBundle\Event\WorkflowRequestAccessCheckEvent;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Routing\Generator\UrlGenerator;
 use Symfony\Component\Routing\RequestContext;
@@ -137,7 +138,7 @@ final class SearchRequestHarness
         return WorkflowRequestSearchOptions::fromConfig($subject, $override + $base);
     }
 
-    public function definition(string $subject = 'leave', ?WorkflowRequestSearchOptions $options = null, ?TranslatorInterface $translator = null, bool $withDispatcher = true, ?WorkflowRequestSearchNarrowerInterface $narrower = null): WorkflowRequestSearchDefinition
+    public function definition(string $subject = 'leave', ?WorkflowRequestSearchOptions $options = null, ?TranslatorInterface $translator = null, bool $withDispatcher = true, ?WorkflowRequestSearchNarrowerInterface $narrower = null, ?LoggerInterface $logger = null): WorkflowRequestSearchDefinition
     {
         $options ??= self::options($subject);
 
@@ -150,6 +151,7 @@ final class SearchRequestHarness
             $translator,
             $options->titleResolver === null ? null : $this->titles,
             $narrower ?? ($options->narrower === null ? null : $this->ownerNarrower),
+            $logger,
         );
     }
 

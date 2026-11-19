@@ -80,7 +80,7 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
     /** Translation key of the generic title of a request without one. */
     public const UNTITLED = 'search.untitled_request';
 
-    /** @var WeakMap<SearchQuery, WorkflowRequestSearchCriteria> the narrowing of one search, keyed by its query */
+    /** @var WeakMap<SearchQuery, array{tenant: int|string, criteria: WorkflowRequestSearchCriteria}> the narrowing of one search, keyed by its query (and its tenant) */
     private readonly WeakMap $criteria;
 
     /** Key of the resolved titles in the SearchItemContext of a render. */
@@ -128,7 +128,8 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
 
     /**
      * The gate's switch, then the narrowing: a narrower that gives {@see WorkflowRequestSearchCriteria::none()} — or
-     * more values for a field than `narrower_max_values` (logged) — leaves no group, before any SQL runs.
+     * more values for a field than `narrower_max_values`, or more than
+     * {@see WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES} in all (logged) — leaves no group, before any SQL runs.
      */
     public function featureEnabled(int|string $tenant, SearchQuery $query): bool
     {
@@ -139,10 +140,12 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         if (!$criteria instanceof WorkflowRequestSearchCriteria) {
             return true;
         }
-        if ($criteria->overflowingFields() !== []) {
-            $this->logger?->warning('Workflow request search: the narrower of subject "{subject}" gave more than {max} values for {fields}; no results (fail closed).', [
+        if ($criteria->exceedsLimits()) {
+            $this->logger?->warning('Workflow request search: the narrower of subject "{subject}" gave too many values ({total} in all, limit {limit}; more than {max} for: {fields}); no results (fail closed).', [
                 'bundle'  => 'NowoWorkflowBundle',
                 'subject' => $this->options->subject,
+                'total'   => $criteria->totalValues(),
+                'limit'   => WorkflowRequestSearchCriteria::MAX_TOTAL_VALUES,
                 'max'     => $criteria->maxValues,
                 'fields'  => implode(', ', $criteria->overflowingFields()),
             ]);
@@ -326,22 +329,25 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
     }
 
     /**
-     * The narrowing of this search (null without a narrower): asked once per query object and kept with it (a WeakMap
-     * keyed by the query, so featureEnabled() and baseQuery() of one search share it and it goes with the query).
+     * The narrowing of this search (null without a narrower): asked once per query object and tenant, and kept with
+     * the query (a WeakMap keyed by it, so featureEnabled() and baseQuery() of one search share it and it goes with the
+     * query; another tenant asks again).
      */
     private function criteria(int|string $tenant, SearchQuery $query): ?WorkflowRequestSearchCriteria
     {
         if (!$this->narrower instanceof WorkflowRequestSearchNarrowerInterface) {
             return null;
         }
-        if (!isset($this->criteria[$query])) {
-            $criteria = new WorkflowRequestSearchCriteria($this->options->narrowerMaxValues);
-            $this->narrower->narrow($this->options->subject, $criteria, $query->userIdentifier, $tenant);
-            // @igor-ignore - keyed by the search's own query object: the entry goes with that query (WeakMap)
-            $this->criteria[$query] = $criteria;
+        $memo = $this->criteria[$query] ?? null;
+        if ($memo !== null && $memo['tenant'] === $tenant) {
+            return $memo['criteria'];
         }
+        $criteria = new WorkflowRequestSearchCriteria($this->options->narrowerMaxValues);
+        $this->narrower->narrow($this->options->subject, $criteria, $query->userIdentifier, $tenant);
+        // @igor-ignore - keyed by the search's own query object: the entry goes with that query (WeakMap)
+        $this->criteria[$query] = ['tenant' => $tenant, 'criteria' => $criteria];
 
-        return $this->criteria[$query];
+        return $criteria;
     }
 
     /**
@@ -353,7 +359,7 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
      */
     private function narrow(WorkflowRequestSearchCriteria $criteria, QueryBuilder $qb, ClassMetadata $metadata): void
     {
-        if ($criteria->isNone() || $criteria->overflowingFields() !== []) {
+        if ($criteria->isNone() || $criteria->exceedsLimits()) {
             $qb->andWhere('1 = 0');
 
             return;

@@ -346,6 +346,20 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     }
 
     #[Test]
+    public function theNarrowerIsAskedOncePerQueryAndTenant(): void
+    {
+        $narrower   = new OwnRequestsNarrower(static fn (WorkflowRequestSearchCriteria $criteria): WorkflowRequestSearchCriteria => $criteria->whereIn('ownerIdentifier', ['']));
+        $definition = $this->harness->definition(narrower: $narrower);
+        $query      = $this->query('x');
+
+        self::assertTrue($definition->featureEnabled(self::TENANT, $query));
+        $definition->baseQuery(self::TENANT, $query);
+        self::assertCount(1, $narrower->calls);
+        $definition->baseQuery(self::TENANT + 1, $query);
+        self::assertSame([self::TENANT, self::TENANT + 1], array_map(static fn (array $call): int|string => $call[2], $narrower->calls), 'another tenant asks again');
+    }
+
+    #[Test]
     public function anEmptyListMatchesNothing(): void
     {
         $marker = $this->marker();
@@ -367,8 +381,9 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         $this->harness->counter->reset();
         self::assertNull((new EntitySearchProvider($definition, new EventDispatcher()))->search($this->query($marker)));
         self::assertSame(0, $this->harness->counter->count());
-        self::assertStringContainsString('more than {max} values', $logger->records[0]['message'] ?? '');
-        self::assertSame(['leave', 1000, 'ownerIdentifier'], [$logger->records[0]['context']['subject'], $logger->records[0]['context']['max'], $logger->records[0]['context']['fields']]);
+        self::assertStringContainsString('gave too many values', $logger->records[0]['message'] ?? '');
+        $context = $logger->records[0]['context'];
+        self::assertSame(['leave', 1001, 60000, 1000, 'ownerIdentifier'], [$context['subject'], $context['total'], $context['limit'], $context['max'], $context['fields']]);
         self::assertStringContainsString('1 = 0', $definition->baseQuery(self::TENANT, $this->query($marker))->getDQL(), 'a direct baseQuery() finds nothing either');
     }
 
