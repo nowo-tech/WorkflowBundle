@@ -407,7 +407,7 @@ One search of a subject runs, in order: the group switch (`nowo_search_kit.group
 feature switch, **one SQL query** (tenant, archived rows, excluded statuses and the narrowing as conditions; an
 escaped `LOWER(field) LIKE … ESCAPE '!'` of every word over the search text and the status; at most `max_candidates`
 rows, newest first), then **one** `WorkflowRequestAccessCheckEvent` for all candidates, SearchKit's own host event,
-then **one** title resolver call. Any refusal gives no group at all: no count, no hint.
+then **one** title resolver call for the shown page. Any refusal gives no group at all: no count, no hint.
 
 Every subject needs a tenant: `tenant_field`, or `single_tenant: true` when every request of the class belongs to the
 one tenant (an application without tenants). The container refuses a subject with neither.
@@ -473,8 +473,9 @@ final class LeaveSearchAccess
 
 ### Titles: the title resolver
 
-The shown title comes from the subject's `title_resolver`, in **one** batch per search, and only for ids the access
-event let through: never for an id it hid. A title may depend on the viewer (*Absent* instead of a medical leave
+The shown title comes from the subject's `title_resolver`, in **one** batch per results page, with exactly the ids
+shown on that page (after the access event, SearchKit's host event and the page cut), and once per revalidated recent:
+never with an id the viewer may not see. A title may depend on the viewer (*Absent* instead of a medical leave
 type, as on your requests list). Without a resolver, or for an id it leaves out, `title_field` is shown (else an empty
 title). The bundle cuts titles to 200 characters; SearchKit escapes them.
 
@@ -490,14 +491,15 @@ final class LeaveSearchTitles implements WorkflowRequestTitleResolverInterface
 }
 ```
 
-With SearchKit 1.9 the batch covers the visible candidates of the search (up to `max_candidates`), not only the shown
-page, because SearchKit 1.9 has no hook for the shown rows.
+The titles of a render are kept in SearchKit's per-render `SearchItemContext` (`prepareItems()` /
+`toPreparedItem()`), never on the definition, so nothing reaches another viewer or request in worker mode.
 
 ### Narrowing in SQL (the candidate window)
 
-One search reads at most `max_candidates` matching requests (newest first), then the access event decides. A viewer
-who may see only a few requests among many (e.g. only their own) can find **none** of them when newer requests they
-may not see fill the window. A `narrower` adds SQL conditions for the viewer first, so their requests stay in the
+One search reads at most `max_candidates` matching requests (newest first), then the access event decides **in PHP**.
+A viewer who may see only a few requests among many (e.g. only their own) can find **none** of them when newer
+requests they may not see fill the window, and a full window makes the total a lower bound. Push every rule SQL can
+express into the narrower; keep the access event for what it cannot. A `narrower` adds SQL conditions for the viewer first, so their requests stay in the
 window (mapped fields and bound values only; the access event still decides every row):
 
 ```php
@@ -531,7 +533,7 @@ revalidation, a stored recent is checked again: same route, an id of the id colu
 range for an integer column, else letters, digits, `_` or `-`), then the whole flow above.
 
 The definitions are stateless (FrankenPHP worker mode with the kernel reset off): the entity manager, the tenant and
-the viewer are resolved on every call; the titles of one search are kept with that search only.
+the viewer are resolved on every call; the titles of one render live in its `SearchItemContext` only.
 
 ## FrankenPHP / long-running workers
 

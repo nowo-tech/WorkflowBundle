@@ -557,7 +557,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
 
     /**
      * Since 1.21: one SearchKit group per `search_kit.subjects` entry ({@see WorkflowRequestSearchDefinition}), only
-     * when `search_kit.enabled` and SearchKit >= 1.9 is installed (SearchKit stays optional: it needs PHP >= 8.3).
+     * when `search_kit.enabled` and SearchKit >= 1.10 is installed (SearchKit stays optional: it needs PHP >= 8.3).
      * Each definition is tagged for SearchKit's provider pass, which builds its provider.
      *
      * @param array{enabled: bool, subjects: array<string, array<string, mixed>>} $searchKit

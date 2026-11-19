@@ -14,6 +14,7 @@ use Nowo\SearchKitBundle\Model\SearchItem;
 use Nowo\SearchKitBundle\Model\SearchQuery;
 use Nowo\SearchKitBundle\Model\SearchReference;
 use Nowo\SearchKitBundle\Provider\Entity\EntitySearchDefinition;
+use Nowo\SearchKitBundle\Provider\Entity\SearchItemContext;
 use Nowo\SearchKitBundle\Search\Query\SeeAllLink;
 use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchGateInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowRequestSearchNarrowerInterface;
@@ -26,12 +27,12 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Stringable;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
-use WeakMap;
 
 use function count;
 use function ctype_digit;
 use function implode;
 use function in_array;
+use function is_array;
 use function is_int;
 use function is_object;
 use function is_string;
@@ -44,7 +45,7 @@ use function strlen;
 use const PHP_INT_MAX;
 
 /**
- * Since 1.21.0: one SearchKit group (SearchKit >= 1.9, {@see EntitySearchDefinition}) per subject of
+ * Since 1.21.0: one SearchKit group (SearchKit >= 1.10, {@see EntitySearchDefinition}) per subject of
  * `nowo_workflow.search_kit.subjects` — the host's workflow requests of one type (e.g. leave requests), matched on a
  * viewer-neutral search text and the status, only those the viewer may see.
  *
@@ -53,11 +54,11 @@ use const PHP_INT_MAX;
  *   ({@see WorkflowRequestSearchNarrowerInterface}) are conditions of the query; the newest first.
  * - Then `view`: one {@see WorkflowRequestAccessCheckEvent} for all candidates ({@see filterVisible()}), **deny by
  *   default**, so the host's access rules decide (SearchKit's own host event runs after it).
- * - Titles: the subject's {@see WorkflowRequestTitleResolverInterface} in one batch, for visible ids only
+ * - Titles: the subject's {@see WorkflowRequestTitleResolverInterface} in one batch for exactly the shown rows
  *   ({@see prepareItems()}), else `title_field`. A result shows the title and the status label only.
  *
  * Stateless (FrankenPHP worker mode, kernel reset off): the entity manager, the tenant and the viewer are resolved on
- * every call. The titles of a search live in a WeakMap keyed by that search's query object, so they go with it.
+ * every call. The titles of a render live in SearchKit's per-render SearchItemContext, never in a property.
  */
 final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
 {
@@ -79,8 +80,8 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
     /** Doctrine types of integer id fields: a recent's id must then be digits within the int range. */
     private const INTEGER_TYPES = [Types::INTEGER, Types::SMALLINT, Types::BIGINT];
 
-    /** @var WeakMap<SearchQuery, array<string, string>> the resolved titles of one search, keyed by its query */
-    private readonly WeakMap $titles;
+    /** Key of the resolved titles in the SearchItemContext of a render. */
+    private const CONTEXT_TITLES = 'workflow_request_titles';
 
     public function __construct(
         private readonly ManagerRegistry $doctrine,
@@ -92,7 +93,6 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         private readonly ?WorkflowRequestTitleResolverInterface $titleResolver = null,
         private readonly ?WorkflowRequestSearchNarrowerInterface $narrower = null,
     ) {
-        $this->titles = new WeakMap();
     }
 
     public function group(): string
@@ -183,37 +183,36 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
                 $visible[] = $row;
             }
         }
-        // SearchKit 1.9 has no batch hook for the shown rows: the titles of the visible candidates are resolved here,
-        // in one call, never for a row the access event hid.
-        $this->prepareItems($visible, $query);
 
         return $visible;
     }
 
     /**
-     * Resolves the titles of these visible rows in one {@see WorkflowRequestTitleResolverInterface} call (nothing
-     * without a resolver or without rows), for the toItem() calls of the same search.
+     * The titles of the shown rows in one {@see WorkflowRequestTitleResolverInterface} call (nothing without a resolver),
+     * kept in this render's context. SearchKit calls it once per page with exactly the shown rows (after the access
+     * event, SearchKit's host event and the page cut) and once per resolved recent: never with a hidden row.
      *
-     * @param list<array<string, mixed>|object> $rows
+     * @param list<array<string, mixed>|object> $shownRows
      */
-    public function prepareItems(array $rows, SearchQuery $query): void
+    public function prepareItems(array $shownRows, SearchQuery $query, SearchItemContext $context): void
     {
-        if (!$this->titleResolver instanceof WorkflowRequestTitleResolverInterface || $rows === []) {
+        if (!$this->titleResolver instanceof WorkflowRequestTitleResolverInterface || $shownRows === []) {
+            return;
+        }
+        $tenant = $this->gate->tenantOf($query->userIdentifier);
+        if ($tenant === null) {
             return;
         }
         $ids  = [];
         $seen = [];
-        foreach ($rows as $row) {
+        foreach ($shownRows as $row) {
             $id = $this->requestId($row);
             if (!isset($seen[$id])) {
                 $seen[$id] = true;
                 $ids[]     = $id;
             }
         }
-        $tenant = $this->gate->tenantOf($query->userIdentifier);
-        $titles = $tenant === null ? [] : $this->titleResolver->titles($this->options->subject, $ids, $query->userIdentifier, $tenant, $query->locale);
-        // @igor-ignore - keyed by the search's own query object: the entry goes with that query (WeakMap)
-        $this->titles[$query] = $titles;
+        $context->set(self::CONTEXT_TITLES, $this->titleResolver->titles($this->options->subject, $ids, $query->userIdentifier, $tenant, $query->locale));
     }
 
     public function subjectId(array|object $row): string
@@ -221,13 +220,12 @@ final class WorkflowRequestSearchDefinition extends EntitySearchDefinition
         return $this->requestId($row);
     }
 
-    public function toItem(array|object $row, SearchQuery $query): SearchItem
+    /** The title from this render's resolved titles, else `title_field`; the status label; the subject's route. */
+    public function toPreparedItem(array|object $row, SearchQuery $query, SearchItemContext $context): SearchItem
     {
-        $id = $this->requestId($row);
-        if ($this->titleResolver instanceof WorkflowRequestTitleResolverInterface && !isset($this->titles[$query])) {
-            $this->prepareItems([$row], $query);
-        }
-        $title = $this->titles[$query][$id] ?? ($this->options->titleField === null ? null : $this->value($row, $this->options->titleField));
+        $id     = $this->requestId($row);
+        $titles = $context->get(self::CONTEXT_TITLES, []);
+        $title  = is_array($titles) && isset($titles[$id]) ? $titles[$id] : ($this->options->titleField === null ? null : $this->value($row, $this->options->titleField));
 
         return new SearchItem(
             is_string($title) || is_int($title) ? mb_substr((string) $title, 0, self::MAX_TITLE_LENGTH) : '',

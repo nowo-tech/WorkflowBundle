@@ -258,7 +258,7 @@ See [SECURITY.md](SECURITY.md#protecting-the-crud-ui).
 ## Header search (SearchKit, 1.21)
 
 One SearchKit group per subject ([USAGE](USAGE.md#header-search-the-workflow-requests-searchkit-121)). The groups are
-registered only when `enabled` is true **and** SearchKit 1.9 or later is installed (PHP 8.3 or later). Everything is
+registered only when `enabled` is true **and** SearchKit 1.10 or later is installed (PHP 8.3 or later). Everything is
 checked when the container is built: every `*_field` is a mapped field (not an association) of `subject_class`, letters,
 digits and `_` (checked again against the entity metadata on every search); group keys start with a lower-case letter,
 never start with `nowo_search_` and are unique across subjects.

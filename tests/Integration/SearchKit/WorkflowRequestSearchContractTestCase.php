@@ -28,7 +28,8 @@ if (!class_exists(EntitySearchProviderTestCase::class)) {
  * Since 1.21.0: SearchKit's provider contract (EntitySearchProviderTestCase), one definition per subject:
  *
  * - "leave": matched on the host-maintained search text, titles from the host's title resolver, a string-backed enum
- *   status column, integer ids and tenant. Budget 3: the search, the access listener and the title resolver.
+ *   status column, integer ids and tenant. Budget 3: the search, the access listener and the title resolver
+ *   (prepareItems(): one statement, exactly the shown rows).
  * - "purchase": the simple form — the title column is searched and shown, a plain status, string ids and tenant.
  *   Budget 2: the search and the access listener.
  *
@@ -48,7 +49,7 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
     protected function setUp(): void
     {
         if (!class_exists(EntitySearchDefinition::class)) {
-            self::markTestSkipped('nowo-tech/search-kit-bundle >= 1.9 is not installed (PHP >= 8.3).');
+            self::markTestSkipped('nowo-tech/search-kit-bundle >= 1.10 is not installed (PHP >= 8.3).');
         }
         $variable = static::urlVariable();
         $url      = $variable === null ? null : getenv($variable);
@@ -160,6 +161,30 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
     protected function queryBudget(): int
     {
         return $this->leave() ? 3 : 2;
+    }
+
+    protected function prepareItemsBudget(): int
+    {
+        return 1;
+    }
+
+    protected function hasArchivedState(): bool
+    {
+        return true;
+    }
+
+    /** The host's search text (leave) or title (purchase) changes: the next render must show it. */
+    protected function changeSeededText(int|string $id, string $text): bool
+    {
+        $connection = $this->harness->em->getConnection();
+        if ($this->leave()) {
+            $connection->update('wfsk_search_request', ['search_text' => 'Leave ' . $text, 'title' => 'T ' . $text], ['id' => $id]);
+        } else {
+            $connection->update('wfsk_purchase_request', ['title' => 'Purchase ' . $text], ['id' => $id]);
+        }
+        $this->harness->em->clear();
+
+        return true;
     }
 
     private function leave(): bool

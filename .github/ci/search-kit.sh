@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI helper (since 1.21.0): SearchKit (nowo-tech/search-kit-bundle >= 1.9, PHP >= 8.3) is an optional dependency of the
+# CI helper (since 1.21.0): SearchKit (nowo-tech/search-kit-bundle >= 1.10, PHP >= 8.3) is an optional dependency of the
 # SearchKit groups of workflow requests (src/Bridge/SearchKit). It is not in composer.json or composer.lock: the bundle
 # supports PHP 8.2 and the PHP 8.2 jobs (and composer.json's platform 8.2.0) could not resolve it.
 #
@@ -8,7 +8,7 @@
 # nothing: the groups are not registered, their tests are skipped and PHPStan leaves it out (phpstan-search-kit.php).
 set -euo pipefail
 
-CONSTRAINT="${SEARCH_KIT_CONSTRAINT:-^1.9}"
+CONSTRAINT="${SEARCH_KIT_CONSTRAINT:-^1.10}"
 PACKAGE="nowo-tech/search-kit-bundle"
 
 if ! php -r 'exit(PHP_VERSION_ID >= 80300 ? 0 : 1);'; then

@@ -20,7 +20,7 @@ interface WorkflowRequestTitleResolverInterface
 {
     /**
      * @param string $subject the subject key (`search_kit.subjects.<subject>`), to tell request types apart
-     * @param list<string> $ids the visible ids (the subject's `id_field` values, as strings)
+     * @param list<string> $ids the shown ids (the subject's `id_field` values, as strings)
      * @param string $userIdentifier the signed-in user of the search
      * @param int|string $tenant the gate's tenant of the search
      * @param string|null $locale the search locale

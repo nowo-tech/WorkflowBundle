@@ -309,7 +309,7 @@ final class Configuration implements ConfigurationInterface
     {
         $node = (new TreeBuilder('search_kit'))->getRootNode();
         $node
-            ->info('Since 1.21: one SearchKit group per subject (SearchKit >= 1.9, PHP >= 8.3): the host\'s workflow requests of one type, matched on a viewer-neutral search text and the status, only those the viewer may see (WorkflowRequestAccessCheckEvent, deny by default). Registered only when enabled and SearchKit is installed; reorder or switch a group off with nowo_search_kit.groups.<group>.')
+            ->info('Since 1.21: one SearchKit group per subject (SearchKit >= 1.10, PHP >= 8.3): the host\'s workflow requests of one type, matched on a viewer-neutral search text and the status, only those the viewer may see (WorkflowRequestAccessCheckEvent, deny by default). Registered only when enabled and SearchKit is installed; reorder or switch a group off with nowo_search_kit.groups.<group>.')
             ->addDefaultsIfNotSet()
             ->children()
                 ->booleanNode('enabled')->defaultFalse()->info('true = register a group per subject.')->end()

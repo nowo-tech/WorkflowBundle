@@ -12,6 +12,7 @@ use Nowo\SearchKitBundle\Model\SearchQuery;
 use Nowo\SearchKitBundle\Model\SearchReference;
 use Nowo\SearchKitBundle\Provider\Entity\EntitySearchDefinition;
 use Nowo\SearchKitBundle\Provider\Entity\EntitySearchProvider;
+use Nowo\SearchKitBundle\Provider\Entity\SearchItemContext;
 use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
 use Nowo\WorkflowBundle\Event\WorkflowRequestAccessCheckEvent;
 use Nowo\WorkflowBundle\Model\WorkflowRequestRef;
@@ -53,7 +54,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     protected function setUp(): void
     {
         if (!class_exists(EntitySearchDefinition::class)) {
-            self::markTestSkipped('nowo-tech/search-kit-bundle >= 1.9 is not installed (PHP >= 8.3).');
+            self::markTestSkipped('nowo-tech/search-kit-bundle >= 1.10 is not installed (PHP >= 8.3).');
         }
         $this->harness               = new SearchRequestHarness();
         $this->harness->gate->tenant = self::TENANT;
@@ -113,23 +114,40 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         $id         = $this->harness->insert(self::TENANT, 'x', title: null);
         $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['title_field' => 'searchText']));
         $query      = $this->query('x');
+        $context    = new SearchItemContext();
 
-        self::assertSame('x', $definition->toItem($this->find($id), $query)->title, 'the resolver gave none');
-        self::assertCount(1, $this->harness->titles->calls, 'toItem() outside a search resolves its own row');
-        $definition->toItem($this->find($id), $query);
-        self::assertCount(1, $this->harness->titles->calls, 'once per query');
+        $definition->prepareItems([$this->find($id), $this->find($id)], $query, $context);
+        self::assertSame([(string) $id], $this->harness->titles->calls[0]['ids'], 'one id once');
+        self::assertSame('x', $definition->toPreparedItem($this->find($id), $query, $context)->title, 'the resolver gave none');
+        self::assertSame('x', $definition->toPreparedItem($this->find($id), $query, new SearchItemContext())->title, 'nothing prepared');
+        self::assertCount(1, $this->harness->titles->calls, 'toPreparedItem() never calls the resolver');
     }
 
     #[Test]
-    public function noTenantNoTitleLookup(): void
+    public function noTenantOrNoRowsNoTitleLookup(): void
     {
-        $id                          = $this->harness->insert(self::TENANT, 'x');
+        $id      = $this->harness->insert(self::TENANT, 'x');
+        $context = new SearchItemContext();
+        $this->harness->definition()->prepareItems([], $this->query('x'), $context);
         $this->harness->gate->viewer = 'someone-else';
-
-        $this->harness->definition()->prepareItems([$this->find($id)], $this->query('x'));
-        $this->harness->definition()->prepareItems([], $this->query('x'));
+        $this->harness->definition()->prepareItems([$this->find($id)], $this->query('x'), $context);
+        $this->harness->definition('purchase')->prepareItems([$this->find($id)], $this->query('x'), $context);
 
         self::assertSame([], $this->harness->titles->calls);
+        self::assertFalse($context->has('workflow_request_titles'));
+    }
+
+    #[Test]
+    public function theResolverOnlyGetsTheShownPage(): void
+    {
+        $marker = $this->marker();
+        $first  = $this->harness->insert(self::TENANT, 'A ' . $marker);
+        $this->harness->insert(self::TENANT, 'B ' . $marker);
+
+        $group = (new EntitySearchProvider($this->harness->definition(), new EventDispatcher()))->search(SearchQuery::forUserIdentifier(self::VIEWER, $marker, 1));
+        self::assertInstanceOf(SearchGroup::class, $group);
+        self::assertCount(1, $group->items);
+        self::assertSame([[(string) $first]], array_map(static fn (array $call): array => $call['ids'], $this->harness->titles->calls));
     }
 
     #[Test]
@@ -197,8 +215,10 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
         $id         = $this->harness->insert(self::TENANT, 'x', body: 'secret', title: str_repeat('x', 250));
         $definition = $this->harness->definition(options: SearchRequestHarness::options('leave', ['route_parameters' => ['tab' => 'details']]));
         $query      = $this->query('x');
+        $context    = new SearchItemContext();
+        $definition->prepareItems([$this->find($id)], $query, $context);
 
-        $item = $definition->toItem($this->find($id), $query);
+        $item = $definition->toPreparedItem($this->find($id), $query, $context);
         self::assertSame(WorkflowRequestSearchDefinition::MAX_TITLE_LENGTH, mb_strlen($item->title));
         self::assertSame('/requests/' . $id . '?tab=details', $item->url);
         self::assertSame('pending', $item->subtitle);
@@ -219,11 +239,11 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
 
         $translated = $this->harness->definition(options: SearchRequestHarness::options('leave', ['status_label_domain' => 'leave', 'status_label_prefix' => 'leave.status.']), translator: $translator);
         self::assertSame('Solicitudes', $translated->label($query));
-        self::assertSame('Pendiente', $translated->toItem($this->find($id), $query)->subtitle);
+        self::assertSame('Pendiente', $translated->toPreparedItem($this->find($id), $query, new SearchItemContext())->subtitle);
         self::assertSame('Compras', $this->harness->definition('purchase', translator: $translator)->label($query));
 
         $noTranslator = $this->harness->definition(options: SearchRequestHarness::options('leave', ['status_label_domain' => 'leave']));
-        self::assertSame('pending', $noTranslator->toItem($this->find($id), $query)->subtitle);
+        self::assertSame('pending', $noTranslator->toPreparedItem($this->find($id), $query, new SearchItemContext())->subtitle);
     }
 
     #[Test]
@@ -357,7 +377,7 @@ final class WorkflowRequestSearchDefinitionTest extends TestCase
     {
         $this->expectException(LogicException::class);
 
-        $this->harness->definition('purchase')->toItem(['id' => 1, 'title' => 'x'], $this->query('a'));
+        $this->harness->definition('purchase')->toPreparedItem(['id' => 1, 'title' => 'x'], $this->query('a'), new SearchItemContext());
     }
 
     #[Test]

@@ -14,6 +14,6 @@ abstract class SearchKitAbsentTestCase extends TestCase
 {
     public function testSearchKitIsInstalled(): void
     {
-        self::markTestSkipped('nowo-tech/search-kit-bundle >= 1.9 is not installed (PHP >= 8.3).');
+        self::markTestSkipped('nowo-tech/search-kit-bundle >= 1.10 is not installed (PHP >= 8.3).');
     }
 }
