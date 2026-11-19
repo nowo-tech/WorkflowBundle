@@ -27,8 +27,10 @@ use Symfony\Component\Routing\RouteCollection;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 use function bin2hex;
+use function hrtime;
 use function is_string;
 use function random_bytes;
+use function sprintf;
 
 use const PHP_VERSION_ID;
 
@@ -180,7 +182,9 @@ final class SearchRequestHarness
 
     public function insertPurchase(int|string $tenant, string $title, string $owner = '', bool $deleted = false, string $place = 'open'): string
     {
-        $request = new PurchaseRequest('p' . bin2hex(random_bytes(8)), (string) $tenant, $title, $place, $owner);
+        // Ids sort by insertion (a fixed-width monotonic clock, then a random suffix): every row has the same created_at,
+        // so the definition's tie-break (id ASC) gives insertion order, as the leave rows' auto-increment ids do.
+        $request = new PurchaseRequest(sprintf('p%020d%s', hrtime(true), bin2hex(random_bytes(2))), (string) $tenant, $title, $place, $owner);
         if ($deleted) {
             $request->delete();
         }
