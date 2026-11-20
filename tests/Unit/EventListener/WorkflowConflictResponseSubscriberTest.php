@@ -9,6 +9,8 @@ use Doctrine\DBAL\Exception\DeadlockException;
 use Doctrine\ORM\OptimisticLockException;
 use LogicException;
 use Nowo\TransactionContract\TransientStorageFailure;
+use Nowo\TransactionDoctrine\WriteUnit\CommitLedger;
+use Nowo\TransactionDoctrine\WriteUnit\CommitMark;
 use Nowo\WorkflowBundle\EventListener\WorkflowConflictResponseSubscriber;
 use Nowo\WorkflowBundle\Exception\WorkflowConflictException;
 use Nowo\WorkflowBundle\Exception\WorkflowPinConflictException;
@@ -93,6 +95,59 @@ final class WorkflowConflictResponseSubscriberTest extends TestCase
     }
 
     #[Test]
+    public function aConflictWithoutAnEarlierCommitIsConflict001WithRetryAfterInBothShapes(): void
+    {
+        $json = $this->request();
+        $json->headers->set('X-Requested-With', 'XMLHttpRequest');
+        $event = $this->event($json, WorkflowConflictException::markingChanged('leave', ['a'], ['b'], 3));
+        (new WorkflowConflictResponseSubscriber())->onKernelException($event);
+        self::assertSame('CONFLICT_001', $event->getResponse()?->headers->get('X-Conflict-Code'));
+        self::assertSame('3', $event->getResponse()->headers->get('Retry-After'));
+
+        $event = $this->event($this->request(), WorkflowConflictException::markingChanged('leave', ['a'], ['b'], 3));
+        (new WorkflowConflictResponseSubscriber())->onKernelException($event);
+        $http = $event->getThrowable();
+        self::assertInstanceOf(HttpException::class, $http);
+        self::assertSame('CONFLICT_001', $http->getHeaders()['X-Conflict-Code']);
+        self::assertSame('CONFLICT_001', $http->getHeaders()['X-Error-Code']);
+        self::assertSame('3', $http->getHeaders()['Retry-After']);
+    }
+
+    #[Test]
+    public function aCommitEarlierInTheRequestIsConflict002WithoutRetryAfterInBothShapes(): void
+    {
+        $json = $this->committedRequest();
+        $json->headers->set('X-Requested-With', 'XMLHttpRequest');
+        $event = $this->event($json, WorkflowConflictException::markingChanged('leave', ['a'], ['b'], 3));
+        (new WorkflowConflictResponseSubscriber())->onKernelException($event);
+        $response = $event->getResponse();
+        self::assertInstanceOf(JsonResponse::class, $response);
+        self::assertSame(409, $response->getStatusCode());
+        self::assertSame('CONFLICT_002', $response->headers->get('X-Conflict-Code'));
+        self::assertFalse($response->headers->has('Retry-After'));
+        self::assertSame('{"error":"CONFLICT_002","message":"' . WorkflowConflictResponseSubscriber::PARTIAL_MESSAGE . '"}', $response->getContent());
+
+        $event = $this->event($this->committedRequest(), WorkflowConflictException::markingChanged('leave', ['a'], ['b'], 3));
+        (new WorkflowConflictResponseSubscriber())->onKernelException($event);
+        $http = $event->getThrowable();
+        self::assertInstanceOf(HttpException::class, $http);
+        self::assertSame(409, $http->getStatusCode());
+        self::assertSame('CONFLICT_002', $http->getHeaders()['X-Conflict-Code']);
+        self::assertArrayNotHasKey('Retry-After', $http->getHeaders());
+        self::assertArrayNotHasKey('X-Error-Code', $http->getHeaders());
+    }
+
+    #[Test]
+    public function aMarkWithNoCommitKeepsConflict001(): void
+    {
+        $request = $this->request();
+        $request->attributes->set(CommitMark::REQUEST_ATTRIBUTE, new CommitMark(new CommitLedger()));
+        $event = $this->event($request, WorkflowConflictException::subjectMissing('leave', [], 1));
+        (new WorkflowConflictResponseSubscriber())->onKernelException($event);
+        self::assertSame('CONFLICT_001', $event->getThrowable() instanceof HttpException ? $event->getThrowable()->getHeaders()['X-Conflict-Code'] : null);
+    }
+
+    #[Test]
     public function otherFailuresAndOtherRoutesAreLeftAlone(): void
     {
         $event = $this->event($this->request(), new LogicException('bug'));
@@ -111,6 +166,16 @@ final class WorkflowConflictResponseSubscriberTest extends TestCase
     {
         $request = Request::create('/workflow/definitions/1/publish', 'POST');
         $request->attributes->set('_route', 'nowo_workflow_definition_publish');
+
+        return $request;
+    }
+
+    private function committedRequest(): Request
+    {
+        $request = $this->request();
+        $ledger  = new CommitLedger();
+        $request->attributes->set(CommitMark::REQUEST_ATTRIBUTE, new CommitMark($ledger));
+        $ledger->record(); // the host committed after the mark, before the conflict
 
         return $request;
     }

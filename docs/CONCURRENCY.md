@@ -112,15 +112,22 @@ subject and retry". `WorkflowConflictException` extends `Nowo\TransactionContrac
 host with transaction-doctrine's `ConcurrencyConflictResponder` answers it on its own routes with no mapping. Its
 message is constant and client-safe; `reason`, `workflowSlug`, `expectedPlaces` and `currentPlaces` are public.
 
-| Case | HTTP | Code | Retry-After |
+| Case | HTTP | `X-Conflict-Code` | Retry-After |
 | --- | --- | --- | --- |
-| Marking changed, subject deleted, newer version, deadlock / lock wait timeout / serialization failure (MySQL 1213 / 1205, MariaDB 1020, PostgreSQL 40001 / 40P01 / 55P03) | 409 | `CONFLICT_001` (retry is safe) | `runtime.concurrency.retry_after` (default 1) |
+| Marking changed, subject deleted, newer version, deadlock / lock wait timeout / serialization failure (MySQL 1213 / 1205, MariaDB 1020, PostgreSQL 40001 / 40P01 / 55P03), nothing committed earlier in the request | 409 | `CONFLICT_001` (retry is safe) | `runtime.concurrency.retry_after` (default 1) |
+| The same failures after the host (or another bundle) already committed earlier in the same request | 409 | `CONFLICT_002` (part committed: read again, do not repeat) | none |
 
-On the bundle's own routes (the Workflow UI) `WorkflowConflictResponseSubscriber` answers these failures: JSON
-requests get `{"error": "CONFLICT_001", "message": "…"}` with 409 and `Retry-After`; HTML requests get an
-`HttpException(409)` with `Retry-After` and `X-Error-Code: CONFLICT_001`, rendered by the application's own error page.
-`CONFLICT_002` (partly committed) does not occur: every bundle write path is one transaction. Unique violations and
-lost connections are not conflicts.
+On the bundle's own routes (the Workflow UI) `WorkflowConflictResponseSubscriber` answers these failures. Since 1.22 the
+code comes from `Nowo\TransactionDoctrine\ConflictCode::forRequest($request, $failure)` (nowo-tech/transaction-doctrine
+`^1.6`), so a commit made earlier in the same request is seen when the host's transaction-doctrine bundle has
+`commit_detection` on (it takes the request's `CommitMark` at `kernel.request`); without a mark the failure alone
+decides (always `CONFLICT_001` for the bundle's own failures: every bundle write path is one transaction, so the bundle
+itself never commits part of a request). JSON requests get `{"error": "CONFLICT_00n", "message": "…"}` with 409; HTML
+requests get an `HttpException(409)` rendered by the application's own error page. Both carry the header
+`X-Conflict-Code` (only `CONFLICT_001` or `CONFLICT_002`) and, for `CONFLICT_001` only, `Retry-After`. The HTML answer
+of `CONFLICT_001` still carries `X-Error-Code: CONFLICT_001` as before (kept for existing clients; domain codes belong in
+`X-Error-Code`, the conflict code in `X-Conflict-Code`). `CONFLICT_002` answers `"Part of your change may have been
+saved. Reload before trying again."`. Unique violations and lost connections are not conflicts.
 
 ## Definition versions
 
