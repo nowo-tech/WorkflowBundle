@@ -15,7 +15,6 @@ use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\ToolEvents;
 use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
-use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -53,7 +52,7 @@ final class MySqlNoPadCollationTest extends TestCase
         }
         $params        = (new DsnParser(['mysql' => 'pdo_mysql', 'pdo-mysql' => 'pdo_mysql', 'mariadb' => 'pdo_mysql']))->parse($url);
         $this->manager = new EntityManager(DriverManager::getConnection($params + ['charset' => 'utf8mb4'], $config), $config);
-        $this->manager->getEventManager()->addEventListener(ToolEvents::postGenerateSchemaTable, new BinaryKeyCollationSubscriber(new TestManagerRegistry($this->manager)));
+        $this->manager->getEventManager()->addEventListener(ToolEvents::postGenerateSchema, new BinaryKeyCollationSubscriber());
 
         $tool = new SchemaTool($this->manager);
         $tool->dropSchema($this->metadata());

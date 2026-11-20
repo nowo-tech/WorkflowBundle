@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 1.22.1](#to-1221)
 - [To 1.22.0](#to-1220)
 - [To 1.21.0](#to-1210)
 - [To 1.20.0](#to-1200)
@@ -85,6 +86,69 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 1.22.1
+
+From **1.22.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+From 1.15.0 to 1.22.0, on MySQL and MariaDB with `doctrine/orm` 3.7 or 3.8 and `doctrine/dbal` 4.5 or later, the schema
+the bundle generated (`doctrine:schema:create`, `doctrine:schema:update`, `doctrine:migrations:diff`) had no foreign key
+from `workflow_subject_pin.definition_id` to `workflow_definition` and no index on `definition_id`. A migration generated
+then may have dropped them. Without the key a definition version can be deleted while subjects are pinned to it, and the
+pins then point at a row that no longer exists. PostgreSQL and SQLite were not affected.
+
+1.22.1 generates the key again, so your next `doctrine:migrations:diff` adds it, and `doctrine:schema:validate` reports
+the mapping and the database out of sync until it is there. It cannot be added while orphaned pins exist, so first look
+for them (table names with your `table_prefix`, if any):
+
+```sql
+SELECT p.id, p.tenant_key, p.workflow_slug, p.subject_ref, p.definition_id
+FROM workflow_subject_pin p
+LEFT JOIN workflow_definition d ON d.id = p.definition_id
+WHERE d.id IS NULL;
+```
+
+Delete them (each subject then follows the current version of its workflow, as an unpinned subject does):
+
+```sql
+DELETE p FROM workflow_subject_pin p
+LEFT JOIN workflow_definition d ON d.id = p.definition_id
+WHERE d.id IS NULL;
+```
+
+or point them at an existing version of the same workflow and tenant if they must stay pinned, e.g. the latest
+published one:
+
+```sql
+UPDATE workflow_subject_pin p
+LEFT JOIN workflow_definition gone ON gone.id = p.definition_id
+JOIN workflow_definition d ON d.id = (
+    SELECT MAX(v.id) FROM workflow_definition v
+    WHERE v.slug = p.workflow_slug AND v.tenant_key = p.tenant_key AND v.status = 'published'
+)
+SET p.definition_id = d.id
+WHERE gone.id IS NULL;
+```
+
+Then add the index and the key (what `doctrine:migrations:diff` generates without a table prefix; the same SQL on
+MySQL 8.4 and MariaDB 11.4; with a prefix the names differ, take them from `doctrine:migrations:diff` or
+`doctrine:schema:update --dump-sql`):
+
+```sql
+CREATE INDEX IDX_FBA186C2D11EA911 ON workflow_subject_pin (definition_id);
+ALTER TABLE workflow_subject_pin ADD CONSTRAINT FK_FBA186C2D11EA911 FOREIGN KEY (definition_id) REFERENCES workflow_definition (id) ON DELETE RESTRICT;
+```
+
+Skip the statements whose index or key already exists (`SHOW CREATE TABLE workflow_subject_pin`). Afterwards
+`doctrine:schema:validate` reports the database in sync. The other foreign keys of the bundle (`workflow_place`,
+`workflow_transition`, `workflow_match_rule` → `workflow_definition`) were never affected.
+
+If you call the collation listener yourself: it now listens to `postGenerateSchema`;
+`BinaryKeyCollationSubscriber::postGenerateSchemaTable()` is a deprecated no-op and its registry argument is unused.
 
 ## To 1.22.0
 

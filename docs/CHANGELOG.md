@@ -62,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The generated schema keeps the `workflow_subject_pin.definition_id → workflow_definition` foreign key (`ON DELETE RESTRICT`) and its index on MySQL and MariaDB. From 1.15.0 to 1.22.0, with `doctrine/orm` 3.7 or 3.8 and `doctrine/dbal` 4.5 or later, the key column collation listener replaced the pin table during schema generation (`setClassTable()`), and the ORM schema tool then added the table's foreign key to the replaced one: `doctrine:schema:create` created no foreign key on `workflow_subject_pin`, and `doctrine:migrations:diff` / `doctrine:schema:update` proposed `DROP FOREIGN KEY` and `DROP INDEX` on a database that had them. Without the key a definition version could be deleted while subjects were still pinned to it. The listener now applies the collation on `postGenerateSchema`, once every foreign key exists, and never replaces a table during `postGenerateSchemaTable` (its `postGenerateSchemaTable()` method is a deprecated no-op). PostgreSQL and SQLite were not affected. Check your database: see UPGRADING.md "To 1.22.1".
+
 ## [1.22.0] - 2026-11-20
 
 ### Changed

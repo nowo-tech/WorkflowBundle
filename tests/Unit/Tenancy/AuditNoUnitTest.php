@@ -14,9 +14,9 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
+use Doctrine\ORM\Mapping\ClassMetadataFactory;
 use Doctrine\ORM\Mapping\FieldMapping;
-use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
-use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
 use Exception;
 use LogicException;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
@@ -43,6 +43,7 @@ use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
 use Nowo\WorkflowBundle\Tenancy\TenancyContext;
 use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
 use RuntimeException;
@@ -152,29 +153,31 @@ final class AuditNoUnitTest extends TestCase
     #[Test]
     public function keyColumnsGetTheBinaryCollationOnMysqlOnly(): void
     {
-        foreach ([[WorkflowDefinition::class, ['tenant_key', 'slug']], [WorkflowSubjectPin::class, ['tenant_key', 'workflow_slug', 'subject_ref']]] as [$class, $columns]) {
-            $args = $this->schemaArgs($class, [...$columns, 'other']);
-            (new BinaryKeyCollationSubscriber($this->registry(new MySQLPlatform())))->postGenerateSchemaTable($args);
+        foreach (['workflow_definition' => ['tenant_key', 'slug'], 'workflow_subject_pin' => ['tenant_key', 'workflow_slug', 'subject_ref']] as $table => $columns) {
+            $args = $this->schemaArgs(new MySQLPlatform(), $table, [...$columns, 'other']);
+            (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
             foreach ($columns as $column) {
-                self::assertSame(BinaryKeyCollationSubscriber::COLLATION, $args->getClassTable()->getColumn($column)->getCollation(), $class . '::' . $column);
+                self::assertSame(BinaryKeyCollationSubscriber::COLLATION, $args->getSchema()->getTable($table)->getColumn($column)->getCollation(), $table . '.' . $column);
             }
-            self::assertNull($args->getClassTable()->getColumn('other')->getCollation());
+            self::assertNull($args->getSchema()->getTable($table)->getColumn('other')->getCollation());
         }
 
-        $sqlite = $this->schemaArgs(WorkflowDefinition::class, ['tenant_key']);
-        (new BinaryKeyCollationSubscriber($this->registry(new SQLitePlatform())))->postGenerateSchemaTable($sqlite);
-        self::assertFalse($sqlite->classTableWasMutated());
+        $sqlite = $this->schemaArgs(new SQLitePlatform(), 'workflow_definition', ['tenant_key']);
+        $schema = $sqlite->getSchema();
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($sqlite);
+        self::assertSame($schema, $sqlite->getSchema());
 
-        $other = $this->schemaArgs(WorkflowPlace::class, ['name']);
-        (new BinaryKeyCollationSubscriber($this->registry(new MySQLPlatform())))->postGenerateSchemaTable($other);
-        self::assertFalse($other->classTableWasMutated());
+        $other  = $this->schemaArgs(new MySQLPlatform(), 'workflow_place', ['name']);
+        $schema = $other->getSchema();
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($other);
+        self::assertSame($schema, $other->getSchema());
 
-        $partial = $this->schemaArgs(WorkflowSubjectPin::class, ['tenant_key']);
-        (new BinaryKeyCollationSubscriber($this->registry(new MySQLPlatform())))->postGenerateSchemaTable($partial);
-        self::assertSame(BinaryKeyCollationSubscriber::COLLATION, $partial->getClassTable()->getColumn('tenant_key')->getCollation());
+        $partial = $this->schemaArgs(new MySQLPlatform(), 'workflow_subject_pin', ['tenant_key']);
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($partial);
+        self::assertSame(BinaryKeyCollationSubscriber::COLLATION, $partial->getSchema()->getTable('workflow_subject_pin')->getColumn('tenant_key')->getCollation());
 
         $this->expectException(RuntimeException::class);
-        (new BinaryKeyCollationSubscriber($this->registry(null)))->postGenerateSchemaTable($this->schemaArgs(WorkflowDefinition::class, ['tenant_key']));
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($this->schemaArgs(null, 'workflow_definition', ['tenant_key']));
     }
 
     #[Test]
@@ -372,25 +375,33 @@ final class AuditNoUnitTest extends TestCase
     }
 
     /**
-     * @param class-string $class
      * @param list<string> $columns
      */
-    private function schemaArgs(string $class, array $columns): GenerateSchemaTableEventArgs
+    /**
+     * The schema tool's `postGenerateSchema` event for one generated table on a manager with that platform (null: the
+     * platform cannot be read).
+     *
+     * @param list<string> $columns
+     */
+    private function schemaArgs(?object $platform, string $tableName, array $columns): GenerateSchemaEventArgs
     {
-        $table = new Table('t');
+        $table = new Table($tableName);
         foreach ($columns as $column) {
             $table->addColumn($column, 'string', ['length' => 128]);
         }
+        $factory = $this->createStub(ClassMetadataFactory::class);
+        $factory->method('isTransient')->willReturn(false);
+        $manager = $this->manager($platform);
+        $manager->method('getMetadataFactory')->willReturn($factory);
+        $manager->method('getClassMetadata')->willReturnCallback(static function (string $class): ClassMetadata {
+            /** @var class-string $class */
+            $metadata = new ClassMetadata($class);
+            $metadata->setPrimaryTable(['name' => $class === WorkflowDefinition::class ? 'workflow_definition' : 'workflow_subject_pin']);
 
-        return new GenerateSchemaTableEventArgs(new ClassMetadata($class), new Schema(), $table);
-    }
+            return $metadata;
+        });
 
-    private function registry(?object $platform): ManagerRegistry
-    {
-        $registry = $this->createMock(ManagerRegistry::class);
-        $registry->method('getManagerForClass')->willReturn($this->manager($platform));
-
-        return $registry;
+        return new GenerateSchemaEventArgs($manager, new Schema([$table]));
     }
 
     private function repository(Connection $connection): WorkflowDefinitionRepository
@@ -430,7 +441,7 @@ final class AuditNoUnitTest extends TestCase
         return $metadata;
     }
 
-    private function manager(?object $platform): EntityManagerInterface
+    private function manager(?object $platform): EntityManagerInterface&MockObject
     {
         $connection = $this->createMock(Connection::class);
         if ($platform === null) {
