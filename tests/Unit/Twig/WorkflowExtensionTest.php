@@ -13,26 +13,18 @@ use Symfony\Component\HttpFoundation\RequestStack;
 final class WorkflowExtensionTest extends TestCase
 {
     #[Test]
-    public function testExposesUiGlobals(): void
+    public function testExposesOnlyTheLocalesGlobal(): void
     {
-        $extension = new WorkflowExtension(
-            new LocaleManager(new RequestStack(), ['en', 'es', 'fr'], 'en'),
-            '@NowoWorkflowBundle/layout.html.twig',
-            'bootstrap5',
-            'bootstrap-icons',
-        );
+        $extension = new WorkflowExtension(new LocaleManager(new RequestStack(), ['en', 'es', 'fr'], 'en'));
 
-        self::assertSame([
-            'nowo_workflow_locales'         => ['en', 'es', 'fr'],
-            'nowo_workflow_layout_template' => '@NowoWorkflowBundle/layout.html.twig',
-            'nowo_workflow_css_framework'   => 'bootstrap5',
-            'nowo_workflow_icon_set'        => 'bootstrap-icons',
-            'nowo_workflow_form_themes'     => [],
-        ], $extension->getGlobals());
+        self::assertSame(['nowo_workflow_locales' => ['en', 'es', 'fr']], $extension->getGlobals());
     }
 
+    /**
+     * 2.0: the 1.x constructor arguments that fed the removed globals are still accepted, and ignored (removed in 3.0).
+     */
     #[Test]
-    public function testFormThemesFollowTheDeprecatedCssFrameworkOverride(): void
+    public function testTheFormerGlobalArgumentsAreIgnored(): void
     {
         $extension = new WorkflowExtension(
             new LocaleManager(new RequestStack(), ['en'], 'en'),
@@ -42,7 +34,7 @@ final class WorkflowExtensionTest extends TestCase
             'bootstrap4',
         );
 
-        self::assertSame(['bootstrap_4_layout.html.twig'], $extension->getGlobals()['nowo_workflow_form_themes']);
+        self::assertSame(['nowo_workflow_locales' => ['en']], $extension->getGlobals());
     }
 
     #[Test]

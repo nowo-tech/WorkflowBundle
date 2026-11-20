@@ -9,7 +9,6 @@ use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
 use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
 use Nowo\WorkflowBundle\Collation\WorkflowExactKeyColumns;
-use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\Controller\DashboardController;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
@@ -38,7 +37,6 @@ use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
 use Nowo\WorkflowBundle\Tenancy\TenancyContext;
 use Nowo\WorkflowBundle\Tenancy\WorkflowDefinitionLocator;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
-use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -55,18 +53,12 @@ use function is_array;
 use function is_bool;
 use function is_string;
 use function method_exists;
-use function trigger_deprecation;
 
 /**
  * Loads bundle services and exposes configuration as container parameters.
  */
 final class NowoWorkflowExtension extends Extension implements PrependExtensionInterface
 {
-    /**
-     * Value of the deprecated nowo_workflow_layout_template global when no 1.x layout is configured.
-     */
-    public const UI_KIT_ADMIN_LAYOUT = '@NowoUiKit/layout/admin.html.twig';
-
     /**
      * Public path of src/Resources/public after `assets:install` (base_path of the nowo_workflow asset package).
      */
@@ -129,7 +121,6 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ]);
         }
 
-        $this->prependUiKitDefaults($container);
     }
 
     /**
@@ -258,12 +249,12 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     }
 
     /**
-     * CSS stack the Workflow pages render with: the host's nowo_ui_kit.css_framework, else the deprecated
-     * ui.css_framework, else UiKit's default (bootstrap5).
+     * CSS stack the Workflow pages render with: the host's nowo_ui_kit.css_framework, else UiKit's default
+     * (bootstrap5).
      */
     private function resolvedCssFramework(ContainerBuilder $container): string
     {
-        $framework = null;
+        $framework = 'bootstrap5';
         if ($container->hasExtension('nowo_ui_kit')) {
             foreach ($container->getExtensionConfig('nowo_ui_kit') as $cfg) {
                 if (is_array($cfg) && is_string($cfg['css_framework'] ?? null)) {
@@ -272,66 +263,7 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             }
         }
 
-        if ($framework === null) {
-            $legacy    = $this->processedConfig($container)['ui']['css_framework'] ?? null;
-            $framework = is_string($legacy) ? $legacy : 'bootstrap5';
-        }
-
         return $framework;
-    }
-
-    /**
-     * Seeds nowo_ui_kit.css_framework / icon_set from the deprecated ui.css_framework / ui.icon_set when the host
-     * sets them and does not configure UiKit itself (REQ-UI-003: the CSS stack is inherited from nowo_ui_kit).
-     */
-    private function prependUiKitDefaults(ContainerBuilder $container): void
-    {
-        if (!$container->hasExtension('nowo_ui_kit')) {
-            return;
-        }
-
-        $hostHasCssFramework = false;
-        $hostHasIconSet      = false;
-        foreach ($container->getExtensionConfig('nowo_ui_kit') as $cfg) {
-            if (!is_array($cfg)) {
-                continue;
-            }
-            if (array_key_exists('css_framework', $cfg)) {
-                $hostHasCssFramework = true;
-            }
-            if (array_key_exists('icon_set', $cfg)) {
-                $hostHasIconSet = true;
-            }
-        }
-
-        if ($hostHasCssFramework && $hostHasIconSet) {
-            return;
-        }
-
-        $ui       = $this->processedConfig($container)['ui'];
-        $defaults = [];
-
-        if (!$hostHasCssFramework && is_string($ui['css_framework'] ?? null)) {
-            $defaults['css_framework'] = $ui['css_framework'];
-        }
-        if (!$hostHasIconSet && is_string($ui['icon_set'] ?? null)) {
-            $defaults['icon_set'] = $ui['icon_set'];
-        }
-
-        if ($defaults !== []) {
-            $container->prependExtensionConfig('nowo_ui_kit', $defaults);
-        }
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function processedConfig(ContainerBuilder $container): array
-    {
-        /** @var array<string, mixed> $config */
-        $config = (new Processor())->processConfiguration(new Configuration(), $container->getExtensionConfig(Configuration::ALIAS));
-
-        return $config;
     }
 
     /**
@@ -344,23 +276,16 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
 
         $config = $this->processConfiguration(new Configuration(), $configs);
         $webUi  = $config['web_ui'];
-        $ui     = $config['ui'];
 
         $container->setParameter(Configuration::ALIAS . '.enabled', $webUi['enabled']);
-        $container->setParameter(Configuration::ALIAS . '.environments', $config['environments']);
         $container->setParameter(Configuration::ALIAS . '.connection', $config['connection']);
         $container->setParameter(Configuration::ALIAS . '.table_prefix', $config['table_prefix']);
         $container->setParameter(Configuration::ALIAS . '.runtime.flush_after_apply', $config['runtime']['flush_after_apply']);
         $container->setParameter(Configuration::ALIAS . '.runtime.concurrency.default', $config['runtime']['concurrency']['default']);
         $container->setParameter(Configuration::ALIAS . '.runtime.concurrency.workflows', $config['runtime']['concurrency']['workflows']);
         $container->setParameter(Configuration::ALIAS . '.runtime.concurrency.retry_after', $config['runtime']['concurrency']['retry_after']);
-        if (!$this->setsFlushAfterApply($configs)) {
-            trigger_deprecation(Configuration::PACKAGE, '1.14', 'Not setting "nowo_workflow.runtime.flush_after_apply" is deprecated: it keeps the 1.13 default (true, WorkflowApplicator flushes the application\'s default entity manager after each transition) and becomes false in 2.0. Set it explicitly: false to persist the subject yourself (what the 1.14 recipe installs), true to keep the current behaviour.');
-        }
         $container->setParameter(PrivateEntityManagerPass::ENTITY_MANAGER_PARAMETER, $config['doctrine']['entity_manager']);
-        if ($config['doctrine']['private_entity_manager']) {
-            $this->registerPrivateEntityManager($container);
-        }
+        $this->registerPrivateEntityManager($container);
         // Filled by FrameworkWorkflowNamesPass with the framework.workflows names.
         $container->setParameter(Configuration::ALIAS . '.framework_workflow_names', []);
 
@@ -372,20 +297,6 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         $container->setParameter(Configuration::ALIAS . '.web_ui.default_locale', $webUi['default_locale']);
         $container->setParameter(Configuration::ALIAS . '.web_ui.locales', $webUi['locales']);
 
-        // Deprecated 1.x parameters (mirrors of the canonical values), removed in 2.0.
-        $legacyLayout = Configuration::legacyLayout($config);
-        $cssFramework = is_string($ui['css_framework'] ?? null) ? $ui['css_framework'] : null;
-        $iconSet      = is_string($ui['icon_set'] ?? null) ? $ui['icon_set'] : null;
-        $container->setParameter(Configuration::ALIAS . '.ui.path', $webUi['path_prefix']);
-        $container->setParameter(Configuration::ALIAS . '.ui.layout_template', $legacyLayout ?? self::UI_KIT_ADMIN_LAYOUT);
-        $container->setParameter(Configuration::ALIAS . '.ui.css_framework', $cssFramework ?? 'bootstrap5');
-        $container->setParameter(Configuration::ALIAS . '.ui.css_framework_override', $cssFramework);
-        $container->setParameter(Configuration::ALIAS . '.ui.icon_set', $iconSet ?? 'bootstrap-icons');
-        $container->setParameter(Configuration::ALIAS . '.ui.list_page_size', $webUi['list_page_size']);
-        $container->setParameter(Configuration::ALIAS . '.ui.default_locale', $webUi['default_locale']);
-        $container->setParameter(Configuration::ALIAS . '.ui.locales', $webUi['locales']);
-        $container->setParameter(Configuration::ALIAS . '.ui.required_roles', $config['security']['access_roles']);
-
         $this->registerTenancy($container, $config);
         $this->registerExactKeyColumns($container);
         $this->registerSearchKit($container, $config['search_kit']);
@@ -396,24 +307,8 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
     }
 
     /**
-     * Whether one of the raw configuration files sets `runtime.flush_after_apply` (true or false).
-     *
-     * @param array<mixed> $configs
-     */
-    private function setsFlushAfterApply(array $configs): bool
-    {
-        foreach ($configs as $config) {
-            if (is_array($config) && is_array($config['runtime'] ?? null) && array_key_exists('flush_after_apply', $config['runtime'])) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * 1.14.0 (REQ-ARCH-001 rule 6): the repository, the admin controller and the demo seeder read and write the
-     * definitions through the bundle's private entity manager ({@see WorkflowEntityManager}), so a definition save
+     * Since 1.14.0, the only mode since 2.0 (REQ-ARCH-001 rule 6): the repository, the admin controller and the demo
+     * seeder read and write the definitions through the bundle's private entity manager ({@see WorkflowEntityManager}), so a definition save
      * never flushes, and a failed one never resets, an application manager. The manager is dropped at every outermost
      * unit-of-work boundary ({@see WorkflowUnitOfWorkSubscriber}) and at `kernel.reset`; the rollback middleware is
      * attached to its connection by {@see PrivateEntityManagerPass} (doctrine/dbal 4 only).
@@ -482,12 +377,11 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArguments([new Reference(WorkflowDefinitionRepository::class), $enabled && $tenancy['lock_clone_structure']]);
         $container->register(WorkflowDefinitionLocator::class, WorkflowDefinitionLocator::class)->setAutowired(true)
             ->setArgument('$logger', new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE));
+        // Internal since 2.0: the admin UI and WorkflowVersionManager call it with the definitions they loaded.
         $container->register(WorkflowVersioning::class, WorkflowVersioning::class)->setAutowired(true)->setPublic(false)
             ->setArgument('$lockCloneStructure', $enabled && $tenancy['lock_clone_structure']);
-        // Since 1.17: the versioning port (REQ-ARCH-001 rule 1) the admin UI type-hints; hosts may decorate or replace it.
-        $container->setAlias(WorkflowVersioningInterface::class, WorkflowVersioning::class);
-        // Since 1.19: the framework-free twin of that port (REQ-ARCH-001 rule 1), a facade over it, so a host
-        // decorator or replacement of the SPI above is honoured here too. Hosts may decorate this one as well.
+        // Since 1.19, the only versioning port since 2.0 (REQ-ARCH-001 rule 1): hosts call it, and decorate or replace
+        // it to change what their callers get.
         $container->register(WorkflowVersionManager::class, WorkflowVersionManager::class)->setAutowired(true)->setPublic(false);
         $container->setAlias(WorkflowVersionManagerInterface::class, WorkflowVersionManager::class);
 

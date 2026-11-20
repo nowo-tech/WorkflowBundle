@@ -18,19 +18,20 @@ use Nowo\WorkflowBundle\Service\WorkflowVersionManager;
 /**
  * Framework-free versioning port of the database workflows (since 1.19, REQ-ARCH-001 rule 1): drafts, publishing,
  * retiring and template clones of tenant-scoped definitions with scalars, bundle enums and bundle value objects only.
- * It is the twin of {@see WorkflowVersioningInterface}, which takes and returns the `WorkflowDefinition`
- * aggregate — a bundle-owned entity, but one that exposes Doctrine `Collection`s, so a framework type is reachable
- * through it. This port takes a {@see WorkflowDefinitionRef} and returns a {@see WorkflowDefinitionView} instead, and
- * is what a DDD / hexagonal host calls.
+ * It takes a {@see WorkflowDefinitionRef} and returns a {@see WorkflowDefinitionView} (never the `WorkflowDefinition`
+ * aggregate, through which Doctrine `Collection`s are reachable), and is what a DDD / hexagonal host calls.
  *
- * {@see WorkflowVersionManager} is the built-in implementation: a facade over
- * {@see WorkflowVersioningInterface}, so a host decorator or replacement of that SPI is honoured here as well (the
- * same split as {@see WorkflowRuntimeInterface} over {@see WorkflowRegistryInterface} since 1.15). Behaviour is still
- * replaced on {@see WorkflowVersioningInterface}, which the admin UI keeps calling with the entity it authorised
- * (audit NO M1); this port may also be decorated, which then applies to the hosts calling it.
+ * Since 2.0 it is the only versioning port, for calling and for decorating or replacing: the 1.17 entity port
+ * (`WorkflowVersioningInterface`) was removed. {@see WorkflowVersionManager} is the built-in implementation, a facade
+ * over the internal `WorkflowVersioning` service; a decorator or replacement applies to the hosts calling this port.
+ * The admin UI calls the internal service with the definition it authorised (audit NO M1), so it is not affected by
+ * a decorator of this port.
+ *
+ * A replacement must keep the owner rule of {@see self::delete()}: a published definition is not deleted while
+ * subjects are pinned to it (the pin foreign key is ON DELETE RESTRICT, so the database refuses it as well).
  *
  * Every write goes through the bundle's private entity manager, never through an application manager
- * (REQ-ARCH-001 rule 6), exactly as on the deprecated port. The reads below are the entity-free way to obtain a
+ * (REQ-ARCH-001 rule 6). The reads below are the entity-free way to obtain a
  * reference in the first place; nothing is memoised, every call reads the store (REQ-RUNTIME-002).
  */
 interface WorkflowVersionManagerInterface

@@ -6,7 +6,6 @@ namespace Nowo\WorkflowBundle\Tests\Integration;
 
 use Nowo\UiKitBundle\Test\PageContractTestCase;
 use Nowo\UiKitBundle\Test\PageFixture;
-use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Service\WorkflowGraphPresenter;
 use Nowo\WorkflowBundle\Tests\Support\WorkflowPageFixtures;
@@ -212,55 +211,6 @@ final class PageContractTest extends PageContractTestCase
         ]));
         self::assertStringContainsString('data-workflow-collection="places"', $places->html);
         self::assertStringNotContainsString('tom-select', $places->html);
-    }
-
-    public function testLegacyLayoutBridgeRendersTheCanonicalBlocksInTheOldLayout(): void
-    {
-        $order = WorkflowPageFixtures::purchaseOrder();
-        $page  = $this->renderPage(new PageFixture(self::VIEWS . 'workflow_definition/index.html.twig', [
-            'page'                          => WorkflowPageFixtures::factory(Configuration::LEGACY_LAYOUT_BRIDGE)->index(WorkflowPageFixtures::result([$order])),
-            'nowo_workflow_layout_template' => 'legacy/base.html.twig',
-        ]));
-
-        self::assertStringContainsString('<title>Workflow definitions</title>', $page->html);
-        self::assertStringContainsString('<main class="legacy">', $page->html);
-        self::assertStringContainsString('data-nowo-ui-bundle="NowoWorkflowBundle"', $page->html);
-        self::assertStringContainsString('Purchase order approval', $page->html);
-        self::assertStringContainsString('/assets/css/nowo-workflow.css', $page->html);
-        self::assertStringContainsString('/assets/js/nowo-ui-confirm.js', $page->html);
-    }
-
-    public function testDeprecatedIntegrateBaseBridgeRendersEveryCanonicalBlock(): void
-    {
-        $page = $this->renderPage(new PageFixture(self::VIEWS . 'dashboard/index.html.twig', [
-            'page'        => WorkflowPageFixtures::factory('@NowoWorkflowBundle/layout_integrate_base.html.twig')->dashboard(1, 1),
-            'definitions' => [WorkflowPageFixtures::purchaseOrder()],
-            'total'       => 1,
-        ]));
-
-        self::assertStringContainsString('<title>Database-driven Symfony Workflows</title>', $page->html);
-        self::assertStringContainsString('id="nowo-ui-content"', $page->html);
-        self::assertStringContainsString('/assets/css/nowo-ui.css', $page->html);
-        self::assertStringContainsString('/assets/js/nowo-ui-confirm.js', $page->html);
-        self::assertStringContainsString('data-testid="workflow-dashboard-definitions"', $page->html);
-    }
-
-    public function testDeprecatedLocaleSwitcherRendersTheUiKitSwitcher(): void
-    {
-        $html = $this->createTwig()->render(self::VIEWS . '_locale_switcher.html.twig', ['nowo_workflow_locales' => ['en', 'es']]);
-
-        self::assertStringContainsString('nowo-ui-locale-switcher', $html);
-        self::assertStringContainsString('/nowo_workflow_locale_switch?_locale=es', $html);
-        self::assertStringContainsString('Spanish', $html);
-        self::assertSame('', trim($this->createTwig()->render(self::VIEWS . '_locale_switcher.html.twig', ['nowo_workflow_locales' => ['en']])));
-    }
-
-    protected static function inlineTemplates(): array
-    {
-        return [
-            'legacy/base.html.twig' => '<title>{% block title %}{% endblock %}</title>{% block stylesheets %}{% endblock %}<main class="legacy">{% block body %}{% endblock %}</main>{% block javascripts %}{% endblock %}',
-            'base.html.twig'        => '<title>{% block title %}{% endblock %}</title>{% block stylesheets %}{% endblock %}{% block body %}{% endblock %}{% block javascripts %}{% endblock %}',
-        ];
     }
 
     protected static function templatePaths(): array

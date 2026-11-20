@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\CsrfProtectionPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\FrameworkWorkflowNamesPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\PrivateEntityManagerPass;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\RemovedPortsPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\TwigPathsPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowRuntimePass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
@@ -22,12 +23,14 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 class NowoWorkflowBundle extends Bundle
 {
     /**
-     * Registers the Twig paths, Workflow UI security, CSRF protection, framework workflow names and private entity
-     * manager compiler passes.
+     * Registers the removed-port check (2.0), Twig paths, Workflow UI security, CSRF protection, framework workflow
+     * names and private entity manager compiler passes.
      */
     public function build(ContainerBuilder $container): void
     {
         parent::build($container);
+        // Since 2.0: first, so a removed port the application still wires fails with its own message.
+        $container->addCompilerPass(new RemovedPortsPass());
         $container->addCompilerPass(new TwigPathsPass());
         $container->addCompilerPass(new WorkflowUiSecurityPass());
         $container->addCompilerPass(new CsrfProtectionPass());

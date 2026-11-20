@@ -29,7 +29,7 @@ final class LocaleController extends AbstractController
     }
 
     /**
-     * Locale-shaped pattern only; the actual allow-list is nowo_workflow.ui.locales (checked below).
+     * Locale-shaped pattern only; the actual allow-list is nowo_workflow.web_ui.locales (checked below).
      */
     public const LOCALE_REQUIREMENT = '[a-zA-Z]{2,3}(?:[_-][a-zA-Z0-9]{2,8})*';
 
@@ -40,7 +40,7 @@ final class LocaleController extends AbstractController
     public function switch(string $_locale, Request $request): RedirectResponse
     {
         if (!$this->localeManager->isEnabled($_locale)) {
-            throw $this->createNotFoundException(sprintf('Locale "%s" is not enabled in nowo_workflow.ui.locales.', $_locale));
+            throw $this->createNotFoundException(sprintf('Locale "%s" is not enabled in nowo_workflow.web_ui.locales.', $_locale));
         }
 
         // @igor-ignore - HTTP handler delegates to services; no controller worker state.

@@ -15,11 +15,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
-use function restore_error_handler;
-use function set_error_handler;
 use function sprintf;
-
-use const E_USER_DEPRECATED;
 
 final class PrivateEntityManagerPassTest extends TestCase
 {
@@ -139,9 +135,10 @@ final class PrivateEntityManagerPassTest extends TestCase
 
     /**
      * NF2-1 scenario A: the application's default manager is "main"; the bundle mapping (1.13: top-level
-     * doctrine.orm.mappings) is on a manager named "default". 1.13 used it through getManagerForClass(): so does 1.14.
+     * doctrine.orm.mappings) is on a manager named "default". 1.14 to 1.22 used it with a deprecation; since 2.0 (Q5)
+     * the build fails and names the option to set (lesson 1: the default manager is compared by name).
      */
-    public function testScenarioAKeepsTheManagerThatMapsTheEntities(): void
+    public function testScenarioAFailsWithoutTheOption(): void
     {
         $container = $this->container();
         $container->setParameter('doctrine.entity_managers', ['main' => 'doctrine.orm.main_entity_manager', 'default' => 'doctrine.orm.default_entity_manager']);
@@ -150,23 +147,27 @@ final class PrivateEntityManagerPassTest extends TestCase
         $container->setDefinition('doctrine.orm.default_metadata_driver', (new Definition('Chain'))->addMethodCall('addDriver', [new Reference('wf'), 'Nowo\\WorkflowBundle\\Entity']));
         $container->setDefinition('doctrine.orm.default_entity_manager', new Definition('EM', [new Reference('doctrine.dbal.legacy_connection')]));
 
-        $deprecations = [];
-        // @phpstan-ignore frankenphp.worker.noSetErrorExceptionHandler
-        set_error_handler(static function (int $level, string $message) use (&$deprecations): bool {
-            $deprecations[] = $message;
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('The workflow definitions are mapped on the Doctrine entity manager "default", which is not the default one ("main"): set nowo_workflow.doctrine.entity_manager: default explicitly. See UPGRADING.md "To 2.0.0".');
 
-            return true;
-        }, E_USER_DEPRECATED);
-        try {
-            (new PrivateEntityManagerPass())->process($container);
-        } finally {
-            restore_error_handler();
-        }
+        (new PrivateEntityManagerPass())->process($container);
+    }
 
-        self::assertSame('default', $container->getDefinition(WorkflowEntityManager::class)->getArgument(1));
+    /**
+     * Scenario A with the option set: the configured manager is used, no derivation.
+     */
+    public function testScenarioAWithTheOptionUsesTheConfiguredManager(): void
+    {
+        $container = $this->container();
+        $container->setParameter('doctrine.entity_managers', ['main' => 'doctrine.orm.main_entity_manager', 'default' => 'doctrine.orm.default_entity_manager']);
+        $container->setParameter('doctrine.default_entity_manager', 'main');
+        $container->setParameter(PrivateEntityManagerPass::ENTITY_MANAGER_PARAMETER, 'default');
+        $container->setDefinition('doctrine.orm.default_metadata_driver', (new Definition('Chain'))->addMethodCall('addDriver', [new Reference('wf'), 'Nowo\\WorkflowBundle\\Entity']));
+        $container->setDefinition('doctrine.orm.default_entity_manager', new Definition('EM', [new Reference('doctrine.dbal.legacy_connection')]));
+
+        (new PrivateEntityManagerPass())->process($container);
+
         self::assertSame([['connection' => 'legacy']], $container->getDefinition(PrivateEntityManagerMiddleware::class)->getTag('doctrine.middleware'));
-        self::assertCount(1, $deprecations);
-        self::assertStringContainsString('entity_manager: default', $deprecations[0]);
     }
 
     /**

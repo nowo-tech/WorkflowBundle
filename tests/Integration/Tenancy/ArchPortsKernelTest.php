@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Integration\Tenancy;
 
 use Nowo\WorkflowBundle\Contract\WorkflowSlugResolverInterface;
-use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\RemovedPortsPass;
 use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Model\WorkflowContext;
@@ -14,7 +14,6 @@ use Nowo\WorkflowBundle\Model\WorkflowDefinitionRef;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
-use Nowo\WorkflowBundle\Service\WorkflowVersioning;
 use Nowo\WorkflowBundle\Service\WorkflowVersionManager;
 use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\FixedSlugResolver;
@@ -29,12 +28,13 @@ use Symfony\Component\Filesystem\Filesystem;
 use function sys_get_temp_dir;
 
 /**
- * 1.17 (REQ-ARCH-001 rule 1): the versioning and slug-resolver ports. The interfaces resolve to the built-in services
- * (same objects, same answers as 1.16), a host can decorate or replace them, and the admin UI goes through the
- * versioning port. The owner rule on deletes (no delete while subjects are pinned) holds behind a decorator.
+ * 1.17 (REQ-ARCH-001 rule 1): the slug-resolver port resolves to the built-in service (same object, same answers as
+ * 1.16) and a host can replace it.
  *
- * 1.19 (REQ-ARCH-001 rule 1): the framework-free versioning twin {@see WorkflowVersionManagerInterface} runs the same
- * flows with references and views only, and a host decorator of the deprecated SPI is honoured through it.
+ * 1.19, the only versioning port since 2.0 (Q2): {@see WorkflowVersionManagerInterface} runs every flow with
+ * references and views only; a host decorates or replaces it to change what its callers get (the 1.17 entity port is
+ * gone, and the admin UI calls the internal service). The owner rule on deletes (no delete while subjects are pinned)
+ * holds behind a decorator.
  */
 final class ArchPortsKernelTest extends TestCase
 {
@@ -69,10 +69,8 @@ final class ArchPortsKernelTest extends TestCase
     {
         $this->kernel = $kernel = self::boot($variant);
 
-        self::assertSame(
-            self::service($kernel, WorkflowVersioning::class, 'test.' . WorkflowVersioning::class),
-            self::service($kernel, WorkflowVersioningInterface::class, 'test.' . WorkflowVersioningInterface::class),
-        );
+        self::assertFalse(self::container($kernel)->has(RemovedPortsPass::VERSIONING), 'the 1.17 entity port is gone');
+        self::versioning($kernel); // the internal service is still registered (the admin UI calls it)
         self::assertSame(
             self::service($kernel, WorkflowResolver::class, 'test.' . WorkflowResolver::class),
             self::service($kernel, WorkflowSlugResolverInterface::class, 'test.' . WorkflowSlugResolverInterface::class),
@@ -112,10 +110,10 @@ final class ArchPortsKernelTest extends TestCase
     }
 
     #[Test]
-    public function aHostDecoratorOfTheVersioningPortRunsForHostsAndForTheUi(): void
+    public function aHostDecoratorOfTheVersioningPortRunsForHostsButNotForTheUi(): void
     {
         $this->kernel = $kernel = self::boot('tenancy-host-ports');
-        $port         = self::service($kernel, WorkflowVersioningInterface::class, 'test.' . WorkflowVersioningInterface::class);
+        $port         = self::versionManager($kernel);
         $decorator    = self::service($kernel, RecordingVersioningDecorator::class, 'app.workflow_versioning_audit');
         self::assertSame($decorator, $port);
         self::assertInstanceOf(FixedSlugResolver::class, self::service($kernel, WorkflowSlugResolverInterface::class, 'test.' . WorkflowSlugResolverInterface::class));
@@ -123,39 +121,39 @@ final class ArchPortsKernelTest extends TestCase
         self::seedLeaveTemplate($kernel);
         $orgA  = new WorkflowTenant('org-a');
         $clone = $port->cloneTemplate('leave', $orgA, publish: true);
-        $id    = (int) $clone->getId();
+        $id    = $clone->ref->id;
         self::assertSame(['cloneTemplate'], $decorator->calls);
 
-        // The admin UI calls the port, so it goes through the host decorator.
+        // The admin UI calls the internal service with the definition it authorised (audit NO M1): not the decorator.
         $retire = self::send($kernel, self::ui('org-a', '/definitions/' . $id . '/retire'), 'admin-org-a', 'POST', ['_token' => self::csrf($kernel, 'retire' . $id)]);
         self::assertSame(302, $retire->getStatusCode());
-        self::assertContains('retire', $decorator->calls);
+        self::assertSame(['cloneTemplate'], $decorator->calls);
         self::assertTrue(self::repository($kernel)->find($id)?->isRetired());
         $decorator->calls = [];
 
         // Owner decision 2026-11-12, unchanged: a definition subjects are pinned to is not deleted, decorator or not.
-        $port->reinstate(self::repository($kernel)->find($id));
+        $port->reinstate($clone->ref);
         $leave = self::persistLeave($kernel, new LeaveRequest('leave-1', 'org-a', 5));
         self::applicator($kernel)->apply($leave, 'leave', 'submit');
-        $current = self::repository($kernel)->findCurrent('leave', $orgA);
+        $current = $port->currentVersion('leave', $orgA);
         self::assertNotNull($current);
         try {
-            $port->delete($current);
+            $port->delete($current->ref);
             self::fail('Pinned subjects block the deletion.');
         } catch (WorkflowDefinitionInUseException $exception) {
             self::assertSame(1, $exception->pinnedSubjects);
         }
-        self::assertNotNull(self::repository($kernel)->findCurrent('leave', $orgA));
+        self::assertNotNull($port->currentVersion('leave', $orgA));
 
         self::assertSame(1, $port->forgetSubject(new WorkflowSubjectRef('leave-1'), $orgA));
-        $port->delete($current);
-        self::assertNull(self::repository($kernel)->findCurrent('leave', $orgA));
+        $port->delete($current->ref);
+        self::assertNull($port->currentVersion('leave', $orgA));
         self::assertSame(['reinstate', 'delete', 'forgetSubject', 'delete'], $decorator->calls);
     }
 
     #[Test]
     #[DataProvider('builtInShapes')]
-    public function theVersioningTwinIsTheBuiltInFacade(string $variant): void
+    public function theVersioningPortIsTheBuiltInFacade(string $variant): void
     {
         $this->kernel = $kernel = self::boot($variant);
 
@@ -226,7 +224,7 @@ final class ArchPortsKernelTest extends TestCase
     }
 
     #[Test]
-    public function theVersioningTwinNeverReachesAnotherTenantAndGoesThroughAHostDecorator(): void
+    public function theVersioningPortNeverReachesAnotherTenantThroughAHostDecorator(): void
     {
         $this->kernel = $kernel = self::boot('tenancy-host-ports');
         self::seedLeaveTemplate($kernel);
@@ -234,7 +232,7 @@ final class ArchPortsKernelTest extends TestCase
         $decorator = self::service($kernel, RecordingVersioningDecorator::class, 'app.workflow_versioning_audit');
 
         $clone = $manager->cloneTemplate('leave', new WorkflowTenant('org-a'), publish: true);
-        self::assertSame(['cloneTemplate'], $decorator->calls, 'the twin asks the decorated SPI');
+        self::assertSame(['cloneTemplate'], $decorator->calls, 'the host decorator runs');
 
         // Same row id and version number, another tenant: the scope lookup finds nothing.
         $this->expectException(WorkflowNotFoundException::class);

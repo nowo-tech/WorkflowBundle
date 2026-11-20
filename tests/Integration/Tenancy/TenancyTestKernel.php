@@ -9,10 +9,8 @@ use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Nowo\FormKitBundle\NowoFormKitBundle;
 use Nowo\UiKitBundle\NowoUiKitBundle;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
-use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowSlugResolverInterface;
-use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use Nowo\WorkflowBundle\NowoWorkflowBundle;
@@ -25,7 +23,6 @@ use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
 use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\AnyUserTokenListener;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\ArrayCsrfTokenStorage;
-use Nowo\WorkflowBundle\Tests\Support\Tenancy\CountingRegistryDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\FixedSlugResolver;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\HostRuntime;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\HostTenancyPorts;
@@ -61,10 +58,9 @@ use const PHP_VERSION_ID;
  * - `tenancy-ddd`: DDD host, the bundle's XML mapping on a dedicated `workflow` manager and connection, the host's
  *   subject on the default one;
  * - `plain`: no tenancy port at all (the 1.14 behaviour), UI at `/workflow`;
- * - `legacy-registry`: `plain` plus a 1.14 host decorator of the deprecated WorkflowRegistryInterface;
  * - `host-runtime`: `plain` plus the host's own WorkflowRuntimeInterface;
- * - `tenancy-host-ports`: `tenancy` plus a host decorator of WorkflowVersioningInterface and the host's own
- *   WorkflowSlugResolverInterface (1.17).
+ * - `tenancy-host-ports`: `tenancy` plus a host decorator of WorkflowVersionManagerInterface (the only versioning
+ *   port since 2.0) and the host's own WorkflowSlugResolverInterface (1.17).
  */
 final class TenancyTestKernel extends Kernel
 {
@@ -164,21 +160,14 @@ final class TenancyTestKernel extends Kernel
 
         $services->alias('test.' . WorkflowRuntimeInterface::class, WorkflowRuntimeInterface::class)->public();
         $services->alias('test.' . WorkflowSlugResolverInterface::class, WorkflowSlugResolverInterface::class)->public();
-        $services->alias('test.' . WorkflowVersioningInterface::class, WorkflowVersioningInterface::class)->public();
         $services->alias('test.' . WorkflowVersionManagerInterface::class, WorkflowVersionManagerInterface::class)->public();
         if ($this->variant === 'tenancy-host-ports') {
             $services->set('app.workflow_versioning_audit', RecordingVersioningDecorator::class)
-                ->decorate(WorkflowVersioningInterface::class)
+                ->decorate(WorkflowVersionManagerInterface::class)
                 ->args([service('.inner')])
                 ->public();
             $services->set('app.workflow_slug_resolver', FixedSlugResolver::class);
             $services->alias(WorkflowSlugResolverInterface::class, 'app.workflow_slug_resolver');
-        }
-        if ($this->variant === 'legacy-registry') {
-            $services->set('app.workflow_registry_audit', CountingRegistryDecorator::class)
-                ->decorate(WorkflowRegistryInterface::class)
-                ->args([service('.inner')])
-                ->public();
         }
         if ($this->variant === 'host-runtime') {
             $services->set('app.workflow_runtime', HostRuntime::class);

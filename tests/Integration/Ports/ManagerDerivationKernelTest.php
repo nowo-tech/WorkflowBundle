@@ -9,24 +9,27 @@ use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Filesystem\Filesystem;
 
 use function restore_error_handler;
 use function set_error_handler;
-use function str_contains;
+use function sprintf;
 use function sys_get_temp_dir;
 
 use const E_USER_DEPRECATED;
 
 /**
- * Audit NF2-1 / NF2-3: without `doctrine.entity_manager`, the private entity manager uses the manager that maps the
- * bundle entities (the 1.13 `getManagerForClass()` rule), derived at build time, in booted kernels:
+ * Audit NF2-1 / NF2-3: the private entity manager uses the manager that maps the bundle entities, in booted kernels:
  *
  * - scenario A: the application's default manager is `main`, the bundle mapping is on a manager named `default`;
  * - scenario B: register_mapping: false and the bundle mapped on a `workflow` manager only;
- * - a host DoctrineOrmMappingsPass mapping the bundle (added after the bundle's own passes run) does not false-fail.
+ * - a host DoctrineOrmMappingsPass mapping the bundle on the default manager (added after the bundle's own passes
+ *   run) does not false-fail and needs no option.
  *
- * The definitions are written on that manager's connection and the UI reads them.
+ * The definitions are written on that manager's connection and the UI reads them. Since 2.0 (Q5) scenarios A and B
+ * need `doctrine.entity_manager`: without it the build fails and names the option to set (1.14 to 1.22 derived the
+ * manager with a deprecation).
  */
 final class ManagerDerivationKernelTest extends TestCase
 {
@@ -43,18 +46,48 @@ final class ManagerDerivationKernelTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{string, string, string|null, bool}>
+     * @return iterable<string, array{string, string, string|null}>
      */
     public static function shapes(): iterable
     {
-        yield 'scenario A: default manager "main", bundle on "default"' => ['main-default', 'default', 'main', true];
-        yield 'scenario B: bundle mapped on "workflow" only' => ['mapped-elsewhere', 'workflow', 'default', true];
-        yield 'host DoctrineOrmMappingsPass' => ['host-mapping-pass', 'default', null, false];
+        yield 'scenario A: default manager "main", bundle on "default"' => ['main-default-explicit', 'default', 'main'];
+        yield 'scenario B: bundle mapped on "workflow" only' => ['mapped-elsewhere-explicit', 'workflow', 'default'];
+        yield 'host DoctrineOrmMappingsPass' => ['host-mapping-pass', 'default', null];
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function shapesWithoutTheOption(): iterable
+    {
+        yield 'scenario A' => ['main-default', 'default', 'main'];
+        yield 'scenario B' => ['mapped-elsewhere', 'workflow', 'default'];
+    }
+
+    /**
+     * 2.0 (Q5): a mapping manager that is not the default one fails the build without `doctrine.entity_manager`.
+     */
+    #[Test]
+    #[DataProvider('shapesWithoutTheOption')]
+    public function aNonDefaultMappingManagerWithoutTheOptionFailsTheBuild(string $variant, string $manager, string $default): void
+    {
+        $kernel = new PortsTestKernel($variant, false);
+
+        try {
+            $kernel->boot();
+            self::fail('The build must fail without nowo_workflow.doctrine.entity_manager.');
+        } catch (InvalidConfigurationException $exception) {
+            self::assertStringContainsString(sprintf('mapped on the Doctrine entity manager "%s", which is not the default one ("%s")', $manager, $default), $exception->getMessage());
+            self::assertStringContainsString('set nowo_workflow.doctrine.entity_manager: ' . $manager, $exception->getMessage());
+            self::assertStringContainsString('UPGRADING.md "To 2.0.0"', $exception->getMessage());
+        } finally {
+            $kernel->shutdown();
+        }
     }
 
     #[Test]
     #[DataProvider('shapes')]
-    public function theDefinitionsLiveOnTheManagerThatMapsThem(string $variant, string $expected, ?string $other, bool $deprecated): void
+    public function theDefinitionsLiveOnTheManagerThatMapsThem(string $variant, string $expected, ?string $other): void
     {
         $deprecations = [];
         // @phpstan-ignore frankenphp.worker.noSetErrorExceptionHandler
@@ -86,13 +119,9 @@ final class ManagerDerivationKernelTest extends TestCase
                 self::assertNotSame($connection, $otherConnection);
             }
 
-            $matching = 0;
             foreach ($deprecations as $message) {
-                if (str_contains($message, 'nowo_workflow.doctrine.entity_manager: ' . $expected)) {
-                    ++$matching;
-                }
+                self::assertStringNotContainsString('nowo-tech/workflow-bundle', $message, 'no Workflow deprecation in 2.0');
             }
-            self::assertSame($deprecated ? 1 : 0, $matching, 'a derived manager that is not the default one asks for the explicit option');
 
             self::assertSame(200, self::send($kernel, '/workflow/definitions', 'admin')->getStatusCode());
         } finally {

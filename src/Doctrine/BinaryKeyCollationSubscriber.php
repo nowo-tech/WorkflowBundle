@@ -13,7 +13,6 @@ use Doctrine\DBAL\Schema\ColumnEditor;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
-use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
@@ -56,7 +55,8 @@ use function version_compare;
  *   a new schema given back with `GenerateSchemaEventArgs::setSchema()`;
  * - older doctrine/dbal: the columns' platform options are set in place (no editor exists there).
  *
- * The listener never calls `setClassTable()`. It skips an entity manager that does not map the bundle entities and
+ * The listener never calls `setClassTable()`; its `postGenerateSchemaTable()` no-op (deprecated in 1.22.1) was removed
+ * in 2.0. It skips an entity manager that does not map the bundle entities and
  * reads the platform from the schema tool's own connection.
  *
  * @internal
@@ -159,16 +159,6 @@ final readonly class BinaryKeyCollationSubscriber
             $schemaEditor->dropTableByUnquotedName($tableName)->addTable($table);
         }
         $args->setSchema($schemaEditor->create());
-    }
-
-    /**
-     * No longer subscribed (1.22.1, FK loss): replacing the table there lost its foreign keys. Kept for BC; does nothing.
-     *
-     * @deprecated since 1.22.1, the collation is applied on postGenerateSchema ({@see self::postGenerateSchema()})
-     */
-    public function postGenerateSchemaTable(GenerateSchemaTableEventArgs $args): void
-    {
-        unset($args);
     }
 
     /**

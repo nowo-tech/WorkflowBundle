@@ -7,11 +7,11 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Support\Legacy;
 
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker;
 use Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker;
 use Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker;
+use Nowo\WorkflowBundle\Tests\Support\Legacy\WorkflowUiAccessCheckerInterfaceV1130 as WorkflowUiAccessCheckerInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

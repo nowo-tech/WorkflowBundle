@@ -15,7 +15,6 @@ use Nowo\TransactionDoctrine\TransientFailureClassifier;
 use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Concurrency\SubjectMarkingGuard;
 use Nowo\WorkflowBundle\Concurrency\WorkflowConcurrencyPolicy;
-use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -61,16 +60,18 @@ final class WorkflowApplicator
     /**
      * Creates the applicator with the registry, repository, resolver and entity manager.
      *
-     * With $flushAfterApply false (config nowo_workflow.runtime.flush_after_apply) apply*() only changes the marking
-     * of the subject and leaves persisting it to the caller.
+     * With $flushAfterApply false (config nowo_workflow.runtime.flush_after_apply, the default since 2.0) apply*() only
+     * changes the marking of the subject and leaves persisting it to the caller; true flushes the application's
+     * entity manager after each transition (the 1.x default, kept as an explicit choice). Since 2.0 $registry is the
+     * built-in registry (the 1.x registry port was removed).
      */
     public function __construct(
-        private readonly WorkflowRegistryInterface $registry,
+        private readonly DatabaseWorkflowRegistry $registry,
         private readonly WorkflowDefinitionRepository $definitionRepository,
         private readonly WorkflowResolver $resolver,
         private readonly EntityManagerInterface $entityManager,
         private readonly ?ManagerRegistry $managerRegistry = null,
-        private readonly bool $flushAfterApply = true,
+        private readonly bool $flushAfterApply = false,
         private readonly ?WorkflowDefinitionLocator $locator = null,
         private readonly ?DatabaseWorkflowRegistry $databaseRegistry = null,
         private readonly ?AfterCommitDispatcher $audit = null,
@@ -89,7 +90,7 @@ final class WorkflowApplicator
 
     /**
      * Applies the automatic transitions the subject can take now, one after the other (since 1.15), and flushes when
-     * one was applied (unless runtime.flush_after_apply is false). Idempotent: a subject with no enabled automatic
+     * one was applied (only when runtime.flush_after_apply is true). Idempotent: a subject with no enabled automatic
      * transition is left untouched. Loop-safe: it stops when a marking repeats or after
      * `guards.max_automatic_transitions` steps.
      *
@@ -120,7 +121,7 @@ final class WorkflowApplicator
     }
 
     /**
-     * Applies a transition with the workflow of the given slug and flushes (unless runtime.flush_after_apply is false).
+     * Applies a transition with the workflow of the given slug and, when runtime.flush_after_apply is true, flushes.
      *
      * @throws WorkflowNotFoundException
      * @throws WorkflowTransitionBlockedException when the marking or a guard listener blocks the transition
@@ -200,7 +201,7 @@ final class WorkflowApplicator
     }
 
     /**
-     * Applies a transition with the workflow resolved from the context and flushes (unless runtime.flush_after_apply is false).
+     * Applies a transition with the workflow resolved from the context and, when runtime.flush_after_apply is true, flushes.
      *
      * @throws WorkflowNotFoundException
      * @throws WorkflowTransitionBlockedException when the marking or a guard listener blocks the transition
@@ -213,7 +214,7 @@ final class WorkflowApplicator
     }
 
     /**
-     * Applies a transition with the workflow resolved from the subject and flushes (unless runtime.flush_after_apply is false).
+     * Applies a transition with the workflow resolved from the subject and, when runtime.flush_after_apply is true, flushes.
      *
      * @throws WorkflowNotFoundException
      * @throws WorkflowTransitionBlockedException when the marking or a guard listener blocks the transition
@@ -548,13 +549,8 @@ final class WorkflowApplicator
     {
         $this->assertSubjectSupported($subject, $definition);
         $workflow = $this->workflowFor($definition);
-        $marking  = $workflow->getMarking($subject);
-
-        if ($marking->getPlaces() === []) {
-            return '';
-        }
-
-        $places = array_keys($marking->getPlaces());
+        // A built workflow never answers an empty marking (it sets the initial place); '' only if a listener emptied it.
+        $places = array_keys($workflow->getMarking($subject)->getPlaces());
 
         return (string) ($places[0] ?? '');
     }

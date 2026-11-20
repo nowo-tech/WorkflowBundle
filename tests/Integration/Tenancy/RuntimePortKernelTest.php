@@ -12,7 +12,6 @@ use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
-use Nowo\WorkflowBundle\Tests\Support\Tenancy\CountingRegistryDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\HostRuntime;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -25,7 +24,7 @@ use function sys_get_temp_dir;
 
 /**
  * The framework-free runtime port (1.15, REQ-ARCH-001 rule 3): container shapes (lint:container), equivalence with
- * WorkflowApplicator, the deprecated registry SPI kept for 1.14 decorators, and a DDD host using only the port.
+ * WorkflowApplicator, and a DDD host using only the port (the 1.x registry port was removed in 2.0).
  */
 final class RuntimePortKernelTest extends TestCase
 {
@@ -45,20 +44,19 @@ final class RuntimePortKernelTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{string, string, string}>
+     * @return iterable<string, array{string, string}>
      */
     public static function variants(): iterable
     {
-        yield 'standard host, tenancy' => ['tenancy', 'built-in', 'built-in'];
-        yield 'DDD host, tenancy' => ['tenancy-ddd', 'built-in', 'built-in'];
-        yield 'no tenancy (1.14)' => ['plain', 'built-in', 'built-in'];
-        yield '1.14 registry decorator' => ['legacy-registry', 'built-in', 'host'];
-        yield 'host runtime port' => ['host-runtime', 'host', 'built-in'];
+        yield 'standard host, tenancy' => ['tenancy', 'built-in'];
+        yield 'DDD host, tenancy' => ['tenancy-ddd', 'built-in'];
+        yield 'no tenancy (1.14)' => ['plain', 'built-in'];
+        yield 'host runtime port' => ['host-runtime', 'host'];
     }
 
     #[Test]
     #[DataProvider('variants')]
-    public function lintContainerPassesForEveryShape(string $variant, string $runtime, string $registry): void
+    public function lintContainerPassesForEveryShape(string $variant, string $runtime): void
     {
         $this->kernel = new TenancyTestKernel($variant, true);
         $this->kernel->boot();
@@ -69,7 +67,6 @@ final class RuntimePortKernelTest extends TestCase
         self::assertSame(0, $tester->execute([]), $tester->getDisplay());
 
         self::assertSame($runtime, $this->kernel->getContainer()->getParameter(WorkflowRuntimePass::RUNTIME_PARAMETER));
-        self::assertSame($registry, $this->kernel->getContainer()->getParameter(WorkflowRuntimePass::REGISTRY_PARAMETER));
     }
 
     #[Test]
@@ -113,20 +110,6 @@ final class RuntimePortKernelTest extends TestCase
                 }
             }
         }
-    }
-
-    #[Test]
-    public function a114RegistryDecoratorKeepsRunningBehindTheRuntimePort(): void
-    {
-        $this->kernel = $kernel = self::boot('legacy-registry');
-        self::seedLeaveTemplate($kernel);
-        $decorator = self::service($kernel, CountingRegistryDecorator::class, 'app.workflow_registry_audit');
-        $leave     = self::persistLeave($kernel, new LeaveRequest('leave-1', '', 5));
-
-        self::service($kernel, WorkflowRuntimeInterface::class, 'test.' . WorkflowRuntimeInterface::class)->apply($leave, 'leave', 'submit');
-
-        self::assertGreaterThan(0, $decorator->calls);
-        self::assertSame('submitted', $leave->getStatus());
     }
 
     #[Test]

@@ -940,8 +940,6 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  * }
  * @psalm-type NowoWorkflowConfig = array{
- *     enabled?: bool|Param, // Deprecated: The "nowo_workflow.enabled.enabled" option is deprecated, use "nowo_workflow.web_ui.enabled" instead. // Deprecated alias of web_ui.enabled.
- *     environments?: list<scalar|Param|null>,
  *     connection?: scalar|Param|null, // Entity manager name used by nowo:workflow:sync-schema. The bundle mapping is registered on the default entity manager; for another manager, map NowoWorkflowBundle on it yourself. // Default: "default"
  *     table_prefix?: scalar|Param|null, // Default: "workflow_"
  *     web_ui?: array{ // Workflow admin UI (REQ-UI-003 vocabulary).
@@ -959,19 +957,9 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         default_locale?: scalar|Param|null, // Default: "en"
  *         locales?: list<scalar|Param|null>,
  *     },
- *     ui?: array{ // Deprecated since 1.9: use web_ui.*, security.access_roles and nowo_ui_kit.css_framework / icon_set.
- *         path?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.path.path" option is deprecated, use "nowo_workflow.web_ui.path_prefix" instead.
- *         layout_template?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.layout_template.layout_template" option is deprecated, use "nowo_workflow.web_ui.layout_template" (a layout rendering the UiKit canonical blocks; null = nowo_ui_kit.layouts.admin) instead. // 1.x layout (global nowo_workflow_layout_template). Pages render through the deprecated @NowoWorkflowBundle/base.html.twig bridge while it is set.
- *         css_framework?: "bootstrap"|"bootstrap5"|"bootstrap4"|"tailwind"|"foundation"|"custom"|"tabler"|"none"|Param|null, // Deprecated: The "nowo_workflow.ui.css_framework.css_framework" option is deprecated, set "nowo_ui_kit.css_framework" instead. // Seeds nowo_ui_kit.css_framework when the host does not set it. bootstrap / tabler are aliases of bootstrap5. // Default: null
- *         icon_set?: "bootstrap-icons"|"tabler-icons"|"ux_icon"|"svg_inline"|"none"|Param|null, // Deprecated: The "nowo_workflow.ui.icon_set.icon_set" option is deprecated, set "nowo_ui_kit.icon_set" instead. // Seeds nowo_ui_kit.icon_set when the host does not set it. // Default: null
- *         list_page_size?: int|Param, // Deprecated: The "nowo_workflow.ui.list_page_size.list_page_size" option is deprecated, use "nowo_workflow.web_ui.list_page_size" instead.
- *         default_locale?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.default_locale.default_locale" option is deprecated, use "nowo_workflow.web_ui.default_locale" instead.
- *         locales?: list<scalar|Param|null>,
- *         required_roles?: list<scalar|Param|null>,
- *     },
  *     security?: array{
  *         access_roles?: list<scalar|Param|null>,
- *         access_checker?: scalar|Param|null, // Service id implementing WorkflowUiAccessCheckerInterface. null = RoleBasedWorkflowUiAccessChecker. // Default: null
+ *         access_checker?: scalar|Param|null, // Service id implementing WorkflowUiAccessPolicyInterface. null = RoleBasedWorkflowUiAccessChecker. // Default: null
  *         allow_unauthenticated?: bool|Param, // DEV/DEMO ONLY. When true, UI may load without SecurityBundle. Never true in production. // Default: false
  *     },
  * }

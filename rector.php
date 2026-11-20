@@ -25,6 +25,8 @@ return RectorConfig::configure()
         // the subscribers are tested through getSubscribedEvents() (same skip as LegalKit / RuntimeEnv).
         EventSubscriberToAttributeRector::class,
         __DIR__ . '/vendor',
+        // Since 2.0: host classes that still implement a removed port; they cannot be loaded by design.
+        __DIR__ . '/tests/Support/Removed',
 
         // Each skip below is deliberate and scoped to one rule in one file. Do not "fix" `composer rector-dry` by
         // applying the hunks or by dropping the skip: the reviewed intent is recorded here.

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\EventListener;
 
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
 use Nowo\WorkflowBundle\EventListener\WorkflowUiAccessSubscriber;
 use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
@@ -19,8 +18,8 @@ use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\User\InMemoryUser;
 
 /**
- * 1.14: the subscriber asks the framework-free port with a VO, the deprecated port with the request, or both (both
- * must grant), and denies when no port is wired.
+ * The subscriber asks the framework-free port with a VO (since 1.14; the only port since 2.0) and denies when no
+ * policy is wired.
  */
 final class WorkflowUiAccessSubscriberPortsTest extends TestCase
 {
@@ -56,44 +55,16 @@ final class WorkflowUiAccessSubscriberPortsTest extends TestCase
     }
 
     #[Test]
-    public function bothPortsMustGrant(): void
+    public function aGrantingPolicyLetsTheRequestThrough(): void
     {
-        $allow = $this->createStub(WorkflowUiAccessPolicyInterface::class);
-        $allow->method('allows')->willReturn(true);
-        $deny = $this->createStub(WorkflowUiAccessCheckerInterface::class);
-        $deny->method('isGranted')->willReturn(false);
+        $allow = $this->createMock(WorkflowUiAccessPolicyInterface::class);
+        $allow->expects(self::once())->method('allows')->willReturn(true);
 
-        $this->expectException(AccessDeniedHttpException::class);
-
-        (new WorkflowUiAccessSubscriber($deny, true, $allow))->onKernelController($this->event());
+        (new WorkflowUiAccessSubscriber(null, true, $allow))->onKernelController($this->event());
     }
 
     #[Test]
-    public function aDenyingPolicySkipsTheDeprecatedPort(): void
-    {
-        $deny = $this->createStub(WorkflowUiAccessPolicyInterface::class);
-        $deny->method('allows')->willReturn(false);
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
-        $checker->expects(self::never())->method('isGranted');
-
-        $this->expectException(AccessDeniedHttpException::class);
-
-        (new WorkflowUiAccessSubscriber($checker, true, $deny))->onKernelController($this->event());
-    }
-
-    #[Test]
-    public function bothGrantingPortsLetTheRequestThrough(): void
-    {
-        $allow = $this->createStub(WorkflowUiAccessPolicyInterface::class);
-        $allow->method('allows')->willReturn(true);
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
-        $checker->expects(self::once())->method('isGranted')->willReturn(true);
-
-        (new WorkflowUiAccessSubscriber($checker, true, $allow))->onKernelController($this->event());
-    }
-
-    #[Test]
-    public function noPortWiredDenies(): void
+    public function noPolicyWiredDenies(): void
     {
         $this->expectException(AccessDeniedHttpException::class);
 

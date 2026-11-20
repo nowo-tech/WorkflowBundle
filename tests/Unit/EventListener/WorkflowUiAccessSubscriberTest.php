@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\EventListener;
 
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
 use Nowo\WorkflowBundle\EventListener\WorkflowUiAccessSubscriber;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,9 +19,9 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
 {
     public function testAllowsWorkflowUiRouteWhenCheckerGrantsAccess(): void
     {
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
+        $checker = $this->createMock(WorkflowUiAccessPolicyInterface::class);
         $checker->expects(self::once())
-            ->method('isGranted')
+            ->method('allows')
             ->willReturn(true);
 
         $request = new Request();
@@ -34,16 +34,16 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
             HttpKernelInterface::MAIN_REQUEST,
         );
 
-        (new WorkflowUiAccessSubscriber($checker))->onKernelController($event);
+        (new WorkflowUiAccessSubscriber(null, true, $checker))->onKernelController($event);
 
         self::addToAssertionCount(1);
     }
 
     public function testDeniesWorkflowUiRouteWhenCheckerRejectsAccess(): void
     {
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
+        $checker = $this->createMock(WorkflowUiAccessPolicyInterface::class);
         $checker->expects(self::once())
-            ->method('isGranted')
+            ->method('allows')
             ->willReturn(false);
 
         $request = new Request();
@@ -58,14 +58,14 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
 
         $this->expectException(AccessDeniedHttpException::class);
 
-        (new WorkflowUiAccessSubscriber($checker))->onKernelController($event);
+        (new WorkflowUiAccessSubscriber(null, true, $checker))->onKernelController($event);
     }
 
     /** Routes imported with a `name_prefix` keep the bundle controller: still guarded. */
     public function testDeniesBundleControllersUnderAForeignRouteName(): void
     {
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
-        $checker->expects(self::once())->method('isGranted')->willReturn(false);
+        $checker = $this->createMock(WorkflowUiAccessPolicyInterface::class);
+        $checker->expects(self::once())->method('allows')->willReturn(false);
 
         $request = new Request();
         $request->attributes->set('_route', 'cms_definitions');
@@ -81,13 +81,13 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
         self::assertTrue(WorkflowUiAccessSubscriber::isWorkflowUiRoute($request));
         $this->expectException(AccessDeniedHttpException::class);
 
-        (new WorkflowUiAccessSubscriber($checker))->onKernelController($event);
+        (new WorkflowUiAccessSubscriber(null, true, $checker))->onKernelController($event);
     }
 
     public function testIgnoresNonWorkflowUiRoutes(): void
     {
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
-        $checker->expects(self::never())->method('isGranted');
+        $checker = $this->createMock(WorkflowUiAccessPolicyInterface::class);
+        $checker->expects(self::never())->method('allows');
 
         $request = new Request();
         $request->attributes->set('_route', 'app_home');
@@ -99,15 +99,15 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
             HttpKernelInterface::MAIN_REQUEST,
         );
 
-        (new WorkflowUiAccessSubscriber($checker))->onKernelController($event);
+        (new WorkflowUiAccessSubscriber(null, true, $checker))->onKernelController($event);
 
         self::addToAssertionCount(1);
     }
 
     public function testIgnoresSubRequests(): void
     {
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
-        $checker->expects(self::never())->method('isGranted');
+        $checker = $this->createMock(WorkflowUiAccessPolicyInterface::class);
+        $checker->expects(self::never())->method('allows');
 
         $request = new Request();
         $request->attributes->set('_route', 'nowo_workflow_dashboard');
@@ -119,7 +119,7 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
             HttpKernelInterface::SUB_REQUEST,
         );
 
-        (new WorkflowUiAccessSubscriber($checker))->onKernelController($event);
+        (new WorkflowUiAccessSubscriber(null, true, $checker))->onKernelController($event);
 
         self::addToAssertionCount(1);
     }
@@ -137,15 +137,15 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
 
     public function testDisabledBundleAnswers404OnRequestForWorkflowUiRoute(): void
     {
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
-        $checker->expects(self::never())->method('isGranted');
+        $checker = $this->createMock(WorkflowUiAccessPolicyInterface::class);
+        $checker->expects(self::never())->method('allows');
 
         $request = Request::create('/workflow');
         $request->attributes->set('_route', 'nowo_workflow_dashboard');
 
         $this->expectException(NotFoundHttpException::class);
 
-        (new WorkflowUiAccessSubscriber($checker, false))->onKernelRequest(new RequestEvent(
+        (new WorkflowUiAccessSubscriber(null, false, $checker))->onKernelRequest(new RequestEvent(
             $this->createMock(HttpKernelInterface::class),
             $request,
             HttpKernelInterface::MAIN_REQUEST,
@@ -157,7 +157,7 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
         $request = Request::create('/');
         $request->attributes->set('_route', 'app_home');
 
-        (new WorkflowUiAccessSubscriber($this->createMock(WorkflowUiAccessCheckerInterface::class), false))->onKernelRequest(new RequestEvent(
+        (new WorkflowUiAccessSubscriber(null, false, $this->createMock(WorkflowUiAccessPolicyInterface::class)))->onKernelRequest(new RequestEvent(
             $this->createMock(HttpKernelInterface::class),
             $request,
             HttpKernelInterface::MAIN_REQUEST,
@@ -171,7 +171,7 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
         $request = Request::create('/workflow');
         $request->attributes->set('_route', 'nowo_workflow_dashboard');
 
-        (new WorkflowUiAccessSubscriber($this->createMock(WorkflowUiAccessCheckerInterface::class)))->onKernelRequest(new RequestEvent(
+        (new WorkflowUiAccessSubscriber(null, true, $this->createMock(WorkflowUiAccessPolicyInterface::class)))->onKernelRequest(new RequestEvent(
             $this->createMock(HttpKernelInterface::class),
             $request,
             HttpKernelInterface::MAIN_REQUEST,
@@ -182,15 +182,15 @@ final class WorkflowUiAccessSubscriberTest extends TestCase
 
     public function testDisabledBundleAnswers404OnControllerEvenForAllowAllChecker(): void
     {
-        $checker = $this->createMock(WorkflowUiAccessCheckerInterface::class);
-        $checker->method('isGranted')->willReturn(true);
+        $checker = $this->createMock(WorkflowUiAccessPolicyInterface::class);
+        $checker->method('allows')->willReturn(true);
 
         $request = new Request();
         $request->attributes->set('_route', 'nowo_workflow_definition_index');
 
         $this->expectException(NotFoundHttpException::class);
 
-        (new WorkflowUiAccessSubscriber($checker, false))->onKernelController(new ControllerEvent(
+        (new WorkflowUiAccessSubscriber(null, false, $checker))->onKernelController(new ControllerEvent(
             $this->createMock(HttpKernelInterface::class),
             static fn (): string => 'ok',
             $request,
