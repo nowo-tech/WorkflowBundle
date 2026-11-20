@@ -107,9 +107,13 @@ final class PortsTestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . self::CACHE_ROOT . '/cache/' . $this->variant . ($this->debug ? '-debug' : '') . match ($this->flushAfterApply) {
-            null => '', true => '-flush', false => '-noflush'
+        $flush = match ($this->flushAfterApply) {
+            null  => '',
+            true  => '-flush',
+            false => '-noflush',
         };
+
+        return sys_get_temp_dir() . self::CACHE_ROOT . '/cache/' . $this->variant . ($this->debug ? '-debug' : '') . $flush;
     }
 
     public function getLogDir(): string
