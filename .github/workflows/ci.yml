@@ -8,7 +8,67 @@ on:
   pull_request:
     branches: [main, master]
 
+# Superseded PR runs are cancelled. Push runs (main/master) get their own group (run_id), so a main run is never
+# cancelled, not even while pending: tag_when_green.sh needs a completed run on every release commit.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Light mode (docs/GITHUB_CI.md#light-mode-for-deps-and-docs-only-prs): one representative cell plus the cheap
+  # gates. The org (or repo) Actions variable NOWO_CI_PR_MODE picks the PR mode: light = every PR light; full = every
+  # PR full; auto / unset = light only when the PR touches nothing but composer.json / composer.lock (root or demo),
+  # docs/**, *.md, .github/ISSUE_TEMPLATE/**, specs/** or .cursor/**. push, tags, workflow_dispatch and schedule are
+  # always full. Fail-closed: any error, unknown value or empty output means full (jobs reduce only on 'light').
+  changes:
+    name: Change scope (light or full)
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+    steps:
+      - name: Checkout code (PR merge commit and its base parent)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Classify the change
+        id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+          SWITCH: ${{ vars.NOWO_CI_PR_MODE }}
+          LIGHT: '^((demo/([^/]+/)?)?composer\.(json|lock)|docs/.*|specs/.*|\.cursor/.*|\.github/ISSUE_TEMPLATE/.*|.*\.md|\.github/workflows/.*)$' # TEMP pilot measurement only: reverted before merge
+        run: |
+          mode=full; paths=""
+          if [ "$EVENT" != pull_request ]; then
+            reason="event '$EVENT' always runs full"
+          else
+            case "$SWITCH" in
+              light) mode=light; reason="NOWO_CI_PR_MODE=light: every PR is light" ;;
+              full) reason="NOWO_CI_PR_MODE=full: every PR is full" ;;
+              ''|auto)
+                if files=$(git diff --name-only --no-renames HEAD^1 HEAD); then
+                  mode=light; reason="NOWO_CI_PR_MODE=${SWITCH:-unset} (auto): only deps/docs paths changed"
+                  while IFS= read -r f; do
+                    [ -n "$f" ] || continue
+                    if ! printf '%s\n' "$f" | grep -Eq "$LIGHT"; then mode=full; paths="$paths $f"; fi
+                  done <<< "$files"
+                  [ "$mode" = light ] || reason="NOWO_CI_PR_MODE=${SWITCH:-unset} (auto): non deps/docs paths changed:$paths"
+                else
+                  reason="NOWO_CI_PR_MODE=${SWITCH:-unset} (auto): git diff failed, fail-closed"
+                fi ;;
+              *) reason="NOWO_CI_PR_MODE='$SWITCH' is not light/auto/full, fail-closed" ;;
+            esac
+          fi
+          echo "mode=$mode ($reason)"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          {
+            echo "### CI mode: \`$mode\`"
+            echo ""
+            echo "$reason"
+            if [ "$EVENT" = pull_request ] && [ -n "${files:-}" ]; then echo ""; echo "Changed paths:"; echo '```'; echo "$files" | head -200; echo '```'; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   git-hygiene:
     name: Git history (no Cursor co-author)
     runs-on: ubuntu-latest
@@ -26,6 +86,9 @@ jobs:
   test:
     name: PHP ${{ matrix.php }} - Symfony ${{ matrix.symfony }}
     runs-on: ubuntu-latest
+    needs: changes
+    # Never skipped at job level: a skipped matrix job reports its un-expanded name and the required contexts would never appear.
+    if: ${{ !cancelled() }}
 
     strategy:
       fail-fast: false
@@ -39,11 +102,18 @@ jobs:
           - php: '8.3'
             symfony: '8.1'
 
+    env:
+      HEAVY: ${{ needs.changes.outputs.mode != 'light' || (matrix.php == '8.5' && matrix.symfony == '8.1') }}
     steps:
+      - name: Light mode (deps/docs-only PR) - covered by PHP 8.5 - Symfony 8.1
+        if: env.HEAVY != 'true'
+        run: echo "Light mode, this cell has nothing to do."
       - name: Checkout code
+        if: env.HEAVY == 'true'
         uses: actions/checkout@v7
 
       - name: Setup PHP
+        if: env.HEAVY == 'true'
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -52,13 +122,16 @@ jobs:
           tools: composer:v2
 
       - name: Validate composer.json
+        if: env.HEAVY == 'true'
         run: composer validate --strict
 
       - name: Get Composer cache directory
+        if: env.HEAVY == 'true'
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
       - name: Cache Composer dependencies
+        if: env.HEAVY == 'true'
         uses: actions/cache@v6
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
@@ -68,14 +141,17 @@ jobs:
             ${{ runner.os }}-php-${{ matrix.php }}-composer-
 
       - name: Override Composer platform PHP (composer.json pins the minimum PHP for the lock)
+        if: env.HEAVY == 'true'
         run: composer config platform.php "${{ matrix.php }}.99"
 
       # Since 1.21.0: SearchKit (PHP >= 8.3) is added on 8.3+ only (never in composer.json / composer.lock); the 8.2 cells
       # skip the SearchKit group's tests.
       - name: SearchKit (PHP >= 8.3)
+        if: env.HEAVY == 'true'
         run: bash .github/ci/search-kit.sh
 
       - name: Install dependencies with Symfony ${{ matrix.symfony }}
+        if: env.HEAVY == 'true'
         run: |
           composer require --dev \
             symfony/browser-kit:^${{ matrix.symfony }} \
@@ -104,17 +180,19 @@ jobs:
           esac
           composer update symfony/* doctrine/doctrine-bundle ${SEARCH_KIT_PACKAGES:-} --with-all-dependencies --no-interaction --prefer-dist --no-progress
       - name: Composer audit (Critical/High)
+        if: env.HEAVY == 'true'
         run: composer audit --locked
 
 
       - name: Run tests
+        if: env.HEAVY == 'true'
         env:
           SYMFONY_DEPRECATIONS_HELPER: max[direct]=0
         run: composer test
 
       # Since 1.21.0 on PHP 8.4 (was 8.2): SearchKit is installed there, so the SearchKit group counts.
       - name: Run tests with coverage (PHP 8.4 + Symfony 7.4 only; fails below 100%, REQ-TEST-003)
-        if: matrix.php == '8.4' && matrix.symfony == '7.4'
+        if: env.HEAVY == 'true' && (matrix.php == '8.4' && matrix.symfony == '7.4')
         env:
           SYMFONY_DEPRECATIONS_HELPER: max[direct]=0
         run: composer test-coverage-100
@@ -123,6 +201,9 @@ jobs:
     # 1.15.2: the NO PAD key collation against real servers: migrations:diff stays clean, keys are exact.
     name: Schema round trip (${{ matrix.db }})
     runs-on: ubuntu-latest
+    needs: changes
+    # Never skipped at job level: a skipped matrix job reports its un-expanded name and the required contexts would never appear.
+    if: ${{ !cancelled() }}
 
     strategy:
       fail-fast: false
@@ -131,7 +212,7 @@ jobs:
 
     services:
       database:
-        image: ${{ matrix.db }}
+        image: ${{ needs.changes.outputs.mode != 'light' && matrix.db || '' }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: workflow
@@ -145,11 +226,18 @@ jobs:
           --health-timeout=5s
           --health-retries=30
 
+    env:
+      HEAVY: ${{ needs.changes.outputs.mode != 'light' }}
     steps:
+      - name: Light mode (deps/docs-only PR) - no run for this cell
+        if: env.HEAVY != 'true'
+        run: echo "Light mode, this cell has nothing to do."
       - name: Checkout code
+        if: env.HEAVY == 'true'
         uses: actions/checkout@v7
 
       - name: Setup PHP
+        if: env.HEAVY == 'true'
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -158,14 +246,17 @@ jobs:
           tools: composer:v2
 
       - name: Install dependencies
+        if: env.HEAVY == 'true'
         run: composer install --prefer-dist --no-progress --no-interaction
 
       - name: Collation round trip
+        if: env.HEAVY == 'true'
         env:
           NOWO_WORKFLOW_TEST_MYSQL_URL: pdo-mysql://root:root@127.0.0.1:3306/workflow
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/MySqlNoPadCollationTest.php
 
       - name: Identity key collation gate (REQ-SEC-006)
+        if: env.HEAVY == 'true'
         env:
           NOWO_WORKFLOW_TEST_MYSQL_URL: pdo-mysql://root:root@127.0.0.1:3306/workflow
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Collation/WorkflowExactKeyColumnsTest.php
@@ -174,6 +265,9 @@ jobs:
     # REQ-TEST-005: the schema and a definition round trip against a real PostgreSQL server.
     name: Schema round trip (postgres:16)
     runs-on: ubuntu-latest
+    needs: changes
+    # Light mode: skipped (a skipped non-matrix job reports its own name as skipped, accepted by branch protection).
+    if: ${{ !cancelled() && needs.changes.outputs.mode != 'light' }}
 
     services:
       database:
@@ -214,6 +308,9 @@ jobs:
     # real servers with real row locks, on DBAL 3 and DBAL 4. Required check on main.
     name: Databases (${{ matrix.db.image }}, DBAL ${{ matrix.dbal }})
     runs-on: ubuntu-latest
+    needs: changes
+    # Never skipped at job level: a skipped matrix job reports its un-expanded name and the required contexts would never appear.
+    if: ${{ !cancelled() }}
 
     strategy:
       fail-fast: false
@@ -241,7 +338,7 @@ jobs:
 
     services:
       database:
-        image: ${{ matrix.db.image }}
+        image: ${{ needs.changes.outputs.mode != 'light' && matrix.db.image || '' }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: workflow
@@ -257,11 +354,18 @@ jobs:
           --health-timeout=5s
           --health-retries=30
 
+    env:
+      HEAVY: ${{ needs.changes.outputs.mode != 'light' }}
     steps:
+      - name: Light mode (deps/docs-only PR) - no run for this cell
+        if: env.HEAVY != 'true'
+        run: echo "Light mode, this cell has nothing to do."
       - name: Checkout code
+        if: env.HEAVY == 'true'
         uses: actions/checkout@v7
 
       - name: Setup PHP
+        if: env.HEAVY == 'true'
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -270,13 +374,15 @@ jobs:
           tools: composer:v2
 
       - name: Install dependencies
+        if: env.HEAVY == 'true'
         run: composer install --prefer-dist --no-progress --no-interaction
 
       - name: Use DBAL 3
-        if: matrix.dbal == '3'
+        if: env.HEAVY == 'true' && (matrix.dbal == '3')
         run: composer require doctrine/dbal:^3.8.2 --with-all-dependencies --no-interaction --no-progress
 
       - name: Race tests (REQ-RUNTIME-003)
+        if: env.HEAVY == 'true'
         env:
           ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.test }}
@@ -287,6 +393,9 @@ jobs:
     # status matching and recents ids. SearchKit needs PHP >= 8.3.
     name: SearchKit databases (${{ matrix.db.image }})
     runs-on: ubuntu-latest
+    needs: changes
+    # Light mode: skipped (a skipped non-matrix job reports its own name as skipped, accepted by branch protection).
+    if: ${{ !cancelled() && needs.changes.outputs.mode != 'light' }}
 
     strategy:
       fail-fast: false
@@ -425,6 +534,9 @@ jobs:
   igor:
     name: Igor (FrankenPHP worker audit)
     runs-on: ubuntu-latest
+    needs: changes
+    # Light mode: skipped (a skipped non-matrix job reports its own name as skipped, accepted by branch protection).
+    if: ${{ !cancelled() && needs.changes.outputs.mode != 'light' }}
 
     steps:
       - name: Checkout code
