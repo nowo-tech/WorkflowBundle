@@ -11,6 +11,8 @@ nav:
   documents: Documents
   expenses: Dépenses
   purchase_orders: 'Bons de commande'
+  section_playground: 'Laboratoire'
+  section_admin: 'Administration'
   toggle: 'Basculer la navigation'
 
 home:

@@ -2,74 +2,81 @@
 
 {% block title %}{{ 'playground.change_requests.title'|trans({}, 'demo') }}{% endblock %}
 
-{% block body %}
-    <div class="nowo-ui-page-header"><h1 class="nowo-ui-page-header__title">{{ 'playground.change_requests.title'|trans({}, 'demo') }}</h1></div>
-    <p class="nowo-ui-muted">
-            {{ 'playground.change_requests.intro'|trans({'%entity%': 'DemoChangeRequest', '%workflow%': 'change_request_review'}, 'demo') }}
-        </p>
+{% block nowo_ui_page_header %}
+    {% set _toolbar %}<a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path('nowo_workflow_definition_show_by_slug', {slug: 'change_request_review'}) }}">{{ 'playground.change_requests.view_diagram'|trans({}, 'demo') }}</a>{% endset %}
+    {{ include(nowo_ui_partial('page_header'), {
+        title: 'playground.change_requests.title'|trans({}, 'demo'),
+        intro: 'playground.change_requests.intro'|trans({'%entity%': 'DemoChangeRequest', '%workflow%': 'change_request_review'}, 'demo') ~ ' ' ~ 'playground.change_requests.try_path'|trans({}, 'demo'),
+        toolbar: _toolbar,
+    }) }}
+{% endblock %}
 
+{% block nowo_ui_flashes %}
     {% if workflow_definition is null %}
-        <div class="nowo-ui-flash nowo-ui-flash--warning">
-            {{ 'playground.change_requests.seed_warning'|trans({'%command%': 'php bin/console nowo:workflow:seed-demo'}, 'demo') }}
-        </div>
+        {{ include('@NowoUiKit/demo_platform/_flashes.html.twig', {flash_messages: {warning: ['playground.change_requests.seed_warning'|trans({'%command%': 'php bin/console nowo:workflow:seed-demo'}, 'demo')]}}) }}
+    {% else %}
+        {{ parent() }}
     {% endif %}
+{% endblock %}
 
-    <div class="nowo-ui-flash nowo-ui-flash--info">
-        {{ 'playground.change_requests.try_path'|trans({}, 'demo') }}
-        <a href="{{ path('nowo_workflow_definition_show_by_slug', {slug: 'change_request_review'}) }}">{{ 'playground.change_requests.view_diagram'|trans({}, 'demo') }}</a>
-    </div>
-
+{% block body %}
     <div class="nowo-ui-cards">
         {% for key, tone in {happy_path: 'success', changes_loop: 'warning', rejection_loop: 'danger'} %}
-            <section class="nowo-ui-card">
-                <div class="nowo-ui-card__body">
-                    <h2 class="nowo-ui-card__title"><span class="nowo-ui-badge nowo-ui-badge--{{ tone }}">{{ ('playground.change_requests.' ~ key)|trans({}, 'demo') }}</span></h2>
-                    <p class="nowo-ui-muted">{{ ('playground.change_requests.' ~ key ~ '_desc')|trans({}, 'demo') }}</p>
-                </div>
-            </section>
+            {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: ('playground.change_requests.' ~ key)|trans({}, 'demo'), intro: ('playground.change_requests.' ~ key ~ '_desc')|trans({}, 'demo'), heading_level: 2, kind: 'detail'} %}
+                {% block section_body %}<span class="nowo-ui-badge nowo-ui-badge--{{ tone }}">{{ tone }}</span>{% endblock %}
+            {% endembed %}
         {% endfor %}
     </div>
 
-    {{ form_start(create_form) }}
-        <section class="nowo-ui-card">
-            <div class="nowo-ui-card__body">
-                <div class="nowo-ui-form__columns">
-                {% for child in create_form %}
-                    {% if not child.rendered %}
-                        {{ form_row(child) }}
-                    {% endif %}
-                {% endfor %}
-                </div>
-                <div class="nowo-ui-form__actions">
-                    <button type="submit" class="nowo-ui-btn nowo-ui-btn--primary">{{ 'playground.change_requests.create'|trans({}, 'demo') }}</button>
-                </div>
-            </div>
-        </section>
-    {{ form_end(create_form) }}
-
-    {% for item in change_requests %}
-        <section class="nowo-ui-card">
-            <div class="nowo-ui-card__body">
-                <div class="nowo-ui-card__toolbar">
-                    <strong>#{{ item.entity.id }}</strong>
-                    <span>{{ item.entity.title }}</span>
-                    <span class="nowo-ui-badge nowo-ui-badge--primary">{{ item.marking|replace({'_': ' '})|title }}</span>
-                </div>
-                <p class="nowo-ui-muted">{{ 'playground.resolved'|trans({}, 'demo') }}: <code class="nowo-ui-code">{{ item.workflow_slug }}</code></p>
-                <div class="nowo-ui-card__toolbar">
-                    {% for transition in item.transitions %}
-                        {% set transition_form = item.transition_forms[transition] %}
-                        {{ form_start(transition_form) }}
-                            {% for child in transition_form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
-                            <button type="submit" class="nowo-ui-btn nowo-ui-btn--sm nowo-ui-btn--outline">{{ transition|replace({'_': ' '})|title }}</button>
-                        {{ form_end(transition_form) }}
-                    {% else %}
-                        <span class="nowo-ui-muted">{{ 'playground.no_transitions'|trans({}, 'demo') }}</span>
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'playground.change_requests.create'|trans({}, 'demo'), kind: 'form', create_form: create_form} %}
+        {% block section_body %}
+            {{ form_start(create_form, {attr: {id: 'playground-create'}}) }}
+                    {% for child in create_form %}
+                        {% if not child.rendered %}{{ form_row(child) }}{% endif %}
                     {% endfor %}
-                </div>
-            </div>
-        </section>
-    {% else %}
-        <p class="nowo-ui-muted">{{ 'playground.no_items'|trans({}, 'demo') }}</p>
-    {% endfor %}
+            {{ form_end(create_form) }}
+        {% endblock %}
+        {% block section_footer %}
+            <button type="submit" form="playground-create" class="nowo-ui-btn nowo-ui-btn--primary">{{ 'playground.change_requests.create'|trans({}, 'demo') }}</button>
+        {% endblock %}
+    {% endembed %}
+
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'playground.change_requests.title'|trans({}, 'demo'), kind: 'table', items: change_requests, empty: change_requests is empty, state_message: 'playground.no_items'|trans({}, 'demo')} %}
+        {% block section_body %}
+            <table class="nowo-ui-data-table">
+                <thead>
+                    <tr>
+                        <th scope="col" class="nowo-ui-cell--num">#</th>
+                        <th scope="col">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">{{ 'playground.resolved'|trans({}, 'demo') }}</th>
+                        <th scope="col">Transitions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td class="nowo-ui-cell--num">{{ item.entity.id }}</td>
+                            <td class="nowo-ui-cell--wrap">{{ item.entity.title }}</td>
+                            <td><span class="nowo-ui-badge nowo-ui-badge--primary">{{ item.marking|replace({'_': ' '})|title }}</span></td>
+                            <td><code class="nowo-ui-code">{{ item.workflow_slug }}</code></td>
+                            <td>
+                                <div class="nowo-ui-row-actions">
+                                    {% for transition in item.transitions %}
+                                        {% set transition_form = item.transition_forms[transition] %}
+                                        {{ form_start(transition_form) }}
+                                            {% for child in transition_form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
+                                            <button type="submit" class="nowo-ui-btn nowo-ui-btn--sm nowo-ui-btn--outline">{{ transition|replace({'_': ' '})|title }}</button>
+                                        {{ form_end(transition_form) }}
+                                    {% else %}
+                                        <span class="nowo-ui-muted">{{ 'playground.no_transitions'|trans({}, 'demo') }}</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endblock %}
+    {% endembed %}
 {% endblock %}
