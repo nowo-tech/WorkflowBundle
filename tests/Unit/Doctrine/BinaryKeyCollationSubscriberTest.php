@@ -12,12 +12,14 @@ use Doctrine\DBAL\Platforms\MySQL84Platform;
 use Doctrine\DBAL\Platforms\MySQLPlatform;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
+use Doctrine\DBAL\Schema\Column;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
+use Doctrine\ORM\Mapping\ClassMetadataFactory;
+use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
 use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
-use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
@@ -28,7 +30,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * 1.15.2: NO PAD binary collations (PAD SPACE lesson): MariaDB `utf8mb4_nopad_bin`, MySQL 8.0.17+ `utf8mb4_0900_bin`,
- * older MySQL `utf8mb4_bin`; nothing on PostgreSQL / SQLite.
+ * older MySQL `utf8mb4_bin`; nothing on PostgreSQL / SQLite. 1.22.1: applied on `postGenerateSchema`, by table name.
  */
 final class BinaryKeyCollationSubscriberTest extends TestCase
 {
@@ -60,49 +62,72 @@ final class BinaryKeyCollationSubscriberTest extends TestCase
     #[Test]
     public function theConfiguredServerVersionDecidesOnMysql8(): void
     {
-        $args = $this->args(WorkflowSubjectPin::class);
-        (new BinaryKeyCollationSubscriber($this->registry(new MySQL80Platform(), ['serverVersion' => '8.0.16'])))->postGenerateSchemaTable($args);
-        self::assertSame('utf8mb4_bin', $args->getClassTable()->getColumn('subject_ref')->getCollation());
-        self::assertSame('utf8mb4', $args->getClassTable()->getColumn('subject_ref')->getCharset());
-        self::assertNull($args->getClassTable()->getColumn('other')->getCollation());
+        $args = $this->args(new MySQL80Platform(), ['serverVersion' => '8.0.16']);
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame('utf8mb4_bin', $this->column($args, 'workflow_subject_pin', 'subject_ref')->getCollation());
+        self::assertSame('utf8mb4', $this->column($args, 'workflow_subject_pin', 'subject_ref')->getCharset());
+        self::assertNull($this->column($args, 'workflow_subject_pin', 'other')->getCollation());
 
-        $args = $this->args(WorkflowSubjectPin::class);
-        (new BinaryKeyCollationSubscriber($this->registry(new MySQL80Platform(), ['primary' => ['serverVersion' => '8.0.40']])))->postGenerateSchemaTable($args);
-        self::assertSame('utf8mb4_0900_bin', $args->getClassTable()->getColumn('workflow_slug')->getCollation());
+        $args = $this->args(new MySQL80Platform(), ['primary' => ['serverVersion' => '8.0.40']]);
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame('utf8mb4_0900_bin', $this->column($args, 'workflow_subject_pin', 'workflow_slug')->getCollation());
     }
 
     #[Test]
     public function withoutAConfiguredVersionTheServerIsAsked(): void
     {
-        $args = $this->args(WorkflowDefinition::class);
-        (new BinaryKeyCollationSubscriber($this->registry(new MySQL80Platform(), [], '8.0.12')))->postGenerateSchemaTable($args);
-        self::assertSame('utf8mb4_bin', $args->getClassTable()->getColumn('tenant_key')->getCollation());
+        $args = $this->args(new MySQL80Platform(), [], '8.0.12');
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame('utf8mb4_bin', $this->column($args, 'workflow_definition', 'tenant_key')->getCollation());
 
-        $args = $this->args(WorkflowDefinition::class);
-        (new BinaryKeyCollationSubscriber($this->registry(new MySQL84Platform(), ['serverVersion' => ''], '8.4.0')))->postGenerateSchemaTable($args);
-        self::assertSame('utf8mb4_0900_bin', $args->getClassTable()->getColumn('slug')->getCollation());
+        $args = $this->args(new MySQL84Platform(), ['serverVersion' => ''], '8.4.0');
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame('utf8mb4_0900_bin', $this->column($args, 'workflow_definition', 'slug')->getCollation());
     }
 
     #[Test]
     public function mariaDbNeverAsksTheServer(): void
     {
-        $args = $this->args(WorkflowDefinition::class);
-        (new BinaryKeyCollationSubscriber($this->registry(new MariaDBPlatform(), [], null)))->postGenerateSchemaTable($args);
-        self::assertSame('utf8mb4_nopad_bin', $args->getClassTable()->getColumn('tenant_key')->getCollation());
+        $args = $this->args(new MariaDBPlatform(), [], null);
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame('utf8mb4_nopad_bin', $this->column($args, 'workflow_definition', 'tenant_key')->getCollation());
     }
 
     #[Test]
-    public function anEntityWithoutKeyColumnsOrWithoutAManagerIsLeftAlone(): void
+    public function aManagerWithoutTheBundleEntitiesOrAPlatformWithoutCollationIsLeftAlone(): void
     {
-        $registry = $this->createMock(ManagerRegistry::class);
-        $registry->method('getManagerForClass')->willReturn(null);
-        $args = $this->args(WorkflowDefinition::class);
-        (new BinaryKeyCollationSubscriber($registry))->postGenerateSchemaTable($args);
-        self::assertFalse($args->classTableWasMutated());
+        $args   = $this->args(new MariaDBPlatform(), [], null, transient: true);
+        $schema = $args->getSchema();
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame($schema, $args->getSchema());
 
-        $args = $this->args(WorkflowSubjectPin::class, ['other']);
-        (new BinaryKeyCollationSubscriber($this->registry(new MySQL84Platform(), ['serverVersion' => '8.4.3'])))->postGenerateSchemaTable($args);
-        self::assertFalse($args->classTableWasMutated(), 'no key column: the table is not replaced');
+        $args   = $this->args(new PostgreSQLPlatform(), [], null);
+        $schema = $args->getSchema();
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame($schema, $args->getSchema());
+
+        $args   = $this->args(new MariaDBPlatform(), [], null, columns: ['other']);
+        $schema = $args->getSchema();
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame($schema, $args->getSchema(), 'no key column: the schema is not replaced');
+
+        $args   = $this->args(new MariaDBPlatform(), [], null, tables: false);
+        $schema = $args->getSchema();
+        (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
+        self::assertSame($schema, $args->getSchema(), 'tables not generated (schema filter): nothing to collate');
+    }
+
+    #[Test]
+    public function theDeprecatedTableEventDoesNothing(): void
+    {
+        $table = new Table('workflow_subject_pin');
+        $table->addColumn('subject_ref', 'string', ['length' => 128]);
+        $args = new GenerateSchemaTableEventArgs(new ClassMetadata(WorkflowSubjectPin::class), new Schema([$table]), $table);
+
+        (new BinaryKeyCollationSubscriber())->postGenerateSchemaTable($args);
+
+        self::assertFalse($args->classTableWasMutated());
+        self::assertNull($table->getColumn('subject_ref')->getCollation());
     }
 
     #[Test]
@@ -111,10 +136,8 @@ final class BinaryKeyCollationSubscriberTest extends TestCase
         $logger = new RecordingLogger();
         foreach ([[new MySQL80Platform(), '8.0', 1], [new MySQLPlatform(), '8', 1], [new MySQL84Platform(), '8.4.3', 0], [new MySQL84Platform(), '9.7', 0], [new MariaDBPlatform(), '11.4', 0], [new MySQL84Platform(), null, 0]] as [$platform, $version, $warnings]) {
             $logger->records = [];
-            $registry        = $this->registry($platform, $version === null ? [] : ['serverVersion' => $version], $version === null ? '8.4.3' : null);
-            $listener        = new BinaryKeyCollationSubscriber($registry, $logger);
-            $listener->postGenerateSchemaTable($this->args(WorkflowDefinition::class));
-            $listener->postGenerateSchemaTable($this->args(WorkflowSubjectPin::class));
+            $listener        = new BinaryKeyCollationSubscriber(null, $logger);
+            $listener->postGenerateSchema($this->args($platform, $version === null ? [] : ['serverVersion' => $version], $version === null ? '8.4.3' : null));
             self::assertCount($warnings, $logger->records, (string) $version);
         }
         self::assertStringContainsString('has no patch number', $this->warn($logger));
@@ -122,14 +145,14 @@ final class BinaryKeyCollationSubscriberTest extends TestCase
 
     private function warn(RecordingLogger $logger): string
     {
-        $listener = new BinaryKeyCollationSubscriber($this->registry(new MySQL80Platform(), ['serverVersion' => '8.0']), $logger);
-        $listener->postGenerateSchemaTable($this->args(WorkflowDefinition::class));
+        $listener = new BinaryKeyCollationSubscriber(null, $logger);
+        $listener->postGenerateSchema($this->args(new MySQL80Platform(), ['serverVersion' => '8.0']));
 
         return $logger->records[0]['message'] ?? '';
     }
 
     #[Test]
-    public function olderDbalCollatesInPlace(): void
+    public function collatesInPlaceOrThroughTheEditor(): void
     {
         $table = new Table('t');
         $table->addColumn('tenant_key', 'string', ['length' => 128]);
@@ -137,27 +160,34 @@ final class BinaryKeyCollationSubscriberTest extends TestCase
         self::assertNull(BinaryKeyCollationSubscriber::collate($table, 'tenant_key', 'utf8mb4_nopad_bin', false));
         self::assertSame('utf8mb4_nopad_bin', $table->getColumn('tenant_key')->getPlatformOption('collation'));
         self::assertSame('utf8mb4', $table->getColumn('tenant_key')->getPlatformOption('charset'));
+
+        $edited = BinaryKeyCollationSubscriber::collate($table, 'tenant_key', 'utf8mb4_0900_bin', true);
+        self::assertInstanceOf(Table::class, $edited);
+        self::assertSame('utf8mb4_0900_bin', $edited->getColumn('tenant_key')->getCollation());
+    }
+
+    private function column(GenerateSchemaEventArgs $args, string $table, string $column): Column
+    {
+        return $args->getSchema()->getTable($table)->getColumn($column);
     }
 
     /**
-     * @param class-string $class
+     * The schema tool's event for the two bundle tables (each with `$columns`) on a manager with that platform.
+     *
+     * @param array<string, mixed> $params
      * @param list<string> $columns
      */
-    private function args(string $class, array $columns = ['tenant_key', 'slug', 'workflow_slug', 'subject_ref', 'other']): GenerateSchemaTableEventArgs
+    private function args(AbstractPlatform $platform, array $params = [], ?string $reported = null, bool $transient = false, array $columns = ['tenant_key', 'slug', 'workflow_slug', 'subject_ref', 'other'], bool $tables = true): GenerateSchemaEventArgs
     {
-        $table = new Table('t');
-        foreach ($columns as $column) {
-            $table->addColumn($column, 'string', ['length' => 128]);
+        $schemaTables = [];
+        foreach ($tables ? ['workflow_definition', 'workflow_subject_pin'] : [] as $name) {
+            $table = new Table($name);
+            foreach ($columns as $column) {
+                $table->addColumn($column, 'string', ['length' => 128]);
+            }
+            $schemaTables[] = $table;
         }
 
-        return new GenerateSchemaTableEventArgs(new ClassMetadata($class), new Schema(), $table);
-    }
-
-    /**
-     * @param array<string, mixed> $params
-     */
-    private function registry(AbstractPlatform $platform, array $params = [], ?string $reported = null): ManagerRegistry
-    {
         $connection = $this->createMock(Connection::class);
         $connection->method('getDatabasePlatform')->willReturn($platform);
         $connection->method('getParams')->willReturn($params);
@@ -166,11 +196,19 @@ final class BinaryKeyCollationSubscriberTest extends TestCase
         } else {
             $connection->method('getServerVersion')->willReturn($reported);
         }
-        $manager = $this->createMock(EntityManagerInterface::class);
+        $factory = $this->createStub(ClassMetadataFactory::class);
+        $factory->method('isTransient')->willReturn($transient);
+        $manager = $this->createStub(EntityManagerInterface::class);
         $manager->method('getConnection')->willReturn($connection);
-        $registry = $this->createMock(ManagerRegistry::class);
-        $registry->method('getManagerForClass')->willReturn($manager);
+        $manager->method('getMetadataFactory')->willReturn($factory);
+        $manager->method('getClassMetadata')->willReturnCallback(static function (string $class): ClassMetadata {
+            /** @var class-string $class */
+            $metadata = new ClassMetadata($class);
+            $metadata->setPrimaryTable(['name' => $class === WorkflowDefinition::class ? 'workflow_definition' : 'workflow_subject_pin']);
 
-        return $registry;
+            return $metadata;
+        });
+
+        return new GenerateSchemaEventArgs($manager, new Schema($schemaTables));
     }
 }

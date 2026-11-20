@@ -19,7 +19,6 @@ use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 use Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
-use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
 use PHPUnit\Framework\Attributes\Group;
 
 use function dirname;
@@ -83,7 +82,7 @@ final class WorkflowExactKeyColumnsTest extends ExactKeyColumnsTestCase
 
         $manager = new EntityManager($connection, $config);
         $manager->getEventManager()->addEventListener(Events::loadClassMetadata, new TablePrefixSubscriber(new TableNamePrefixer(self::PREFIX)));
-        $manager->getEventManager()->addEventListener(ToolEvents::postGenerateSchemaTable, new BinaryKeyCollationSubscriber(new TestManagerRegistry($manager)));
+        $manager->getEventManager()->addEventListener(ToolEvents::postGenerateSchema, new BinaryKeyCollationSubscriber());
         $this->manager = $manager;
 
         $tool = new SchemaTool($manager);

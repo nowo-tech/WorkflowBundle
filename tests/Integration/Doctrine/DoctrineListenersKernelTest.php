@@ -47,7 +47,7 @@ final class DoctrineListenersKernelTest extends TestCase
     public function theCollationListenerRunsUnderTheInstalledDoctrineBundle(string $url, string $serverVersion, string $collation): void
     {
         $manager = $this->boot(new DoctrineListenersTestKernel($url, $serverVersion));
-        self::assertTrue($manager->getEventManager()->hasListeners(ToolEvents::postGenerateSchemaTable), $this->doctrineBundle());
+        self::assertTrue($manager->getEventManager()->hasListeners(ToolEvents::postGenerateSchema), $this->doctrineBundle());
 
         $schema = (new SchemaTool($manager))->getSchemaFromMetadata($manager->getMetadataFactory()->getAllMetadata());
         $keys   = [
