@@ -350,7 +350,9 @@ jobs:
       - name: SearchKit contract
         env:
           ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
-        run: vendor/bin/phpunit --no-coverage --fail-on-skipped --group ${{ matrix.db.group }} tests/Integration/SearchKit
+        # SearchKit 1.11's testContractBoundedCandidatesGiveAnInexactTotal is skipped by design (the definitions never bound
+        # their candidates: seedBeyondTheBound() stays false), so it is left out here, where any other skip fails the job.
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped --exclude-filter testContractBoundedCandidatesGiveAnInexactTotal --group ${{ matrix.db.group }} tests/Integration/SearchKit
 
   cs-check:
     name: Code Style Check

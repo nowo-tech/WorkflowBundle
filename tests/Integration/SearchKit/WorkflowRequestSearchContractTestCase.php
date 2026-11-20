@@ -186,6 +186,25 @@ abstract class WorkflowRequestSearchContractTestCase extends EntitySearchProvide
         }
     }
 
+    /**
+     * The fixture's rows come back in insertion order (same timestamp; leave: auto-increment ids, purchase: ids that
+     * sort by insertion), so the kit's window tests never depend on chance.
+     */
+    public function testFixtureRowsComeBackInInsertionOrder(): void
+    {
+        [$tenant] = $this->tenants();
+        $marker   = $this->marker();
+        $this->actAs($tenant, self::VIEWER_A);
+        $urls = [];
+        for ($row = 0; $row < 8; ++$row) {
+            $urls[] = $this->url($this->seed($tenant, $marker . 'r' . $row));
+        }
+
+        $group = $this->provider()->search($this->query($marker, 8));
+        self::assertInstanceOf(SearchGroup::class, $group);
+        self::assertSame($urls, array_map(static fn (SearchItem $item): string => $item->url, $group->items));
+    }
+
     protected function definition(): EntitySearchDefinition
     {
         return $this->harness->definition(static::subject());

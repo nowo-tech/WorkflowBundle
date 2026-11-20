@@ -61,6 +61,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Tests only: the SearchKit contract fixture of the "purchase" subject gave every row the same `created_at` and a random id, so its rows came back in random order and SearchKit's window test failed about once in 231 runs. Its ids now sort by insertion, as the "leave" fixture's auto-increment ids already did, and a new contract test checks that both fixtures return rows in insertion order on every database. No change to the bundle.
+- CI only: SearchKit 1.11 added a kit test, `testContractBoundedCandidatesGiveAnInexactTotal`, that is skipped for definitions that never bound their candidates, as these do. The `search-kit-databases` job, which fails on any skipped test, now leaves that test out.
+
 ## [1.21.0] - 2026-11-19
 
 ### Added
