@@ -5,8 +5,8 @@
 - [Standard Symfony host](#standard-symfony-host)
 - [DDD / hexagonal host](#ddd--hexagonal-host)
 - [Flushing after apply: new installs and upgrades](#flushing-after-apply-new-installs-and-upgrades)
-- [Doctrine: the private entity manager (1.14)](#doctrine-the-private-entity-manager-114)
-  - [Deprecated keys (since 1.9, removed in 2.0)](#deprecated-keys-since-19-removed-in-20)
+- [Doctrine: the private entity manager](#doctrine-the-private-entity-manager)
+  - [Keys removed in 2.0](#keys-removed-in-20)
 - [Host layout integration (REQ-UI-003)](#host-layout-integration-req-ui-003)
 - [Protecting the CRUD UI (REQ-UI-002)](#protecting-the-crud-ui-req-ui-002)
 - [Header search (SearchKit, 1.21)](#header-search-searchkit-121)
@@ -17,7 +17,7 @@ nowo_workflow:
     connection: default
     table_prefix: workflow_
     runtime:
-        flush_after_apply: false    # 1.14 recipe value; unset = true (1.13 behaviour) with a deprecation, false in 2.0
+        flush_after_apply: false    # default since 2.0; true = flush the application's default entity manager after apply*()
         concurrency:                # 1.20, REQ-RUNTIME-003 (docs/CONCURRENCY.md)
             default: lock           # lock (SELECT … FOR UPDATE + expected marking) | optimistic (#[Version]) | none
             workflows: {}           # mode per workflow slug, e.g. { imported_orders: none }
@@ -61,9 +61,9 @@ nowo_workflow:
 |--------|---------|-------------|
 | `connection` | `default` | **Entity manager name** used by `nowo:workflow:sync-schema`. The bundle mapping (`NowoWorkflowBundle`) is always prepended to the **default** entity manager; to store workflow tables elsewhere, map `NowoWorkflowBundle` on that entity manager yourself and set this option to its name. |
 | `table_prefix` | `workflow_` | Prefix for Doctrine table and constraint names (`workflow_definition` → `{prefix}definition`) |
-| `runtime.flush_after_apply` | `true` when unset (deprecated), `false` in the 1.14 recipe | `true`: `WorkflowApplicator::apply*()` flushes the application's default entity manager after each transition, which commits **every** pending change of its unit of work (1.13 behaviour). `false`: only the marking is changed; the caller persists the subject (repository, transaction boundary). Not setting the key keeps `true` and triggers a deprecation (since 1.14): the default becomes `false` in 2.0. See [Flushing after apply](#flushing-after-apply-new-installs-and-upgrades). |
-| `doctrine.entity_manager` | `null` | Since 1.14. Source manager of the bundle's **private** entity manager (connection, mapping configuration, event manager, SQL filters). `null` = the first manager of `doctrine.orm.entity_managers` that maps the bundle entities (the 1.13 rule, resolved at build time; a deprecation asks for the explicit option when it is not the default manager). A configured name must exist and map the bundle entities: the build fails otherwise. The bundle never flushes, clears or resets it. |
-| `doctrine.private_entity_manager` | `true` | Since 1.14. `false` restores the 1.13 behaviour (the admin UI, demo seeder and repository use the application's default manager; `WorkflowDefinitionRepository::save()` / `remove()` then flush that manager, including the application's pending changes). **Deprecated** as soon as it is set; removed in 2.0. |
+| `runtime.flush_after_apply` | `false` (since 2.0) | `false`: only the marking is changed; the caller persists the subject (repository, transaction boundary). `true`: `WorkflowApplicator::apply*()` flushes the application's default entity manager after each transition, which commits **every** pending change of its unit of work (the 1.x default, kept as an explicit choice of the application). See [Flushing after apply](#flushing-after-apply-new-installs-and-upgrades). |
+| `doctrine.entity_manager` | `null` | Since 1.14. Source manager of the bundle's **private** entity manager (connection, mapping configuration, event manager, SQL filters). `null` = the first manager of `doctrine.orm.entity_managers` that maps the bundle entities (the 1.13 rule, resolved at build time); since 2.0 the build fails when that manager is not the default one (set the option to its name). A configured name must exist and map the bundle entities: the build fails otherwise. The bundle never flushes, clears or resets it. |
+| `doctrine.private_entity_manager` | `true` | No effect since 2.0: the private entity manager is the only mode. `true` is accepted with a deprecation (remove the key; it goes in 3.0); `false` fails the build. |
 | `doctrine.register_mapping` | `true` | Since 1.14. `false` = the bundle does not prepend its mapping; map `Nowo\WorkflowBundle\Entity` yourself (e.g. only on a dedicated manager, from the shipped XML). |
 | `doctrine.mapping_type` | `attribute` | Since 1.14. `xml` = the bundle registers `src/Resources/config/doctrine/*.orm.xml` (same tables, columns, indexes and constraints as the attributes; a test asserts the parity). |
 | `web_ui.enabled` | `true` | When `false`, every Workflow UI route (`nowo_workflow_*`) answers 404; UI access checks stay wired (fail-closed). The registry keeps working. |
@@ -85,7 +85,7 @@ nowo_workflow:
 | `guards.max_automatic_transitions` | `10` | Since 1.15. Automatic transitions applied in a row for one subject (0–100); the run also stops when a marking repeats. |
 | `audit.enabled` | `null` | Since 1.15. `WorkflowTransitionAppliedEvent` after the commit of each applied transition (DBAL 4 middleware on the connections of the definitions' manager and of the default manager). `null` = on with tenancy, off without. |
 | `security.access_roles` | `ROLE_ADMIN` | User must have **at least one** role. An empty list is **rejected** unless `security.access_checker` is set (your checker decides) or `security.allow_unauthenticated: true` (dev/demo only). |
-| `security.access_checker` | `null` | Optional service id implementing `WorkflowUiAccessPolicyInterface` (1.14). A service implementing only the deprecated `WorkflowUiAccessCheckerInterface` keeps working (deprecation at build time); a service implementing neither fails the build. |
+| `security.access_checker` | `null` | Optional service id implementing `WorkflowUiAccessPolicyInterface` (1.14). A service that does not implement it fails the build, and so does a class that still implements the request-based `WorkflowUiAccessCheckerInterface` (removed in 2.0). |
 | `security.allow_unauthenticated` | `false` | **DEV/DEMO only.** When `false` (default), SecurityBundle (`security.authorization_checker`) is required. Never `true` in production. |
 
 Shipped translation catalogs: `en`, `es`, `fr`, `it`, `de`, `nl`, `pt`. Add `de`, `nl`, or `pt` to `web_ui.locales` to expose them.
@@ -129,24 +129,23 @@ false`, and your own `WorkflowUiAccessPolicyInterface` service aliased to the po
 
 ## Flushing after apply: new installs and upgrades
 
-`runtime.flush_after_apply` is the one setting whose recommended value changes in 1.14 (REQ-ARCH-001 rule 6: a
-bundle never flushes the application's entity manager). The mechanism keeps every existing install unchanged:
+`runtime.flush_after_apply` is `false` by default since 2.0 (REQ-ARCH-001 rule 6: a bundle never flushes the
+application's entity manager): `apply*()` only changes the marking and your code flushes or saves the subject.
 
 | Situation | Value used | What happens |
 |-----------|------------|--------------|
-| New install with Symfony Flex (recipe `1.14`) | `false` (written in `config/packages/nowo_workflow.yaml`) | `apply*()` only changes the marking; your code flushes or saves the subject. |
-| Upgrade from ≤ 1.13 without the key | `true` (tree default, unchanged) | Same as 1.13: `apply*()` flushes the default entity manager. A deprecation is triggered when the container is built. |
-| Any install that sets the key | the value set | No deprecation. |
-| 2.0 | `false` | The key's default becomes `false`; `true` stays available until then. |
+| Key not set (2.0) | `false` | `apply*()` only changes the marking; your code flushes or saves the subject. |
+| `false` (the 1.14 Flex recipe) | `false` | Same. |
+| `true` | `true` | `apply*()` flushes the application's default entity manager after each transition (the 1.x default), including every change your code left pending. An explicit choice of the application, supported in 2.x without a notice. |
 
-To silence the deprecation without changing behaviour, set `flush_after_apply: true`. To move to the 2.0 behaviour,
-set `false` and persist the subject after `apply*()` (the same database state results; this is covered by
+1.x applications that did not set the key flushed through the bundle: see UPGRADING.md "To 2.0.0" (data-loss
+warning). `true` and `false` followed by your own flush leave the same database state (covered by
 `PersistenceEquivalenceKernelTest`).
 
-## Doctrine: the private entity manager (1.14)
+## Doctrine: the private entity manager
 
 The workflow definitions (`WorkflowDefinition`, places, transitions, match rules) are read and written through a
-**private entity manager** owned by the bundle (REQ-ARCH-001 rule 6). It is created on the connection, mapping
+**private entity manager** owned by the bundle (REQ-ARCH-001 rule 6; since 1.14, the only mode since 2.0). It is created on the connection, mapping
 configuration and event manager of the source manager (`doctrine.entity_manager`, or the manager that maps the
 entities), so the tables, the table prefix and your Doctrine listeners are unchanged. Its unit of work holds only
 definition rows:
@@ -170,29 +169,31 @@ Unflushed `save($definition, false)` / `remove($definition, false)` changes kept
 are not supported (flush right away inside your own transactions). Changes still pending when a boundary drops the
 private manager are logged as a warning (entity classes and count).
 `WorkflowDefinitionRepository` returns entities managed by the private manager: change and persist them through the
-bundle (admin UI) or with `$repository->save($definition)` / `remove()` (1.14), not through your own manager. Set
-`doctrine.private_entity_manager: false` (deprecated) to keep the 1.13 behaviour for one minor while you migrate.
+bundle (admin UI) or with `$repository->save($definition)` / `remove()` (1.14), not through your own manager. One of
+your entities that points at a definition takes `$yourManager->getReference(WorkflowDefinition::class, $id)`, never the
+instance a bundle service returned.
 
 The application's subjects (the objects a workflow applies to) are never in the private manager: they stay in your
 manager, and `runtime.flush_after_apply` decides who flushes them.
 
-### Deprecated keys (since 1.9, removed in 2.0)
+### Keys removed in 2.0
 
-Still read and mapped (a canonical key set explicitly wins); each one reports a deprecation:
+Setting one fails the build with its replacement (deprecated since 1.9; `environments` since 1.8):
 
-| Deprecated | Use instead |
+| Removed | Use instead |
 | --- | --- |
 | `enabled` | `web_ui.enabled` |
 | `ui.path` | `web_ui.path_prefix` |
-| `ui.layout_template` | `web_ui.layout_template` with a layout rendering the canonical blocks, or `nowo_ui_kit.layouts.admin`. While set, pages render through the deprecated `@NowoWorkflowBundle/base.html.twig` bridge into that 1.x layout; the removed default `@NowoWorkflowBundle/layout.html.twig` maps to the UiKit layout. |
-| `ui.css_framework` | `nowo_ui_kit.css_framework` (still seeded when the host does not set it; also re-enables the 1.x scoped Bootstrap form theme) |
-| `ui.icon_set` | `nowo_ui_kit.icon_set` (still seeded when the host does not set it) |
+| `ui.layout_template` | `web_ui.layout_template` with a layout rendering the canonical blocks, or `nowo_ui_kit.layouts.admin` |
+| `ui.css_framework` | `nowo_ui_kit.css_framework` |
+| `ui.icon_set` | `nowo_ui_kit.icon_set` |
 | `ui.list_page_size`, `ui.default_locale`, `ui.locales` | `web_ui.list_page_size`, `web_ui.default_locale`, `web_ui.locales` |
 | `ui.required_roles` | `security.access_roles` |
-| `environments` (since 1.8) | register the bundle per environment in `config/bundles.php` |
+| `environments` | register the bundle per environment in `config/bundles.php` |
+| `doctrine.private_entity_manager: false` | nothing: the private entity manager is the only mode |
 
-Deprecated Twig globals: `nowo_workflow_layout_template`, `nowo_workflow_css_framework`, `nowo_workflow_icon_set`,
-`nowo_workflow_form_themes`.
+The Twig globals `nowo_workflow_layout_template`, `nowo_workflow_css_framework`, `nowo_workflow_icon_set` and
+`nowo_workflow_form_themes` were removed as well.
 
 ## Host layout integration (REQ-UI-003)
 

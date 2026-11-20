@@ -36,7 +36,7 @@ This Symfony bundle persists **workflow definitions** in Doctrine, exposes a **b
 | **SQL injection** | Use Doctrine ORM only; no raw SQL with user input. |
 | **XSS in admin UI** | Twig auto-escaping; validate user-supplied labels in forms. |
 | **Unsafe subject classes** | Validate `subject_class` refers to expected application entities; document trust boundaries for match rules. |
-| **Fail-open when disabled** | `enabled: false` makes every `nowo_workflow_*` route answer **404** (request listener right after the router); the access checker is still wired (fail-closed `DenyAllWorkflowUiAccessChecker` when no security is available). |
+| **Fail-open when disabled** | `web_ui.enabled: false` makes every `nowo_workflow_*` route answer **404** (request listener right after the router); the access checker is still wired (fail-closed `DenyAllWorkflowUiAccessChecker` when no security is available). |
 | **Open redirect (locale switch)** | `/locale/{_locale}` only redirects to a same-host `Referer` (or a local path); anything else goes to the dashboard. |
 | **CSRF** | Create / edit forms carry Symfony form CSRF tokens; delete is a POST checked with `isCsrfTokenValid('delete<id>')`. `CsrfProtectionPass` fails closed: with `web_ui.enabled: true` the container refuses to compile when `security.csrf.token_manager` or the form CSRF extension is missing, or `framework.form.csrf_protection` is disabled. |
 | **DOM XSS in the shipped JS** | `nowo-workflow.js` never parses HTML strings: field values reach the table as text nodes, new collection entries are cloned from a server-rendered `<template>` (no `innerHTML` / `document.write` / `eval`). |
@@ -77,7 +77,7 @@ slugs and ids are configuration identifiers, not personal data.
 
 - `composer audit` runs in CI on every matrix cell (`composer audit --locked`); Dependabot (Composer + GitHub Actions)
   opens grouped update PRs.
-- Security fixes are released as patch versions of the supported line (see [`.github/SECURITY.md`](../.github/SECURITY.md)).
+- Security fixes are released as patch versions of the supported lines (see [`.github/SECURITY.md`](../.github/SECURITY.md)): 2.x, and 1.x for 6 months after 2.0.0 (fixes rated Moderate and above are backported to the last 1.x minor; Low ones are fixed in 2.x only).
 
 ## Reporting a vulnerability
 
@@ -121,9 +121,8 @@ nowo_workflow:
 | Key | Default | Notes |
 | --- | ------- | ----- |
 | `security.access_roles` | `[ROLE_ADMIN]` | At least one non-empty role required. Empty list is rejected at compile time unless `allow_unauthenticated` or a custom `access_checker` is set. |
-| `security.access_checker` | `null` | Custom service id implementing `WorkflowUiAccessPolicyInterface` (1.14, framework-free VO). The deprecated `WorkflowUiAccessCheckerInterface` still works; a service implementing neither fails the build. A policy that answers `false` or throws never grants (fail closed). |
+| `security.access_checker` | `null` | Custom service id implementing `WorkflowUiAccessPolicyInterface` (framework-free VO). A service that does not implement it fails the build (the request-based `WorkflowUiAccessCheckerInterface` was removed in 2.0). A policy that answers `false` or throws never grants (fail closed). |
 | `security.allow_unauthenticated` | `false` | Without SecurityBundle, compilation **fails** unless this is `true` or a custom checker is set. **Never `true` in production.** |
-| `ui.required_roles` | `[ROLE_ADMIN]` | BC alias mirrored to/from `security.access_roles`. |
 
 ### Two layers
 
@@ -136,25 +135,25 @@ security:
         - { path: ^/workflow, roles: ROLE_ADMIN }
 ```
 
-2. **Bundle checker** — `WorkflowUiAccessSubscriber` enforces `WorkflowUiAccessCheckerInterface` on routes named `nowo_workflow_*`; with `enabled: false` those routes return 404. With SecurityBundle and no custom checker, `RoleBasedWorkflowUiAccessChecker` is wired automatically from `access_roles`.
+2. **Bundle checker** — `WorkflowUiAccessSubscriber` enforces `WorkflowUiAccessPolicyInterface` on routes named `nowo_workflow_*`; with `web_ui.enabled: false` those routes return 404. With SecurityBundle and no custom checker, `RoleBasedWorkflowUiAccessChecker` is wired automatically from `access_roles`.
 
 ### Custom checker
 
 ```php
-// src/Security/WorkflowUiAccessChecker.php
+// src/Security/WorkflowUiAccessPolicy.php
 namespace App\Security;
 
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
+use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\HttpFoundation\Request;
 
-final class WorkflowUiAccessChecker implements WorkflowUiAccessCheckerInterface
+final class WorkflowUiAccessPolicy implements WorkflowUiAccessPolicyInterface
 {
     public function __construct(private readonly Security $security)
     {
     }
 
-    public function isGranted(Request $request): bool
+    public function allows(WorkflowUiAccessCheck $check): bool
     {
         return $this->security->isGranted('ROLE_ADMIN');
     }
@@ -164,7 +163,7 @@ final class WorkflowUiAccessChecker implements WorkflowUiAccessCheckerInterface
 ```yaml
 nowo_workflow:
     security:
-        access_checker: App\Security\WorkflowUiAccessChecker
+        access_checker: App\Security\WorkflowUiAccessPolicy
 ```
 
 ### Demos

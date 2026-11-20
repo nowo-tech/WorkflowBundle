@@ -54,7 +54,7 @@ A bundle that is safe under **B** is safe under **A** and under classic mode / P
 
 | Service | Shared | Mutable state | Scenario A | Scenario B |
 |---------|--------|---------------|------------|------------|
-| `Service\DatabaseWorkflowRegistry` (also aliased as `Contract\WorkflowRegistryInterface`) | yes | `array $cache` of built workflows scoped to the current main request (`WeakReference` owner); `reset()` clears it | ✅ | ✅ |
+| `Service\DatabaseWorkflowRegistry` | yes | `array $cache` of built workflows scoped to the current main request (`WeakReference` owner); `reset()` clears it | ✅ | ✅ |
 | `Service\WorkflowApplicator` | yes | none (`readonly` deps); resets a closed EM after a failed flush | ✅ | ✅ |
 | `Service\WorkflowResolver` | yes | none | ✅ | ✅ |
 | `Service\WorkflowVersionManager` (1.19, aliased as `Contract\WorkflowVersionManagerInterface`) | yes | none (`final readonly`); every reference is resolved against the store per call, and the views it returns are built per call | ✅ | ✅ |
@@ -80,7 +80,7 @@ A bundle that is safe under **B** is safe under **A** and under classic mode / P
 ### W-01 — Workflow registry cache is never reset and is per worker (Medium)
 
 - **Where:** `src/Service/DatabaseWorkflowRegistry.php:22-43` (`private array $cache`, filled in `get()`); invalidation only in `invalidate()` (`:56-65`), called from `src/Controller/WorkflowDefinitionController.php:63`, `:131`, `:149-150` and `src/Service/DemoSeedService.php:35`, `:44`. The class does not implement `ResetInterface`.
-- **Worker impact:** in classic mode the cache lives for one request. In worker mode (A and B) each worker keeps the built `Workflow` / `StateMachine` for a slug until the process ends. When an admin edits places or transitions, only the worker that handled the edit calls `invalidate()`; every other worker keeps applying the **old** transitions through `WorkflowApplicator::apply*()` / `getEnabledTransitions*()` (`src/Service/WorkflowApplicator.php:94`, `:108`, `:119`). Direct users of `WorkflowRegistryInterface::get()` / `has()` also keep getting a workflow that was disabled or deleted afterwards, because the `isEnabled()` check at `:38` runs only on a cache miss. This is stale business data, not a cross-user leak; if transitions are used as an approval / authorization gate, treat it as higher severity.
+- **Worker impact:** in classic mode the cache lives for one request. In worker mode (A and B) each worker keeps the built `Workflow` / `StateMachine` for a slug until the process ends. When an admin edits places or transitions, only the worker that handled the edit calls `invalidate()`; every other worker keeps applying the **old** transitions through `WorkflowApplicator::apply*()` / `getEnabledTransitions*()` (`src/Service/WorkflowApplicator.php:94`, `:108`, `:119`). Direct users of `DatabaseWorkflowRegistry::get()` / `has()` (the 1.x `WorkflowRegistryInterface`) also keep getting a workflow that was disabled or deleted afterwards, because the `isEnabled()` check at `:38` runs only on a cache miss. This is stale business data, not a cross-user leak; if transitions are used as an approval / authorization gate, treat it as higher severity.
 - **Recommendation:** implement `ResetInterface` on `DatabaseWorkflowRegistry` with `reset(): void { $this->cache = []; }` (fixes A), and for B validate the cached entry against the definition's `updatedAt` (already stored in `src/Entity/WorkflowDefinition.php:93-94`) or drop the cache, since `WorkflowApplicator` already loads the definition from the database on every call.
 - **Status:** Resolved — `src/Service/DatabaseWorkflowRegistry.php` implements `ResetInterface` and takes an optional `RequestStack`; the memo is owned by the current main request (held through a `WeakReference`) and dropped as soon as another main request is seen, so each request rebuilds from the database. Sub-requests reuse the main request's memo; outside of an HTTP request nothing is memoized. `updatedAt` was not used as a version key because edits to child places/transitions do not touch it. Tests: `tests/Unit/Service/DatabaseWorkflowRegistryTest.php` (`testSecondRequestWithoutResetSeesDefinitionChangedByAnotherWorker`, `testSecondRequestWithoutResetSeesDefinitionDisabledByAnotherWorker`, sub-request / no-request / `reset()` cases).
 
@@ -123,8 +123,8 @@ stateless or have their per-request state cleared between requests: under scenar
 
 The bundle never clears, flushes or resets an application entity manager. A host that disables or bypasses the
 services resetter must clear its own managers at every boundary (REQ-RUNTIME-002 rule 7); with
-`runtime.flush_after_apply: true` (deprecated default) `WorkflowApplicator` still flushes the application's default
-manager and resets it when that flush closed it (1.13 behaviour, W-03).
+`runtime.flush_after_apply: true` (an explicit choice since 2.0; the 1.x default) `WorkflowApplicator` still flushes
+the application's default manager and resets it when that flush closed it (never an open one, W-03).
 
 Worker test: `tests/Integration/Worker/WorkerKeptAliveKernelTest.php`: one kernel, requests sent to `http_kernel`
 (never `Kernel::handle()`, so the services resetter never runs), N = 1,000 iterations alternating an administrator
@@ -155,7 +155,7 @@ Igor: 110 services, 0 KO.
 
 - Workers no longer need a restart after editing definitions: every request rebuilds workflows from the database.
 - Under scenario B, clearing **your** Doctrine identity maps between requests remains the application's responsibility (REQ-RUNTIME-002 rule 7; the bundle clears only its own private manager since 1.14): an entity of yours already loaded by an earlier request in the same worker is returned as-is by `findOneBy()` and would carry stale fields. Keeping `services_resetter` active (scenario A) handles this.
-- Custom `WorkflowUiAccessPolicyInterface` (or deprecated `WorkflowUiAccessCheckerInterface`) or `WorkflowRegistryInterface` implementations must stay stateless (or implement `ResetInterface`); never cache the current user or request in them.
+- Custom `WorkflowUiAccessPolicyInterface`, `WorkflowRuntimeInterface` or `WorkflowVersionManagerInterface` implementations and decorators must stay stateless (or implement `ResetInterface`); never cache the current user or request in them.
 - The demo (`demo/symfony8`) runs in worker mode by default (`FRANKENPHP_MODE=worker`, `docker/Caddyfile` has a `worker` block); use it to check that an edit is visible from all workers.
 
 ## Re-audit triggers

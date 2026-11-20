@@ -33,12 +33,12 @@ This bundle is **FrankenPHP worker mode friendly**.
 
 - Persist workflow definitions (places, transitions, subject class, marking property) in Doctrine
 - Configurable Doctrine `table_prefix` for table and constraint names
-- Built-in admin UI at `/workflow` (configurable path), protected by default via `security.access_roles` / `WorkflowUiAccessCheckerInterface`
+- Built-in admin UI at `/workflow` (configurable path), protected by default via `security.access_roles` / `WorkflowUiAccessPolicyInterface`
 - Admin pages on the UiKit 2.1 page contract (REQ-UI-003): list, show, form, settings and dashboard scaffolds themed once by the host (`nowo_ui_kit.layouts` / `nowo_ui_kit.theme`), flow diagram and collection editors on native `<dialog>`s, no CDN assets — see [Templates](docs/TEMPLATES.md)
 - Configurable `web_ui.path_prefix`, `web_ui.layout_template`, `web_ui.templates.<page>` and `web_ui.list_page_size`
 - UI translations for `en`, `es`, `fr`, `it`, `de`, `nl`, `pt` (enable extra locales in `web_ui.locales`)
 - Runtime resolution via `DatabaseWorkflowRegistry` (Symfony Workflow component)
-- `WorkflowApplicator` helper to apply transitions and flush subjects
+- `WorkflowRuntimeInterface` / `WorkflowApplicator` to apply transitions (your code persists the subject; `runtime.flush_after_apply: true` lets the bundle flush it)
 - Optional header search (SearchKit 1.10+, PHP 8.3+): one group per request type finds your workflow requests by a search text and their status, only those your access rules let the viewer see — see [Usage](docs/USAGE.md#header-search-the-workflow-requests-searchkit-121)
 - Demo with order approval (state machine) and document review (parallel workflow)
 - FrankenPHP worker mode: Supported (including kernel not reset between requests; see [Demo with FrankenPHP](docs/DEMO-FRANKENPHP.md) and [Worker audit](docs/FRANKENPHP-WORKER-AUDIT.md))

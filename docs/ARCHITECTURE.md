@@ -17,7 +17,7 @@ standard Symfony application and a DDD / hexagonal one wire them (REQ-ARCH-001).
   - [Replacing or decorating a port](#replacing-or-decorating-a-port)
   - [Versioning without the aggregate](#versioning-without-the-aggregate)
 - [REQ-ARCH-001 status](#req-arch-001-status)
-- [Deferred to 2.0](#deferred-to-20)
+- [Done in 2.0](#done-in-20)
 
 ## Two parts
 
@@ -39,18 +39,19 @@ class ids keep working, and you may alias the interface to your own service or d
 |------|------------------|-------|-------|
 | `Contract\WorkflowRuntimeInterface` | `Service\WorkflowRuntime` | 1.15 | `can()`, `apply()`, `enabledTransitions()`, `marking()`, `pin()`. Scalars and bundle VOs only (`Model\WorkflowTransitionResult`, `WorkflowMarkingView`, `WorkflowPinResult`). |
 | `Contract\WorkflowSlugResolverInterface` | `Service\WorkflowResolver` | 1.17 | `resolveSlug(WorkflowContext)`, `resolveSlugForSubject(object)`: the slug to pass to the runtime port. The bundle's own applicator, runtime and UI still use `WorkflowResolver` directly, so replacing this port only changes what host callers get. |
-| `Contract\WorkflowVersionManagerInterface` | `Service\WorkflowVersionManager` | 1.19 | Drafts, publishing, retiring, template clones, `forgetSubject()`, `delete()`, plus the entity-free reads `currentVersion()`, `draftVersion()`, `versions()`. Takes `Model\WorkflowDefinitionRef`, returns `Model\WorkflowDefinitionView`: scalars, bundle enums and bundle VOs only. The port to call. |
-| `Contract\WorkflowVersioningInterface` | `Service\WorkflowVersioning` | 1.17 | The same flows taking and returning the `WorkflowDefinition` entity (Doctrine `Collection`s reachable through it). **Deprecated as a calling port since 1.19** (removed in 2.0), but it stays the SPI the admin UI and the twin above ask, so decorators and replacements keep running. |
+| `Contract\WorkflowVersionManagerInterface` | `Service\WorkflowVersionManager` | 1.19 | Drafts, publishing, retiring, template clones, `forgetSubject()`, `delete()`, plus the entity-free reads `currentVersion()`, `draftVersion()`, `versions()`. Takes `Model\WorkflowDefinitionRef`, returns `Model\WorkflowDefinitionView`: scalars, bundle enums and bundle VOs only. The only versioning port since 2.0: call it, decorate or replace it. |
 
 `Service\WorkflowApplicator` and `Service\WorkflowResolver`'s entity-returning methods stay public for standard hosts
 (final classes, no interface): the applicator works with Symfony Workflow types, so the runtime port is its
-framework-free replacement. `Contract\WorkflowRegistryInterface` (returns Symfony `WorkflowInterface`) is deprecated as a
-port for hosts since 1.15.
+framework-free replacement. Removed in 2.0: `Contract\WorkflowRegistryInterface` (returned a Symfony
+`WorkflowInterface`; deprecated since 1.15) and `Contract\WorkflowVersioningInterface` (took and returned the
+`WorkflowDefinition` entity; deprecated as a port since 1.19). `Service\WorkflowVersioning` is internal since 2.0. A
+host service still registered under, aliased to or decorating a removed id fails the build.
 
 ## SPI hosts implement
 
 Configured by service id (`nowo_workflow.*`) or by aliasing the interface. None of them takes a Symfony, Doctrine or
-HTTP type, except the deprecated ones.
+HTTP type.
 
 | SPI | Configuration | Without it |
 |-----|---------------|------------|
@@ -62,8 +63,6 @@ HTTP type, except the deprecated ones.
 | `Contract\WorkflowSubjectVariablesProviderInterface` (1.15) | `guards.variables_provider` | conditions block (fail closed) |
 | `Contract\WorkflowUiTenantResolverInterface`, `WorkflowUiActionCheckerInterface` (1.15) | `tenancy.ui.*` | required with tenancy and the UI |
 | `Contract\WorkflowContextAwareInterface` | on your subject | context = subject class only |
-| `Contract\WorkflowUiAccessCheckerInterface` | deprecated since 1.14 (takes `Request`) | — |
-| `Contract\WorkflowRegistryInterface` | deprecated port since 1.15, still the SPI of `WorkflowApplicator` without tenancy | — |
 
 Presentation stays themable through Twig templates and the FormKit / UiKit profiles (REQ-TWIG-001); the form types and
 `View\WorkflowPageFactory` are UI services, not ports.
@@ -79,13 +78,13 @@ Presentation stays themable through Twig templates and the FormKit / UiKit profi
 
 ## Persistence
 
-- Definitions are read and written through the bundle's private entity manager (`Doctrine\WorkflowEntityManager`),
+- Definitions are read and written through the bundle's private entity manager (the only mode since 2.0) (`Doctrine\WorkflowEntityManager`),
   built on the manager that maps the bundle entities (`doctrine.entity_manager`, default: the one of a standard
   application). It is never flushed, cleared or reset by the host, and the bundle never flushes, clears or resets the
   host's managers to save a definition.
-- Applying a transition changes your subject's marking. With `runtime.flush_after_apply: false` (the recipe value
-  since 1.14) your repository persists the subject inside your transaction boundary; `true` (the value when the key
-  is not set, deprecated) flushes the default entity manager as in 1.13.
+- Applying a transition changes your subject's marking. With `runtime.flush_after_apply: false` (the default since
+  2.0) your repository persists the subject inside your transaction boundary; an explicit `true` flushes the default
+  entity manager as 1.x did by default.
 - Kept-alive workers (FrankenPHP, kernel reset off): see [FRANKENPHP-WORKER-AUDIT.md](FRANKENPHP-WORKER-AUDIT.md). The
   new ports are the existing stateless services under an interface; they add no state.
 
@@ -94,8 +93,8 @@ Presentation stays themable through Twig templates and the FormKit / UiKit profi
 ### Standard Symfony host
 
 Zero configuration beyond the recipe: attribute mapping on the default manager, the role-based UI policy, and
-`WorkflowApplicator` / `WorkflowRuntimeInterface` from your controllers and services. Nothing of 1.17 needs a change:
-the new interfaces are aliases of the services you already autowire by class.
+`WorkflowApplicator` / `WorkflowRuntimeInterface` from your controllers and services; flush or save your subject after
+`apply*()` (`runtime.flush_after_apply: false`, the default since 2.0).
 
 ### DDD / hexagonal host
 
@@ -103,9 +102,9 @@ Opt-in, nothing of it is forced on standard hosts:
 
 - map the bundle entities from the shipped XML on a dedicated manager (`doctrine.register_mapping: false` plus your
   own mapping, or `doctrine.mapping_type: xml`) and set `doctrine.entity_manager` to it;
-- set `runtime.flush_after_apply: false`;
+- keep `runtime.flush_after_apply: false` (the default since 2.0);
 - type-hint only the ports: `WorkflowRuntimeInterface` to move subjects, `WorkflowSlugResolverInterface` to know which
-  workflow a subject runs, `WorkflowVersioningInterface` for tenant copies and versions;
+  workflow a subject runs, `WorkflowVersionManagerInterface` for tenant copies and versions;
 - implement the SPI you need (access policy, tenant resolver, subject reference resolver, permission checker,
   variables provider) in your infrastructure layer;
 - listen to `WorkflowTransitionAppliedEvent` (ids only, after commit) and translate it into your own events.
@@ -143,20 +142,22 @@ shape.
 ```yaml
 services:
     App\Infrastructure\Workflow\AuditedVersioning:
-        decorates: Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface
+        decorates: Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface
         arguments: ['@.inner']
 ```
 
-The admin UI type-hints `WorkflowVersioningInterface`, so a decorator also sees the UI's clone, publish, retire,
-reinstate and delete actions. Keep the owner rule of `delete()`: a published definition is not deleted while subjects
+A decorator of `WorkflowVersionManagerInterface` sees the calls of every host service that type-hints it. The admin UI
+calls the internal `Service\WorkflowVersioning` with the definition it authorised (audit NO M1), so the UI's clone,
+publish, retire, reinstate and delete actions do not go through it (with 1.x a decorator of the removed
+`WorkflowVersioningInterface` did). Keep the owner rule of `delete()`: a published definition is not deleted while subjects
 are pinned to one of its versions (`WorkflowDefinitionInUseException`). The pin foreign key is `ON DELETE RESTRICT`,
 so the database refuses such a delete even when a replacement forgets the check.
 `tests/Integration/Tenancy/ArchPortsKernelTest.php` covers the aliases, a decorator, a replacement and that rule.
 
 ### Versioning without the aggregate
 
-`Contract\WorkflowVersionManagerInterface` is the framework-free twin of `WorkflowVersioningInterface` (rule 1): the
-same flows with bundle value objects only — it takes a `Model\WorkflowDefinitionRef` (row id, slug, tenant, version
+`Contract\WorkflowVersionManagerInterface` (since 1.19; it replaced the removed entity port `WorkflowVersioningInterface`,
+rule 1) runs the versioning flows with bundle value objects only — it takes a `Model\WorkflowDefinitionRef` (row id, slug, tenant, version
 number) and returns a `Model\WorkflowDefinitionView` (the scope plus the definition's own fields, with place and
 transition **names** instead of Doctrine collections). `currentVersion()`, `draftVersion()` and `versions()` are the
 entity-free reads that give a host its first reference.
@@ -178,37 +179,31 @@ final readonly class OnboardOrganization
 }
 ```
 
-`Service\WorkflowVersionManager` is the built-in implementation and a facade over `WorkflowVersioningInterface`, the
-same split as `WorkflowRuntimeInterface` over the deprecated registry port: a host decorator or replacement of that
-SPI is honoured through the twin as well, so **behaviour is still replaced on `WorkflowVersioningInterface`** (which
-the admin UI keeps calling with the entity it authorised). Decorate the twin to change what your own callers see. A
-reference is resolved on every call — scope first, then the row id — so it can never reach another tenant's version and
+`Service\WorkflowVersionManager` is the built-in implementation, a facade over the internal `Service\WorkflowVersioning`
+(the same split as `WorkflowRuntimeInterface` over `WorkflowApplicator`). Decorate or replace the port to change what
+your callers see. A reference is resolved on every call — scope first, then the row id — so it can never reach another tenant's version and
 nothing is memoised between calls (REQ-RUNTIME-002).
 
 ## REQ-ARCH-001 status
 
 | Rule | Status | Where |
 |------|--------|-------|
-| 1. Interfaces + VOs | ✅ | runtime, slug-resolver and versioning ports are framework-free (VOs in `Model\`): `WorkflowVersionManagerInterface` is the id / VO twin of `WorkflowVersioningInterface`, which stays as the SPI (deprecated as a calling port, removed in 2.0) |
+| 1. Interfaces + VOs | ✅ | runtime, slug-resolver and versioning ports are framework-free (VOs in `Model\`); the entity port `WorkflowVersioningInterface` was removed in 2.0 |
 | 2. No forced base class / trait | ✅ | bundle-owned entities, XML mapping (1.14), subjects referenced by class and reference |
-| 3. No framework types in ports, events, VOs | ✅ since 1.15 | deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` kept for BC until 2.0 |
+| 3. No framework types in ports, events, VOs | ✅ | `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` removed in 2.0 |
 | 4. Events carry ids | ✅ | `WorkflowTransitionAppliedEvent` |
 | 5. SPI documented | ✅ | this page |
-| 6. Never flush the host EM | ⚠️ default until 2.0 | `runtime.flush_after_apply` is `true` when unset (deprecated since 1.14); `false` in the recipe and in 2.0 |
+| 6. Never flush the host EM | ✅ since 2.0 | `runtime.flush_after_apply` is `false` by default and definitions always go through the private entity manager; an explicit `true` is the application's own choice (the 1.x behaviour) |
 | 7. Events after commit | ✅ | `AfterCommitDispatcher` |
 | 8. Config through provider ports | ✅ | config tree and the SPI above; no InstanceSettings |
 
-## Deferred to 2.0
+## Done in 2.0
 
-These need a major release (they change a default or remove a public API); they are tracked in
-[UPGRADING.md](UPGRADING.md#to-1170):
+What 1.x deferred to a major (see [UPGRADING.md](UPGRADING.md#unreleased)):
 
-- **Rule 6 default.** `runtime.flush_after_apply` becomes `false` when unset. Changing it in 1.x would silently stop
-  persisting the marking of every host that relies on the 1.13 flush, so 1.x only deprecates the unset key (since
-  1.14) and the recipe sets `false`.
-- **Removal of the deprecated ports.** `WorkflowRegistryInterface` as a host port and
-  `WorkflowUiAccessCheckerInterface::isGranted(Request)` go away.
-- **Removal of the aggregate from `WorkflowVersioningInterface`.** Its id / VO form exists since the twin
-  `WorkflowVersionManagerInterface` (see *Versioning without the aggregate*), which closes rule 1. Changing the
-  signatures of the deprecated interface itself would break every implementer and decorator, so the interface keeps
-  taking and returning `WorkflowDefinition` until 2.0 removes it.
+- **Rule 6 default.** `runtime.flush_after_apply` is `false` when unset, and the definitions are always written through
+  the private entity manager (`doctrine.private_entity_manager: false` fails the build).
+- **Removal of the deprecated ports.** `WorkflowRegistryInterface` and `WorkflowUiAccessCheckerInterface` are gone; a
+  host service that still wires them fails the build.
+- **Removal of the aggregate port.** `WorkflowVersioningInterface` is gone; `WorkflowVersionManagerInterface` is the
+  only versioning port (owner decision Q2).

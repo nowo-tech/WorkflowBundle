@@ -12,7 +12,7 @@ Workflow admin pages on the UiKit 2.1 page contract (REQ-UI-003). Every page ext
 - [Partials of the pages](#partials-of-the-pages)
 - [Assets](#assets)
 - [Per-page overrides](#per-page-overrides)
-- [Deprecated templates](#deprecated-templates)
+- [Templates removed in 2.0](#templates-removed-in-20)
 - [Allowed exceptions](#allowed-exceptions)
 
 ## Pages
@@ -22,7 +22,7 @@ Workflow admin pages on the UiKit 2.1 page contract (REQ-UI-003). Every page ext
 | Dashboard | `dashboard/index.html.twig` | `page/dashboard` | `DashboardPage` (header + create action; KPI tiles definitions / enabled / disabled); extra context `definitions`, `total` | `nowo_ui_dashboard_cards` (definitions card: name, type, subject, status), `nowo_ui_styles` |
 | Definitions list | `workflow_definition/index.html.twig` | `page/list` | `ListPage` (columns name, slug, matchRules, priority, places, transitions; row actions view, edit, delete with `Confirm`; `Pagination`; `EmptyState` with create action; breadcrumbs) | `nowo_ui_list_row`, `nowo_ui_styles` |
 | Definition detail | `workflow_definition/show.html.twig` | `page/show` | `ShowPage` (header edit + delete with `Confirm`; sections general, runtime binding, match rules; meta created / updated); extra context `definition`, `graph` | `nowo_ui_show_sections` (flow diagram, then the sections), `nowo_ui_modals` (place / transition dialogs), `nowo_ui_styles`, `nowo_ui_scripts` |
-| New definition | `workflow_definition/form.html.twig` | `page/form` | `FormPage` (general section form, submit "Create and continue", cancel to the list; `formThemes` while the deprecated `ui.css_framework` is set) | `nowo_ui_form_body` (general fields grid, then the REQ-TWIG-003 loop), `nowo_ui_styles` |
+| New definition | `workflow_definition/form.html.twig` | `page/form` | `FormPage` (general section form, submit "Create and continue", cancel to the list) | `nowo_ui_form_body` (general fields grid, then the REQ-TWIG-003 loop), `nowo_ui_styles` |
 | Edit definition | `workflow_definition/edit.html.twig` | `page/settings` | `SettingsPage` (one `SettingsSection` tab per section: general, match_rules, places, transitions; the current one carries the form and its `formThemes`; header view + delete with `Confirm`); extra context `definition`, `section` | `nowo_ui_settings_section` (general fields grid or the collection editor + submit / cancel), `nowo_ui_styles`, `nowo_ui_scripts` |
 
 Every page sets `attributes: {data-testid: workflow-…}` on the scaffold root (`workflow-dashboard`,
@@ -80,15 +80,16 @@ nowo_workflow:
 Theme the view types once in UiKit (`templates/bundles/NowoUiKitBundle/page/*.html.twig`, `nowo_ui_kit.theme`)
 instead of overriding Workflow pages.
 
-## Deprecated templates
+## Templates removed in 2.0
 
-Kept for one minor version (removed in 2.0):
+Deprecated since 1.9 and removed in 2.0 (with the Twig globals `nowo_workflow_layout_template`,
+`nowo_workflow_css_framework`, `nowo_workflow_icon_set` and `nowo_workflow_form_themes`):
 
-- `base.html.twig` — 1.x layout bridge used automatically while `nowo_workflow.ui.layout_template` is set: extends
-  that layout and maps the canonical blocks into its `title` / `stylesheets` / `body` / `javascripts` blocks.
-- `layout_integrate_base.html.twig` — one-file bridge into the project `base.html.twig` rendering every canonical
-  block; copy it into the app as your `nowo_ui_kit.layouts.admin` bridge.
-- `_locale_switcher.html.twig` — renders UiKit's `partials/_locale_switcher.html.twig` with the Workflow locales.
+| Removed template | Replacement |
+| --- | --- |
+| `base.html.twig` (1.x layout bridge used while `ui.layout_template` was set) | a layout that renders the UiKit canonical blocks, set as `nowo_ui_kit.layouts.admin` or `nowo_workflow.web_ui.layout_template` |
+| `layout_integrate_base.html.twig` (one-file bridge into the project `base.html.twig`) | copy it from the v1.22.1 tag into your application as your `nowo_ui_kit.layouts.admin` bridge |
+| `_locale_switcher.html.twig` | UiKit's `partials/_locale_switcher.html.twig` with the `nowo_workflow_locales` global |
 
 ## Allowed exceptions
 
