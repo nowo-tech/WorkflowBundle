@@ -2,7 +2,7 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/workflow-bundle`  
-**Last audited**: 2026-11-17
+**Last audited**: 2026-11-20 (v1.21.0)
 
 This file proves that **every production source artifact** under `src/` is referenced by the baseline specification. Test-only files under `tests/` and `*.test.ts` under `src/` are out of Packagist scope. Built assets under `Resources/public/` are documented as Vite/build outputs.
 
@@ -81,6 +81,12 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Service/DenyAllWorkflowUiAccessChecker.php` | Fail-closed default UI access (deny all) | FR-SEC-007 |
 | `Service/WorkflowGraphLayout.php` | Layered (Sugiyama-style) layout of the flow diagram | FR-VIEW-008 |
 | `Util/SubjectClass.php` | Subject class matching (Doctrine proxies, subclasses) | FR-WF-003 |
+| `Concurrency/SubjectMarkingGuard.php` | Expected-marking compare-and-set of a subject (1.20, REQ-RUNTIME-003) | FR-WF-004 |
+| `Concurrency/WorkflowConcurrencyPolicy.php` | Per-workflow concurrency control (1.20) | FR-WF-004 |
+| `EventListener/WorkflowConflictResponseSubscriber.php` | Lock conflict answered as 409 / CONFLICT codes (1.20) | FR-WF-004, FR-EVT-001 |
+| `Bridge/SearchKit/WorkflowRequestSearchDefinition.php` | SearchKit group of workflow requests (1.21) | FR-ACL-001, FR-API-001 |
+| `Search/WorkflowRequestSearchCriteria.php` | Conditions a search narrower adds (1.21) | FR-ACL-001, FR-API-001 |
+| `Search/WorkflowRequestSearchOptions.php` | Validated options of one search subject (1.21) | FR-ACL-001, FR-API-001 |
 
 ## Contracts & attributes
 
@@ -200,6 +206,9 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Contract/WorkflowUiActionCheckerInterface.php` | Host port: view / edit / publish authorisation | FR-TEN-002, FR-API-001 |
 | `Contract/WorkflowTransitionPermissionCheckerInterface.php` | Host port: permission guard of a transition | FR-GUARD-001, FR-API-001 |
 | `Contract/WorkflowSubjectVariablesProviderInterface.php` | Host port: whitelisted scalars for conditions | FR-GUARD-001, FR-EXPR-001, FR-API-001 |
+| `Contract/WorkflowRequestSearchGateInterface.php` | Host port: gate of the request search (1.21) | FR-ACL-001, FR-API-001 |
+| `Contract/WorkflowRequestSearchNarrowerInterface.php` | Host port: narrows the request search (1.21) | FR-ACL-001, FR-API-001 |
+| `Contract/WorkflowRequestTitleResolverInterface.php` | Host port: titles of found requests (1.21) | FR-API-001 |
 
 ## Model value objects
 
@@ -224,6 +233,8 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Model/WorkflowUiActionCheck.php` | One UI action to authorise | FR-TEN-002 |
 | `Model/WorkflowTransitionPermissionCheck.php` | Permission guard check given to the host port | FR-GUARD-001 |
 | `Model/WorkflowSubjectVariables.php` | Whitelisted scalar facts for conditions | FR-GUARD-001, FR-EXPR-001 |
+| `Enum/WorkflowConcurrencyMode.php` | Concurrency mode of a transition apply (1.20) | FR-WF-004 |
+| `Model/WorkflowRequestRef.php` | One request found by a search (1.21) | FR-ACL-001, FR-API-001 |
 
 ## Versioning and tenancy services
 
@@ -264,6 +275,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Audit/AuditDriver.php` | Driver wrapper for the audit middleware (internal) | FR-AUD-001 |
 | `Audit/AuditConnection.php` | Reports transactions and savepoints (internal) | FR-AUD-001 |
 | `Audit/TransactionObserverInterface.php` | Transaction observer contract (internal) | FR-AUD-001 |
+| `Event/WorkflowRequestAccessCheckEvent.php` | Host view decision on found requests (1.21) | FR-ACL-001, FR-EVT-001 |
 
 ## Commands and shape validation
 
@@ -283,6 +295,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Exception/WorkflowDefinitionInUseException.php` | Delete refused while subjects are pinned | FR-ERR-002, FR-VER-001 |
 | `Exception/WorkflowPinConflictException.php` | Concurrent pin that cannot be read yet | FR-ERR-002, FR-VER-003 |
 | `Exception/WorkflowStructureLockedException.php` | Clone structure differs from the template | FR-ERR-002, FR-VER-004 |
+| `Exception/WorkflowConflictException.php` | Concurrent apply conflict (1.20) | FR-WF-004, FR-ERR-002 |
 
 ## Coverage summary
 
@@ -294,7 +307,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | Persistence | 5 | 5 |
 | Forms | 7 | 7 |
 | Domain models | 4 | 4 |
-| Application services | 14 | 14 |
+| Application services | 20 | 20 |
 | Contracts & attributes | 5 | 5 |
 | Twig PHP | 2 | 2 |
 | Persistence integration | 5 | 5 |
@@ -304,13 +317,13 @@ This file proves that **every production source artifact** under `src/` is refer
 | Twig views | 12 | 12 |
 | Public assets | 6 | 6 |
 | Doctrine private entity manager | 18 | 18 |
-| Ports (host contracts) | 10 | 10 |
-| Model value objects | 19 | 19 |
+| Ports (host contracts) | 13 | 13 |
+| Model value objects | 21 | 21 |
 | Versioning and tenancy services | 15 | 15 |
 | Expression guards | 3 | 3 |
-| Events and audit | 7 | 7 |
+| Events and audit | 8 | 8 |
 | Commands and shape validation | 3 | 3 |
-| Further exceptions | 6 | 6 |
-| **Total production sources** | **163** | **163** |
+| Further exceptions | 7 | 7 |
+| **Total production sources** | **176** | **176** |
 
-Audit: `git ls-files src | wc -l` → 163.
+Audit: `git ls-files src | wc -l` → 176.
