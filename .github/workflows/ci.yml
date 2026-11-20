@@ -37,7 +37,7 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           SWITCH: ${{ vars.NOWO_CI_PR_MODE }}
-          LIGHT: '^((demo/([^/]+/)?)?composer\.(json|lock)|docs/.*|specs/.*|\.cursor/.*|\.github/ISSUE_TEMPLATE/.*|.*\.md|\.github/workflows/.*)$' # TEMP pilot measurement only: reverted before merge
+          LIGHT: '^((demo/([^/]+/)?)?composer\.(json|lock)|docs/.*|specs/.*|\.cursor/.*|\.github/ISSUE_TEMPLATE/.*|.*\.md)$'
         run: |
           mode=full; paths=""
           if [ "$EVENT" != pull_request ]; then
@@ -261,6 +261,14 @@ jobs:
           NOWO_WORKFLOW_TEST_MYSQL_URL: pdo-mysql://root:root@127.0.0.1:3306/workflow
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Collation/WorkflowExactKeyColumnsTest.php
 
+      # 1.22.1: the subject pin foreign key (ON DELETE RESTRICT) exists after the schema is created and holds; the
+      # UPGRADING.md recovery statements restore it on a database created without it.
+      - name: Foreign keys (FK loss regression)
+        if: env.HEAVY == 'true'
+        env:
+          NOWO_WORKFLOW_TEST_MYSQL_URL: pdo-mysql://root:root@127.0.0.1:3306/workflow
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/MySqlSubjectPinForeignKeyTest.php
+
   pgsql-schema:
     # REQ-TEST-005: the schema and a definition round trip against a real PostgreSQL server.
     name: Schema round trip (postgres:16)
@@ -302,6 +310,11 @@ jobs:
         env:
           NOWO_WORKFLOW_TEST_PGSQL_URL: pdo-pgsql://postgres@127.0.0.1:5432/workflow
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/PostgreSqlSchemaRoundTripTest.php
+
+      - name: Foreign keys (FK loss regression)
+        env:
+          NOWO_WORKFLOW_TEST_PGSQL_URL: pdo-pgsql://postgres@127.0.0.1:5432/workflow
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/PostgreSqlSubjectPinForeignKeyTest.php
 
   databases:
     # REQ-RUNTIME-003: the two-connection race tests (applies, row locks, two processes, definition versions) against
