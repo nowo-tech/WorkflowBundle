@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[1.22.0] - 2026-11-20](#1220---2026-11-20)
 - [[1.21.0] - 2026-11-19](#1210---2026-11-19)
 - [[1.20.0] - 2026-11-18](#1200---2026-11-18)
 - [[1.19.0] - 2026-11-13](#1190---2026-11-13)
@@ -61,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-11-20
+
 ### Changed
 
 - REQ-RUNTIME-003 rule 6: the conflict answer of the bundle's own routes now carries the `X-Conflict-Code` header (`CONFLICT_001` or `CONFLICT_002`, JSON answers also in `error`) and takes the code from `ConflictCode::forRequest()`. A commit made earlier in the same request (host or another bundle, seen through transaction-doctrine's request `CommitMark`) gives `CONFLICT_002` with no `Retry-After` and a "reload" message; otherwise `CONFLICT_001` with `Retry-After`, as before. The HTML answer of `CONFLICT_001` keeps `X-Error-Code: CONFLICT_001`.
@@ -70,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Tests only: the SearchKit contract fixture of the "purchase" subject gave every row the same `created_at` and a random id, so its rows came back in random order and SearchKit's window test failed about once in 231 runs. Its ids now sort by insertion, as the "leave" fixture's auto-increment ids already did, and a new contract test checks that both fixtures return rows in insertion order on every database. No change to the bundle.
 - CI only: SearchKit 1.11 added a kit test, `testContractBoundedCandidatesGiveAnInexactTotal`, that is skipped for definitions that never bound their candidates, as these do. The `search-kit-databases` job, which fails on any skipped test, now leaves that test out.
+
+[1.22.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v1.22.0
 
 ## [1.21.0] - 2026-11-19
 
