@@ -10,8 +10,9 @@ use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Platforms\MariaDBPlatform;
 use Doctrine\DBAL\Platforms\MySQL80Platform;
 use Doctrine\DBAL\Schema\ColumnEditor;
+use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Table;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
 use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -45,6 +46,19 @@ use function version_compare;
  * Since 1.15.2 it is a plain Doctrine listener tagged `doctrine.event_listener` for `postGenerateSchemaTable`:
  * DoctrineBundle 3 no longer registers `doctrine.event_subscriber` services, so 1.15.0 / 1.15.1 never applied it there.
  *
+ * 1.22.1 (FK loss): applied on `postGenerateSchema`, once the schema tool has added every foreign key, by table name.
+ * 1.15.0 to 1.22.0 replaced the table on `postGenerateSchemaTable` (`setClassTable()`, doctrine/dbal 4.5+), and the
+ * doctrine/orm 3.7 / 3.8 schema tool then added the foreign keys it defers to the table it had replaced: on MySQL /
+ * MariaDB the generated schema lost `workflow_subject_pin.definition_id → workflow_definition (ON DELETE RESTRICT)` and
+ * its index (see UPGRADING.md "To 1.22.1"). Now:
+ *
+ * - doctrine/dbal 4.5+: each table is rebuilt with its table editor (foreign keys and indexes included) and swapped into
+ *   a new schema given back with `GenerateSchemaEventArgs::setSchema()`;
+ * - older doctrine/dbal: the columns' platform options are set in place (no editor exists there).
+ *
+ * The listener never calls `setClassTable()`. It skips an entity manager that does not map the bundle entities and
+ * reads the platform from the schema tool's own connection.
+ *
  * @internal
  */
 final readonly class BinaryKeyCollationSubscriber
@@ -67,10 +81,15 @@ final readonly class BinaryKeyCollationSubscriber
         WorkflowSubjectPin::class => ['tenant_key', 'workflow_slug', 'subject_ref'],
     ];
 
+    /**
+     * @param ManagerRegistry|null $doctrine unused since 1.22.1 (the platform comes from the schema tool's entity
+     *                                       manager); kept for BC
+     */
     public function __construct(
-        private ManagerRegistry $doctrine,
+        ?ManagerRegistry $doctrine = null,
         private ?LoggerInterface $logger = null,
     ) {
+        unset($doctrine);
     }
 
     /**
@@ -91,35 +110,65 @@ final readonly class BinaryKeyCollationSubscriber
         };
     }
 
-    public function postGenerateSchemaTable(GenerateSchemaTableEventArgs $args): void
+    /**
+     * Gives the key columns their exact-match collation in the generated schema, keeping every foreign key and index of
+     * the tables.
+     */
+    public function postGenerateSchema(GenerateSchemaEventArgs $args): void
     {
-        $class   = $args->getClassMetadata()->getName();
-        $columns = self::COLUMNS[$class] ?? [];
-        $manager = $columns === [] ? null : $this->doctrine->getManagerForClass($class);
-        if (!$manager instanceof EntityManagerInterface) {
+        $manager = $args->getEntityManager();
+        $factory = $manager->getMetadataFactory();
+        if ($factory->isTransient(WorkflowDefinition::class)) {
             return;
         }
         $connection = $manager->getConnection();
         $platform   = $connection->getDatabasePlatform();
-        if ($class === WorkflowDefinition::class) {
-            $this->warnAboutPartialVersion($connection, $platform);
-        }
+        $this->warnAboutPartialVersion($connection, $platform);
         $collation = self::collationFor($platform, $platform instanceof MySQL80Platform ? self::serverVersion($connection) : null);
         if ($collation === null) {
             return;
         }
 
-        $original = $table = $args->getClassTable();
-        // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType (older doctrine/dbal / doctrine/orm)
-        $editor = method_exists($table, 'edit') && method_exists($args, 'setClassTable');
-        foreach ($columns as $column) {
-            if ($table->hasColumn($column)) {
-                $table = self::collate($table, $column, $collation, $editor) ?? $table;
+        $schema = $args->getSchema();
+        // Table::edit() and Schema::edit() exist from doctrine/dbal 4.5; GenerateSchemaEventArgs::setSchema() from
+        // doctrine/orm 3.6.
+        // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType
+        $editor = method_exists(Table::class, 'edit') && method_exists(Schema::class, 'edit') && method_exists($args, 'setSchema');
+        $edited = [];
+        foreach (self::COLUMNS as $class => $columns) {
+            $tableName = $factory->isTransient($class) ? '' : $manager->getClassMetadata($class)->getTableName();
+            if ($tableName === '' || !$schema->hasTable($tableName)) {
+                continue;
+            }
+            $original = $table = $schema->getTable($tableName);
+            foreach ($columns as $column) {
+                if ($table->hasColumn($column)) {
+                    $table = self::collate($table, $column, $collation, $editor) ?? $table;
+                }
+            }
+            if ($table !== $original) {
+                $edited[$tableName] = $table;
             }
         }
-        if ($table !== $original) {
-            $args->setClassTable($table);
+        if ($edited === []) {
+            return;
         }
+
+        $schemaEditor = $schema->edit();
+        foreach ($edited as $tableName => $table) {
+            $schemaEditor->dropTableByUnquotedName($tableName)->addTable($table);
+        }
+        $args->setSchema($schemaEditor->create());
+    }
+
+    /**
+     * No longer subscribed (1.22.1, FK loss): replacing the table there lost its foreign keys. Kept for BC; does nothing.
+     *
+     * @deprecated since 1.22.1, the collation is applied on postGenerateSchema ({@see self::postGenerateSchema()})
+     */
+    public function postGenerateSchemaTable(GenerateSchemaTableEventArgs $args): void
+    {
+        unset($args);
     }
 
     /**
@@ -137,7 +186,8 @@ final readonly class BinaryKeyCollationSubscriber
             })->create();
         }
 
-        $table->getColumn($column)
+        // In place: doctrine/dbal < 4.5 (no editor); @ silences the deprecation of the setter on 4.5+ (older doctrine/orm).
+        @$table->getColumn($column)
             ->setPlatformOption('charset', 'utf8mb4')
             ->setPlatformOption('collation', $collation);
 

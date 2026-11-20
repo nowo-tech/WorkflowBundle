@@ -108,9 +108,10 @@ services:
             - { name: doctrine.event_listener, event: postGenerateSchema }
 
     # Since 1.15 (audit NO M1): binary collation of tenant keys and subject references on MySQL / MariaDB (NO PAD since 1.15.2).
+    # Since 1.22.1 on postGenerateSchema (was postGenerateSchemaTable: replacing the table there lost its foreign keys).
     Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber:
         tags:
-            - { name: doctrine.event_listener, event: postGenerateSchemaTable }
+            - { name: doctrine.event_listener, event: postGenerateSchema }
 
     # Built workflows dispatch the standard Symfony workflow events (guard, transition, completed, announce…).
     Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry:
