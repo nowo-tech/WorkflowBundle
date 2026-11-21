@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 2.0.0](#to-200)
   - [Before you upgrade](#before-you-upgrade)
   - [runtime.flush_after_apply defaults to false](#runtimeflush_after_apply-defaults-to-false)
   - [doctrine.entity_manager for a non-default mapping manager](#doctrineentity_manager-for-a-non-default-mapping-manager)
@@ -93,6 +94,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 2.0.0
+
+From **1.22.1**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 From **1.22.1** (a major release: `composer update` alone does not cross it):
 

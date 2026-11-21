@@ -199,7 +199,7 @@ nothing is memoised between calls (REQ-RUNTIME-002).
 
 ## Done in 2.0
 
-What 1.x deferred to a major (see [UPGRADING.md](UPGRADING.md#unreleased)):
+What 1.x deferred to a major (see [UPGRADING.md](UPGRADING.md#to-200)):
 
 - **Rule 6 default.** `runtime.flush_after_apply` is `false` when unset, and the definitions are always written through
   the private entity manager (`doctrine.private_entity_manager: false` fails the build).

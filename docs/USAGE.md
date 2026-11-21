@@ -107,7 +107,7 @@ deny: the bundle answers 403, and anything else (an exception) never becomes a g
 
 The 1.x `WorkflowUiAccessCheckerInterface::isGranted(Request)` was removed in 2.0 (deprecated since 1.14). A
 configured service that does not implement `WorkflowUiAccessPolicyInterface` fails the build, and so does a service
-registered under, aliased to or decorating the removed interface. See [UPGRADING.md](UPGRADING.md#unreleased).
+registered under, aliased to or decorating the removed interface. See [UPGRADING.md](UPGRADING.md#to-200).
 
 ## Standard Symfony host
 
