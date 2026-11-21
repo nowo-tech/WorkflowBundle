@@ -29,8 +29,9 @@ class NowoWorkflowBundle extends Bundle
     public function build(ContainerBuilder $container): void
     {
         parent::build($container);
-        // Since 2.0: first, so a removed port the application still wires fails with its own message.
-        $container->addCompilerPass(new RemovedPortsPass());
+        // Since 2.0: first of all (before any pass can drop a definition), so a removed port the application still wires
+        // or implements fails with its own message.
+        $container->addCompilerPass(new RemovedPortsPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 1000);
         $container->addCompilerPass(new TwigPathsPass());
         $container->addCompilerPass(new WorkflowUiSecurityPass());
         $container->addCompilerPass(new CsrfProtectionPass());

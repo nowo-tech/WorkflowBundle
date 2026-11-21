@@ -70,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `doctrine.private_entity_manager: true` is a deprecated no-op (removed in 3.0); `false` fails the build.
 - `WorkflowVersionManagerInterface` is the only versioning port, for calling and for decorating or replacing; `Service\WorkflowVersioning` is `@internal` and the admin UI calls it directly (a decorator of the port does not run for the admin UI).
 - `WorkflowApplicator`'s first constructor argument is `DatabaseWorkflowRegistry` (was the removed `WorkflowRegistryInterface`).
-- A configured `security.access_checker`, a host `WorkflowRuntimeInterface` service or a service registered under, aliased to or decorating a removed port id fails the container build with a message that names what to do; a class that still implements a removed interface is never loaded (no PHP fatal error).
+- A configured `security.access_checker`, a host `WorkflowRuntimeInterface` service or a service registered under, aliased to or decorating a removed port id fails the container build with a message that names what to do; a class that still implements a removed interface is never loaded (no PHP fatal error). An application class that still implements a removed port and is registered by resource discovery (e.g. with `#[AsDecorator]` / `#[AsAlias]`) fails the build too, instead of being dropped silently as unused (a dropped decorator of the UI access port would widen access).
 
 ### Removed
 

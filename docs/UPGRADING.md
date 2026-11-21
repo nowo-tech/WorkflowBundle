@@ -123,9 +123,16 @@ log. The notices, with their exact text:
 | `The "nowo_workflow.enabled" option is deprecated, use "nowo_workflow.web_ui.enabled" instead.` and the same notice for each `nowo_workflow.ui.*` key (`ui.path`, `ui.layout_template`, `ui.css_framework`, `ui.icon_set`, `ui.list_page_size`, `ui.default_locale`, `ui.locales`, `ui.required_roles`) | Move to the new key (table in [To 1.9.0](#configuration)). |
 | `The "nowo_workflow.environments" option is deprecated and has no effect; register the bundle only for the wanted environments in config/bundles.php instead.` | Remove the key. |
 
-Two removals had no runtime notice, only a docblock and the docs: a host implementation, alias or decorator of
-`WorkflowVersioningInterface` (deprecated as a port since 1.19), and the 1.x templates and Twig globals (deprecated
-since 1.9). Search your code for them (see [Removed](#removed)).
+Some removals had no runtime notice, only a docblock and the docs. Search your code for them (see
+[Removed](#removed)):
+
+- a host implementation, alias or decorator of `WorkflowVersioningInterface` (deprecated as a port since 1.19);
+- a decorator of `WorkflowUiAccessCheckerInterface` over the built-in policy (no `access_checker` and no alias of
+  `WorkflowUiAccessPolicyInterface` of yours): 1.14 to 1.22 kept asking it without a notice. In 2.0 it is a build
+  error, also when it is registered with `#[AsDecorator]` or `#[AsAlias]` (its class can no longer be loaded, and the
+  bundle refuses to let Symfony drop it, which would widen access). Move its rule to a decorator of
+  `WorkflowUiAccessPolicyInterface`;
+- the 1.x templates and Twig globals (deprecated since 1.9).
 
 Every path that relied on a removed item fails the container build in 2.0 with a message that names what to do and
 points here. Nothing falls back silently.
@@ -231,7 +238,13 @@ Differences to know:
 - the admin UI calls the internal service with the definition it authorised, so a decorator of the port does not run
   for the admin UI's drafts, publishes, retires and deletes (with 1.x a decorator of the removed interface did);
 - a replacement must keep the owner rule of `delete()`: a published definition is not deleted while subjects are
-  pinned to one of its versions (the pin foreign key is `ON DELETE RESTRICT`, so the database refuses it as well).
+  pinned to one of its versions (the pin foreign key is `ON DELETE RESTRICT`, so the database refuses it as well);
+- **who may act in the admin UI** is decided by `tenancy.ui.action_checker` (`WorkflowUiActionCheckerInterface`:
+  view, edit and publish per scope; it can be set without tenancy too) on top of the access policy. Put permission
+  rules that lived in a decorator of the removed interface there;
+- **there is no admin-UI versioning event.** An audit log that lived in a decorator of the removed interface needs
+  another place: decorate `WorkflowVersionManagerInterface` for your own callers, and listen to Doctrine events of
+  `WorkflowDefinition` (or to `WorkflowTransitionAppliedEvent` for applied transitions) for the admin UI's changes.
 
 ### Composer
 

@@ -71,7 +71,9 @@ use const PHP_VERSION_ID;
  * Paths removed in 2.0, each of which must fail the build: `removed-checker` (access_checker on a class that still
  * implements the removed request-based port), `removed-checker-decorator`, `removed-registry-decorator` and
  * `removed-versioning-decorator` (host decorators of the removed ports), `private-false`
- * (`doctrine.private_entity_manager: false`).
+ * (`doctrine.private_entity_manager: false`), and `discovered-ui` / `discovered-registry` / `discovered-versioning`
+ * (application classes that still implement a removed port, registered by resource discovery with `#[AsDecorator]` /
+ * `#[AsAlias]`: they cannot be loaded, audit XR-WF-M1).
  *
  * SecurityBundle is not installed: the kernel registers `security.token_storage` and `security.authorization_checker`
  * itself, and {@see TestTokenListener} stands in for the firewall.
@@ -82,7 +84,7 @@ final class PortsTestKernel extends Kernel
 
     public const CACHE_ROOT = '/nowo-workflow-ports-kernel';
 
-    public const VARIANTS = ['builtin', 'new', 'policy-decorator', 'ddd', 'main-default', 'main-default-explicit', 'mapped-elsewhere', 'mapped-elsewhere-explicit', 'host-mapping-pass', 'removed-checker', 'removed-checker-decorator', 'removed-registry-decorator', 'removed-versioning-decorator', 'private-false'];
+    public const VARIANTS = ['builtin', 'new', 'policy-decorator', 'ddd', 'main-default', 'main-default-explicit', 'mapped-elsewhere', 'mapped-elsewhere-explicit', 'host-mapping-pass', 'removed-checker', 'removed-checker-decorator', 'removed-registry-decorator', 'removed-versioning-decorator', 'private-false', 'discovered-ui', 'discovered-registry', 'discovered-versioning'];
 
     public function __construct(private readonly string $variant, bool $debug = true, private readonly ?bool $flushAfterApply = null)
     {
@@ -252,6 +254,13 @@ final class PortsTestKernel extends Kernel
                 break;
             case 'private-false':
                 $workflow['doctrine'] = ['private_entity_manager' => false];
+                break;
+            case 'discovered-ui':
+            case 'discovered-registry':
+            case 'discovered-versioning':
+                $directory = ucfirst(substr($this->variant, 11));
+                $services->defaults()->autowire()->autoconfigure();
+                $services->load('Nowo\\WorkflowBundle\\Tests\\Support\\Removed\\Discovered\\' . $directory . '\\', dirname(__DIR__, 2) . '/Support/Removed/Discovered/' . $directory . '/');
                 break;
             case 'ddd':
                 $services->set('app.workflow_policy', PolicyPredicate::class)->args(['non_impersonated_admin']);

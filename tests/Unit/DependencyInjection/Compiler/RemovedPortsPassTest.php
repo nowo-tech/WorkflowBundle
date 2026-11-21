@@ -16,6 +16,8 @@ use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
+use function sprintf;
+
 /**
  * 2.0: a service the application still registers under, aliases to or decorates a removed port id fails the build
  * with a message naming the service and the port to use instead (REQ-ARCH-001, "a removed host-facing path fails
@@ -78,6 +80,31 @@ final class RemovedPortsPassTest extends TestCase
         $container->register('app.optional', stdClass::class)->setDecoratedService($port, null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
 
         $this->assertFails($container, $port, $since, $instead, ['app.audit', 'app.optional']);
+    }
+
+    /**
+     * Audit XR-WF-M1: an application class that still implements a removed port cannot be loaded; resource discovery
+     * keeps its definition with only a loading error (and Symfony would drop it as unused). The build fails.
+     */
+    #[Test]
+    #[DataProvider('removedPorts')]
+    public function aDefinitionThatCannotLoadBecauseOfARemovedPortFailsTheBuild(string $port, string $since, string $instead): void
+    {
+        $container = new ContainerBuilder();
+        $container->register('App\\Workflow\\LegacyService')->addError(sprintf('Class "%s" not found while loading "App\\Workflow\\LegacyService".', $port));
+
+        $this->assertFails($container, $port, $since, $instead, ['App\\Workflow\\LegacyService']);
+    }
+
+    #[Test]
+    public function aLoadingErrorAboutAnotherClassIsLeftToSymfony(): void
+    {
+        $container = new ContainerBuilder();
+        $container->register('App\\Broken')->addError('Class "App\\Missing" not found while loading "App\\Broken".');
+
+        (new RemovedPortsPass())->process($container);
+
+        $this->addToAssertionCount(1);
     }
 
     /**

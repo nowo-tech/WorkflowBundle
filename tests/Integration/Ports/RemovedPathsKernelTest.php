@@ -44,6 +44,9 @@ final class RemovedPathsKernelTest extends TestCase
         yield 'decorator of the removed UI access port' => ['removed-checker-decorator', ['"app.workflow_audit"', RemovedPortsPass::UI_ACCESS_CHECKER, WorkflowUiAccessPolicyInterface::class]];
         yield 'decorator of the removed registry port' => ['removed-registry-decorator', ['"app.workflow_registry_audit"', RemovedPortsPass::REGISTRY, WorkflowRuntimeInterface::class]];
         yield 'decorator of the removed versioning port (Q2)' => ['removed-versioning-decorator', ['"app.workflow_versioning_audit"', RemovedPortsPass::VERSIONING, WorkflowVersionManagerInterface::class]];
+        yield 'discovered #[AsDecorator] of the removed UI access port' => ['discovered-ui', ['RestrictingUiAccessDecorator', RemovedPortsPass::UI_ACCESS_CHECKER, WorkflowUiAccessPolicyInterface::class]];
+        yield 'discovered #[AsAlias] of the removed registry port' => ['discovered-registry', ['HostWorkflowRegistry', RemovedPortsPass::REGISTRY, WorkflowRuntimeInterface::class]];
+        yield 'discovered #[AsDecorator] of the removed versioning port' => ['discovered-versioning', ['AuditingVersioningDecorator', RemovedPortsPass::VERSIONING, WorkflowVersionManagerInterface::class]];
         yield 'private_entity_manager: false' => ['private-false', ['private_entity_manager: false was removed in 2.0', 'WorkflowDefinitionRepository::save()']];
     }
 
