@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Demo: runs in UiKit's demo platform shell (`nowo-tech/ui-kit-bundle` ^2.60; shared top bar, aside, page header and section cards; no demo stylesheet or `<style>`). Demo only, no bundle change.
 - **`runtime.flush_after_apply` defaults to `false`** (announced in 1.14): when the key is not set, `WorkflowApplicator::apply*()` / `WorkflowRuntimeInterface::apply()` only change the marking and the application persists the subject; the bundle never flushes the application's entity manager by default (REQ-ARCH-001 rule 6). An explicit `true` keeps the 1.x behaviour. **Data loss for applications that relied on the unset default**: changes made to other entities around `apply*()` are no longer written. `WorkflowApplicator`'s `$flushAfterApply` constructor default is `false`.
 - A non-default Doctrine entity manager that maps the bundle entities without `doctrine.entity_manager` fails the build (1.14 to 1.22: a deprecation). Set the option to the name in the message.
 - `doctrine.private_entity_manager: true` is a deprecated no-op (removed in 3.0); `false` fails the build.

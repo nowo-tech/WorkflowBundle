@@ -1,40 +1,35 @@
+{#- Demo home, in the demo platform layout grammar: page header (title, lead, the one primary action), then one
+    section card per topic (demo_platform/_section.html.twig). -#}
 {% extends 'base.html.twig' %}
 
 {% block title %}{{ 'title'|trans({}, 'demo') }}{% endblock %}
 
-{% block body %}
-    <div class="nowo-ui-page-header">
-        <h1 class="nowo-ui-page-header__title">{{ 'title'|trans({}, 'demo') }} <span class="nowo-ui-badge nowo-ui-badge--primary">{{ version_badge }}</span></h1>
-    </div>
-    <p class="nowo-ui-muted">{{ 'lead'|trans({}, 'demo') }}</p>
+{% block nowo_ui_page_header %}
+    {% set _toolbar %}<a class="nowo-ui-btn nowo-ui-btn--primary" href="{{ path('demo_change_requests') }}">{{ 'home.branching.playground'|trans({}, 'demo') }}</a>{% endset %}
+    {{ include(nowo_ui_partial('page_header'), {title: 'title'|trans({}, 'demo'), intro: 'lead'|trans({}, 'demo'), toolbar: _toolbar}) }}
+{% endblock %}
 
-    <section class="nowo-ui-card">
-        <div class="nowo-ui-card__header"><h2 class="nowo-ui-card__title">{{ 'home.branching.title'|trans({}, 'demo') }}</h2></div>
-        <div class="nowo-ui-card__body">
-            <p>{{ 'home.branching.text'|trans({'%entity%': 'DemoChangeRequest'}, 'demo') }}</p>
-            <div class="nowo-ui-card__toolbar">
-                <a class="nowo-ui-btn nowo-ui-btn--primary" href="{{ path('demo_change_requests') }}">{{ 'home.branching.playground'|trans({}, 'demo') }}</a>
-                <a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path('nowo_workflow_definition_show_by_slug', {slug: 'change_request_review'}) }}">{{ 'home.branching.diagram'|trans({}, 'demo') }}</a>
-            </div>
-        </div>
-    </section>
+{% block body %}
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'home.branching.title'|trans({}, 'demo'), intro: 'home.branching.text'|trans({'%entity%': 'DemoChangeRequest'}, 'demo'), kind: 'detail'} %}
+        {% block section_footer %}
+            <a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path('nowo_workflow_definition_show_by_slug', {slug: 'change_request_review'}) }}">{{ 'home.branching.diagram'|trans({}, 'demo') }}</a>
+        {% endblock %}
+    {% endembed %}
 
     <div class="nowo-ui-cards">
         {% for key, spec in {
-            resolver: {entity: null, route: 'demo_resolver', style: 'primary'},
-            orders: {entity: 'DemoOrder', route: 'demo_orders', style: 'primary'},
-            documents: {entity: 'DemoDocument', route: 'demo_documents', style: 'primary'},
-            expenses: {entity: 'DemoExpense', route: 'demo_expenses', style: 'primary'},
-            purchase_orders: {entity: 'DemoPurchaseOrder', route: 'demo_purchase_orders', style: 'primary'},
-            crud: {entity: null, route: 'nowo_workflow_dashboard', style: 'outline'},
+            resolver: {entity: null, route: 'demo_resolver'},
+            orders: {entity: 'DemoOrder', route: 'demo_orders'},
+            documents: {entity: 'DemoDocument', route: 'demo_documents'},
+            expenses: {entity: 'DemoExpense', route: 'demo_expenses'},
+            purchase_orders: {entity: 'DemoPurchaseOrder', route: 'demo_purchase_orders'},
+            crud: {entity: null, route: 'nowo_workflow_dashboard'},
         } %}
-            <section class="nowo-ui-card">
-                <div class="nowo-ui-card__header"><h2 class="nowo-ui-card__title">{{ ('home.' ~ key ~ '.title')|trans({}, 'demo') }}</h2></div>
-                <div class="nowo-ui-card__body">
-                    <p class="nowo-ui-muted">{{ ('home.' ~ key ~ '.text')|trans(spec.entity ? {'%entity%': spec.entity} : {}, 'demo') }}</p>
-                    <a class="nowo-ui-btn nowo-ui-btn--{{ spec.style }}" href="{{ path(spec.route) }}">{{ ('home.' ~ key ~ '.action')|trans({}, 'demo') }}</a>
-                </div>
-            </section>
+            {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: ('home.' ~ key ~ '.title')|trans({}, 'demo'), intro: ('home.' ~ key ~ '.text')|trans(spec.entity ? {'%entity%': spec.entity} : {}, 'demo'), kind: 'detail', key: key, spec: spec} %}
+                {% block section_footer %}
+                    <a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path(spec.route) }}">{{ ('home.' ~ key ~ '.action')|trans({}, 'demo') }}</a>
+                {% endblock %}
+            {% endembed %}
         {% endfor %}
     </div>
 {% endblock %}
