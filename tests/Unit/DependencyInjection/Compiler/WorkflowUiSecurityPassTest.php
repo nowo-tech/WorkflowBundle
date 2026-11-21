@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection\Compiler;
 
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker;
 use Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker;
 use Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker;
+use Nowo\WorkflowBundle\Tests\Support\Access\PolicyPredicate;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
@@ -24,7 +25,7 @@ final class WorkflowUiSecurityPassTest extends TestCase
 
         (new WorkflowUiSecurityPass())->process($container);
 
-        self::assertFalse($container->hasAlias(WorkflowUiAccessCheckerInterface::class));
+        self::assertFalse($container->hasAlias(WorkflowUiAccessPolicyInterface::class));
     }
 
     #[Test]
@@ -38,7 +39,7 @@ final class WorkflowUiSecurityPassTest extends TestCase
 
         self::assertSame(
             RoleBasedWorkflowUiAccessChecker::class,
-            (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class),
+            (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class),
         );
     }
 
@@ -52,7 +53,7 @@ final class WorkflowUiSecurityPassTest extends TestCase
 
         self::assertSame(
             DenyAllWorkflowUiAccessChecker::class,
-            (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class),
+            (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class),
         );
     }
 
@@ -62,10 +63,10 @@ final class WorkflowUiSecurityPassTest extends TestCase
         $container = $this->containerWithParams(allowUnauthenticated: true);
         (new WorkflowUiSecurityPass())->process($container);
 
-        self::assertTrue($container->hasAlias(WorkflowUiAccessCheckerInterface::class));
+        self::assertTrue($container->hasAlias(WorkflowUiAccessPolicyInterface::class));
         self::assertSame(
             AllowAllWorkflowUiAccessChecker::class,
-            (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class),
+            (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class),
         );
     }
 
@@ -91,7 +92,7 @@ final class WorkflowUiSecurityPassTest extends TestCase
         self::assertTrue($container->hasDefinition(RoleBasedWorkflowUiAccessChecker::class));
         self::assertSame(
             RoleBasedWorkflowUiAccessChecker::class,
-            (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class),
+            (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class),
         );
     }
 
@@ -102,13 +103,13 @@ final class WorkflowUiSecurityPassTest extends TestCase
             allowUnauthenticated: false,
             accessChecker: 'app.workflow_access',
         );
-        $container->setDefinition('app.workflow_access', new Definition());
+        $container->setDefinition('app.workflow_access', new Definition(PolicyPredicate::class));
 
         (new WorkflowUiSecurityPass())->process($container);
 
         self::assertSame(
             'app.workflow_access',
-            (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class),
+            (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class),
         );
     }
 

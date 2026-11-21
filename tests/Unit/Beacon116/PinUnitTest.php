@@ -13,7 +13,6 @@ use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Mapping\FieldMapping;
 use Exception;
 use LogicException;
-use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowSubjectReferenceResolverInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowTenantResolverInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -24,7 +23,9 @@ use Nowo\WorkflowBundle\Model\WorkflowSubject;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
+use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowApplicator;
+use Nowo\WorkflowBundle\Service\WorkflowDefinitionBuilder;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use Nowo\WorkflowBundle\Tenancy\SubjectPinStore;
 use Nowo\WorkflowBundle\Tenancy\TenancyContext;
@@ -124,7 +125,7 @@ final class PinUnitTest extends TestCase
     public function anApplicatorWithoutLocatorCannotPin(): void
     {
         $applicator = new WorkflowApplicator(
-            $this->createMock(WorkflowRegistryInterface::class),
+            new DatabaseWorkflowRegistry($this->createMock(WorkflowDefinitionRepository::class), new WorkflowDefinitionBuilder()),
             $this->createMock(WorkflowDefinitionRepository::class),
             new WorkflowResolver($this->createMock(WorkflowDefinitionRepository::class)),
             $this->createMock(EntityManagerInterface::class),

@@ -19,8 +19,10 @@ use function sys_get_temp_dir;
  * 1.14 persistence (REQ-ARCH-001 rule 6) in a booted standard host:
  *
  * - EM equivalence: applying a transition with `flush_after_apply: true` (the bundle flushes the application's
- *   manager, 1.13 behaviour) and with `flush_after_apply: false` followed by the application's own flush leave exactly
- *   the same database state (host rows and workflow tables); with false nothing is written before the host flushes;
+ *   manager, the 1.x default kept as an explicit choice) and with `flush_after_apply: false` or the key not set (the
+ *   2.0 default) followed by the application's own flush leave exactly the same database state (host rows and
+ *   workflow tables); without true nothing is written before the host flushes, and a host change left pending before
+ *   apply() stays pending;
  * - definition writes go through the private manager: a definition save never commits an application change left
  *   pending, and the application's manager never holds a definition row.
  */
@@ -43,8 +45,10 @@ final class PersistenceEquivalenceKernelTest extends TestCase
     {
         $flushed = $this->scenario(true);
         $manual  = $this->scenario(false);
+        $unset   = $this->scenario(null);
 
         self::assertSame($flushed, $manual);
+        self::assertSame($flushed, $unset);
         self::assertSame([['reference' => 'PO-1', 'status' => 'submitted'], ['reference' => 'PO-2', 'status' => 'draft']], $flushed['host_purchase_order']);
         self::assertCount(1, $flushed['workflow_definition']);
         self::assertCount(3, $flushed['workflow_place']);
@@ -79,7 +83,7 @@ final class PersistenceEquivalenceKernelTest extends TestCase
     /**
      * @return array<string, list<array<string, mixed>>>
      */
-    private function scenario(bool $flushAfterApply): array
+    private function scenario(?bool $flushAfterApply): array
     {
         $kernel = new PortsTestKernel('builtin', false, $flushAfterApply);
         $kernel->boot();
@@ -100,9 +104,10 @@ final class PersistenceEquivalenceKernelTest extends TestCase
             $applicator->apply($order, 'purchase_order_flow', 'submit');
             self::assertSame('submitted', $order->getStatus());
 
-            if (!$flushAfterApply) {
+            if ($flushAfterApply !== true) {
                 $before = $this->snapshot($host);
-                self::assertSame([['reference' => 'PO-1', 'status' => 'draft']], $before['host_purchase_order'], 'false: the bundle wrote nothing');
+                self::assertSame([['reference' => 'PO-1', 'status' => 'draft']], $before['host_purchase_order'], 'false or not set: the bundle wrote nothing');
+                self::assertCount(1, $host->getUnitOfWork()->getScheduledEntityInsertions(), 'the host change made before apply() is still pending');
                 $host->flush();
             }
 

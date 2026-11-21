@@ -89,7 +89,7 @@ final class TenantIsolationKernelTest extends TestCase
             }
         }
 
-        // WorkflowRegistryInterface::get() returns the global template: it cannot move a customized tenant's subject.
+        // DatabaseWorkflowRegistry::get() returns the global template: it cannot move a customized tenant's subject.
         self::assertFalse(self::registry($kernel)->get('leave')->can(new LeaveRequest('leave-x', 'org-a', 3), 'submit'));
         self::assertTrue(self::registry($kernel)->get('leave')->can(new LeaveRequest('leave-x', 'org-b', 3), 'submit'));
     }

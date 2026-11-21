@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Enum;
 
 /**
- * Host-chosen CSS stack for {@code nowo_workflow.ui.css_framework} (REQ-UI-001 / REQ-PHP-001).
+ * CSS stack values of the 1.x {@code nowo_workflow.ui.css_framework} key (removed in 2.0; the stack is set with
+ * {@code nowo_ui_kit.css_framework}), REQ-UI-001 / REQ-PHP-001.
  */
 enum CssFramework: string
 {

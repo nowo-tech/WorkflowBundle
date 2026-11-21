@@ -5,18 +5,17 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection\Compiler;
 
 use LogicException;
-use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\RemovedPortsPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowRuntimePass;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowRuntime;
-use Nowo\WorkflowBundle\Tests\Support\Tenancy\CountingRegistryDecorator;
+use Nowo\WorkflowBundle\Tests\Support\Removed\LegacyRegistryRuntime;
 use Nowo\WorkflowBundle\Tests\Support\Tenancy\HostRuntime;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 use function restore_error_handler;
 use function set_error_handler;
@@ -24,9 +23,8 @@ use function set_error_handler;
 use const E_USER_DEPRECATED;
 
 /**
- * Runtime port wiring (1.15): the host's new port wins, a 1.14 registry (or decorator) keeps the deprecated SPI with a
- * deprecation, a runtime class under the old name moves to the new port, neither port fails the build, and tenancy
- * refuses a host registry.
+ * Runtime port wiring (1.15): the host's port wins and must implement it. The 1.x registry port was removed in 2.0
+ * (see RemovedPortsPassTest).
  */
 final class WorkflowRuntimePassTest extends TestCase
 {
@@ -57,7 +55,6 @@ final class WorkflowRuntimePassTest extends TestCase
         (new WorkflowRuntimePass())->process($container);
 
         self::assertSame('built-in', $container->getParameter(WorkflowRuntimePass::RUNTIME_PARAMETER));
-        self::assertSame('built-in', $container->getParameter(WorkflowRuntimePass::REGISTRY_PARAMETER));
         self::assertSame([], $this->deprecations);
 
         $empty = new ContainerBuilder();
@@ -98,74 +95,40 @@ final class WorkflowRuntimePassTest extends TestCase
         (new WorkflowRuntimePass())->process($container);
     }
 
+    /**
+     * 2.0: a host runtime class that still implements the removed registry port cannot be loaded: the build fails with
+     * a message, never with a PHP fatal error. A class that does not exist fails the same way.
+     */
     #[Test]
-    public function a114RegistryKeepsTheSpiWithADeprecation(): void
+    public function aRuntimeClassThatCannotBeLoadedFailsTheBuild(): void
     {
-        $container = $this->container();
-        $container->register('app.registry', CountingRegistryDecorator::class);
-        $container->setAlias(WorkflowRegistryInterface::class, 'app.registry');
-        (new WorkflowRuntimePass())->process($container);
-        self::assertSame('host', $container->getParameter(WorkflowRuntimePass::REGISTRY_PARAMETER));
-        self::assertStringContainsString('"app.registry"', $this->deprecations[0] ?? '');
+        foreach ([LegacyRegistryRuntime::class, 'App\\Workflow\\NoSuchRuntime'] as $class) {
+            $container = $this->container();
+            $container->register('app.runtime', $class);
+            $container->setAlias(WorkflowRuntimeInterface::class, 'app.runtime');
 
-        $container = $this->container();
-        $container->register('app.audit', CountingRegistryDecorator::class)->setDecoratedService(WorkflowRegistryInterface::class);
-        $container->register('app.optional', CountingRegistryDecorator::class)->setDecoratedService(WorkflowRegistryInterface::class, null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
-        (new WorkflowRuntimePass())->process($container);
-        self::assertStringContainsString('"app.audit"', $this->deprecations[1] ?? '');
-        self::assertStringNotContainsString('app.optional', $this->deprecations[1] ?? '');
+            try {
+                (new WorkflowRuntimePass())->process($container);
+                self::fail('A runtime class that cannot be loaded must fail the build.');
+            } catch (LogicException $exception) {
+                self::assertStringContainsString('"' . $class . '" cannot be loaded', $exception->getMessage());
+                self::assertStringContainsString(RemovedPortsPass::REGISTRY, $exception->getMessage());
+                self::assertStringContainsString('UPGRADING.md "To 2.0.0"', $exception->getMessage());
+            }
+        }
     }
 
     #[Test]
-    public function aRuntimeClassUnderTheOldNameMovesToTheNewPort(): void
+    public function aRuntimeClassThatIsNotAStringIsTrusted(): void
     {
         $container = $this->container();
-        $container->register('app.runtime', HostRuntime::class);
-        $container->setAlias(WorkflowRegistryInterface::class, 'app.runtime');
+        $container->setParameter('app.runtime_class', ['not', 'a', 'class']);
+        $container->register('app.runtime', '%app.runtime_class%');
+        $container->setAlias(WorkflowRuntimeInterface::class, 'app.runtime');
+
         (new WorkflowRuntimePass())->process($container);
 
-        self::assertSame('app.runtime', (string) $container->getAlias(WorkflowRuntimeInterface::class));
-        self::assertSame(DatabaseWorkflowRegistry::class, (string) $container->getAlias(WorkflowRegistryInterface::class));
-        self::assertSame('built-in', $container->getParameter(WorkflowRuntimePass::REGISTRY_PARAMETER));
-    }
-
-    #[Test]
-    public function aClassOnNeitherPortFailsTheBuild(): void
-    {
-        $container = $this->container();
-        $container->register('app.wrong', stdClass::class);
-        $container->setAlias(WorkflowRegistryInterface::class, 'app.wrong');
-
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('implements neither');
-        (new WorkflowRuntimePass())->process($container);
-    }
-
-    #[Test]
-    public function tenancyRefusesAHostRegistry(): void
-    {
-        $container = $this->container();
-        $container->setParameter('nowo_workflow.tenancy.enabled', true);
-        $container->register('app.audit', CountingRegistryDecorator::class)->setDecoratedService(WorkflowRegistryInterface::class);
-
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('Tenancy');
-        (new WorkflowRuntimePass())->process($container);
-    }
-
-    #[Test]
-    public function aSyntheticOrMissingRegistryIsTrusted(): void
-    {
-        $container = $this->container();
-        $container->register('app.synthetic')->setSynthetic(true);
-        $container->setAlias(WorkflowRegistryInterface::class, 'app.synthetic');
-        (new WorkflowRuntimePass())->process($container);
-        self::assertSame('host', $container->getParameter(WorkflowRuntimePass::REGISTRY_PARAMETER));
-
-        $container = $this->container();
-        $container->removeAlias(WorkflowRegistryInterface::class);
-        (new WorkflowRuntimePass())->process($container);
-        self::assertSame('built-in', $container->getParameter(WorkflowRuntimePass::REGISTRY_PARAMETER));
+        self::assertSame('host', $container->getParameter(WorkflowRuntimePass::RUNTIME_PARAMETER));
     }
 
     private function container(): ContainerBuilder
@@ -174,7 +137,6 @@ final class WorkflowRuntimePassTest extends TestCase
         $container->register(WorkflowRuntime::class, WorkflowRuntime::class);
         $container->register(DatabaseWorkflowRegistry::class, DatabaseWorkflowRegistry::class);
         $container->setAlias(WorkflowRuntimeInterface::class, WorkflowRuntime::class);
-        $container->setAlias(WorkflowRegistryInterface::class, DatabaseWorkflowRegistry::class);
 
         return $container;
     }

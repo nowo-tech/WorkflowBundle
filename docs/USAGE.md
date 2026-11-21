@@ -12,7 +12,6 @@
   - [Listeners run before the flush](#listeners-run-before-the-flush)
   - [Slugs and transition names are configuration](#slugs-and-transition-names-are-configuration)
 - [Runtime port (1.15)](#runtime-port-115)
-- [Custom workflow registry (deprecated port)](#custom-workflow-registry-deprecated-port)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
   - [Keep the domain in charge](#keep-the-domain-in-charge)
   - [Known limitations](#known-limitations)
@@ -106,11 +105,9 @@ parameters and the user object are kept out of its properties (no dump, `seriali
 Use your own authorization checker inside the policy when the role hierarchy or voters must apply. Answer `false` to
 deny: the bundle answers 403, and anything else (an exception) never becomes a grant.
 
-The 1.x `WorkflowUiAccessCheckerInterface::isGranted(Request)` is **deprecated** (removed in 2.0). A service that
-implements only it keeps working exactly as in 1.13 (with a deprecation when the container is built); a service that
-implements both is asked through the new port; a service that implements neither fails the build. A decorator of the
-deprecated interface keeps running (with your own 1.14 policy on the new port, both must grant). See
-[UPGRADING.md](UPGRADING.md#to-1140).
+The 1.x `WorkflowUiAccessCheckerInterface::isGranted(Request)` was removed in 2.0 (deprecated since 1.14). A
+configured service that does not implement `WorkflowUiAccessPolicyInterface` fails the build, and so does a service
+registered under, aliased to or decorating the removed interface. See [UPGRADING.md](UPGRADING.md#unreleased).
 
 ## Standard Symfony host
 
@@ -118,11 +115,11 @@ Zero configuration beyond the recipe:
 
 - the bundle maps its entities on the default entity manager with attributes (`doctrine.mapping_type: attribute`);
   the definitions are read and written through the bundle's private entity manager on that same connection, so a
-  definition save never flushes your pending changes ([CONFIGURATION.md](CONFIGURATION.md#doctrine-the-private-entity-manager-114));
+  definition save never flushes your pending changes ([CONFIGURATION.md](CONFIGURATION.md#doctrine-the-private-entity-manager));
 - the CRUD UI is protected by the role-based policy (`security.access_roles`), or by your
   `WorkflowUiAccessPolicyInterface` service;
-- after `WorkflowApplicator::apply*()`, flush your entity manager (`runtime.flush_after_apply: false`, the 1.14
-  recipe value), or keep `true` to let the bundle flush the default manager as in 1.13:
+- after `WorkflowApplicator::apply*()`, flush your entity manager (`runtime.flush_after_apply: false`, the default
+  since 2.0), or set `true` to let the bundle flush the default manager as 1.x did by default:
 
 ```php
 $this->workflowApplicator->applyForSubject($order, 'approve');
@@ -232,7 +229,7 @@ the new marking: keep guard listeners free of side effects and cheap (no writes,
 
 `WorkflowApplicator::apply*()` changes the marking and dispatches `leave`, `transition`, `enter`, `entered`,
 `completed` and `announce` **inside** Symfony's `apply()`, then flushes (with `runtime.flush_after_apply: true`) or
-leaves the flush to you (`false`, the 1.14 recipe value). So when a `completed` or `announce` listener runs:
+leaves the flush to you (`false`, the default since 2.0). So when a `completed` or `announce` listener runs:
 
 - the marking is already changed in memory but **not persisted yet**;
 - if the flush fails, or a later listener throws, the transition is not stored, but whatever the listener already did
@@ -283,13 +280,10 @@ take your subject and a slug and return scalars or bundle VOs (`Model\WorkflowTr
 It resolves exactly like `WorkflowApplicator` (with tenancy: the subject's pinned or tenant version, see
 [MULTITENANCY.md](MULTITENANCY.md)). Replace it by aliasing the interface to your own service.
 
-## Custom workflow registry (deprecated port)
-
-`WorkflowRegistryInterface` returns Symfony `WorkflowInterface` instances, so since 1.15 it is **deprecated as a port
-for hosts** (REQ-ARCH-001 rule 3; removed in 2.0): call `WorkflowRuntimeInterface` instead. It stays the SPI
-`WorkflowApplicator` asks without tenancy, so a host implementation or decorator keeps running (a deprecation is
-triggered when the container is built). With tenancy a host registry fails the build: the runtime builds the
-subject's pinned tenant version itself.
+The 1.x registry port `WorkflowRegistryInterface` (it returned Symfony `WorkflowInterface` instances) was removed in
+2.0 (deprecated since 1.15): call `WorkflowRuntimeInterface`, and put custom rules in a `workflow.guard` listener or in
+your own `WorkflowRuntimeInterface` service. A host service that still registers, aliases or decorates the removed id
+fails the build.
 
 See demo playgrounds: 0-param orders, 1-param documents, 2-param expenses, 3-param purchase orders, plus `/playground/resolver`.
 
@@ -312,7 +306,7 @@ The bundle has two parts:
   `can()` / `getEnabledTransitions*()`, so the UI and your code only offer transitions the domain accepts.
 - Publish domain events after the commit, not from `completed` listeners (they run before the flush, see
   [Listeners run before the flush](#listeners-run-before-the-flush)).
-- Set `runtime.flush_after_apply: false` (the 1.14 recipe value) and persist through your own repository, so the
+- Keep `runtime.flush_after_apply: false` (the default since 2.0) and persist through your own repository, so the
   workflow never flushes unrelated pending changes of the entity manager outside your transaction boundary.
 - Wrap the runtime in your own application service:
 
@@ -348,16 +342,14 @@ final readonly class ApproveExpense
 - The marking is read and written with `MethodMarkingStore`: the subject needs a public getter and setter for the
   configured marking property (default `status`). Use a dedicated state-holder object if your aggregate only changes
   state through intention-revealing methods.
-- With `runtime.flush_after_apply: true` (the value when the key is not set, deprecated since 1.14), `apply*()`
-  flushes the default entity manager after each transition (including your other pending changes).
-- `WorkflowApplicator` is a final class without an interface (it works with Symfony Workflow types); since 1.15
-  `WorkflowRuntimeInterface` is the framework-free, replaceable port (`WorkflowRegistryInterface` is deprecated for
-  hosts). Since 1.17 `WorkflowSlugResolverInterface` (implemented by `WorkflowResolver`) gives the slug a subject runs
-  and `WorkflowVersioningInterface` (implemented by `WorkflowVersioning`) the tenant versions. Since 1.19 call the
-  framework-free twin `WorkflowVersionManagerInterface` (implemented by `WorkflowVersionManager`) instead: it takes a
-  `Model\WorkflowDefinitionRef` and returns a `Model\WorkflowDefinitionView`, never the definition entity, and adds
-  the entity-free reads `currentVersion()`, `draftVersion()` and `versions()`. See
-  [ARCHITECTURE.md](ARCHITECTURE.md).
+- With an explicit `runtime.flush_after_apply: true` (the 1.x default), `apply*()` flushes the default entity manager
+  after each transition (including your other pending changes).
+- `WorkflowApplicator` is a final class without an interface (it works with Symfony Workflow types);
+  `WorkflowRuntimeInterface` (1.15) is the framework-free, replaceable port. `WorkflowSlugResolverInterface` (1.17,
+  implemented by `WorkflowResolver`) gives the slug a subject runs, and `WorkflowVersionManagerInterface` (1.19,
+  implemented by `WorkflowVersionManager`) the tenant versions: it takes a `Model\WorkflowDefinitionRef` and returns a
+  `Model\WorkflowDefinitionView`, never the definition entity, and adds the entity-free reads `currentVersion()`,
+  `draftVersion()` and `versions()`. See [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Header search: the workflow requests (SearchKit, 1.21)
 

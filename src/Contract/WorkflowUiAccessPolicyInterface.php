@@ -7,13 +7,12 @@ namespace Nowo\WorkflowBundle\Contract;
 use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
 
 /**
- * Controls access to the built-in Workflow CRUD UI. Framework-free twin of the deprecated
- * {@see WorkflowUiAccessCheckerInterface} (since 1.14, REQ-ARCH-001 rule 3): it receives a
- * {@see WorkflowUiAccessCheck} value object instead of the Symfony `Request`.
+ * Controls access to the built-in Workflow CRUD UI (since 1.14, REQ-ARCH-001 rule 3): it receives a
+ * {@see WorkflowUiAccessCheck} value object instead of the Symfony `Request`. The request-based 1.x port
+ * (`WorkflowUiAccessCheckerInterface`) was removed in 2.0.
  *
  * Point `nowo_workflow.security.access_checker` at a service implementing it, or alias this interface to your service.
- * When no custom service is configured, the bundle wires a role-based policy (`security.access_roles`). A service that
- * implements both interfaces is asked through this one. Answer false whenever the request must not reach the UI: the
+ * When no custom service is configured, the bundle wires a role-based policy (`security.access_roles`). Answer false whenever the request must not reach the UI: the
  * bundle answers 403 (fail closed); an exception thrown here is never turned into a grant.
  */
 interface WorkflowUiAccessPolicyInterface

@@ -24,7 +24,6 @@ use Nowo\UiKitBundle\View\ShowPage;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Form\WorkflowDefinitionFormSection;
 use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
-use Nowo\WorkflowBundle\Twig\WorkflowExtension;
 use Symfony\Component\Form\FormView;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
@@ -42,14 +41,20 @@ final class WorkflowPageFactory
     public const DOMAIN = 'NowoWorkflowBundle';
 
     /**
-     * Creates the factory with the URL generator, the CSRF token manager, the layout and the 1.x form theme stack.
+     * Creates the factory with the URL generator, the CSRF token manager and the layout.
+     *
+     * @param string|null $formThemeFramework deprecated since 2.0, ignored (it carried the removed ui.css_framework);
+     *                                        removed in 3.0
+     *
+     * @phpstan-ignore constructor.unusedParameter (arguments deprecated since 2.0, ignored, kept for BC until 3.0)
      */
     public function __construct(
         private readonly UrlGeneratorInterface $urlGenerator,
         private readonly CsrfTokenManagerInterface $csrfTokenManager,
         private readonly ?string $layout = null,
-        private readonly ?string $formThemeFramework = null,
+        ?string $formThemeFramework = null,
     ) {
+        unset($formThemeFramework);
     }
 
     /**
@@ -228,7 +233,6 @@ final class WorkflowPageFactory
             bundle: self::BUNDLE,
             layout: $this->layout,
             attributes: ['data-testid' => 'workflow-definition-new'],
-            formThemes: $this->formThemes(),
         );
     }
 
@@ -249,7 +253,6 @@ final class WorkflowPageFactory
                 $isCurrent ? $form : null,
                 $isCurrent ? self::label($section->helpKey()) : null,
                 self::label('action.save'),
-                $isCurrent ? $this->formThemes() : [],
             );
         }
 
@@ -270,17 +273,6 @@ final class WorkflowPageFactory
             $this->layout,
             ['data-testid' => 'workflow-definition-edit'],
         );
-    }
-
-    /**
-     * Symfony form themes of the Workflow forms (UiKit 2.1 FormPage / SettingsSection formThemes): only while the
-     * deprecated ui.css_framework is set (1.x behaviour); otherwise FormKit styles the forms.
-     *
-     * @return list<string>
-     */
-    private function formThemes(): array
-    {
-        return $this->formThemeFramework === null ? [] : WorkflowExtension::formThemesFor($this->formThemeFramework);
     }
 
     /**

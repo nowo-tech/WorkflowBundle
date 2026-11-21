@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
-use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
@@ -17,18 +16,18 @@ use Nowo\WorkflowBundle\Repository\WorkflowDefinitionRepository;
 use function array_map;
 
 /**
- * Default {@see WorkflowVersionManagerInterface} (since 1.19): {@see WorkflowVersioningInterface} behind a
- * framework-free surface, the same split as {@see WorkflowRuntime} over the deprecated workflow registry port.
+ * Default {@see WorkflowVersionManagerInterface} (since 1.19): the internal {@see WorkflowVersioning} behind a
+ * framework-free surface, the same split as {@see WorkflowRuntime} over {@see WorkflowApplicator}.
  *
- * Every write is delegated to the versioning SPI, so a host decorator or replacement of it keeps running and the
- * owner rule on deletes (no delete while subjects are pinned) holds here as well. A reference is resolved against the
+ * Every write is delegated to {@see WorkflowVersioning}, so the owner rule on deletes (no delete while subjects are
+ * pinned) holds here as well. Hosts change versioning behaviour by decorating or replacing this port (since 2.0). A reference is resolved against the
  * store on every call — scope first (slug and tenant, byte for byte), then the row id — so a reference can never
  * reach a version of another tenant and nothing is memoised between calls (REQ-RUNTIME-002).
  */
 final readonly class WorkflowVersionManager implements WorkflowVersionManagerInterface
 {
     public function __construct(
-        private WorkflowVersioningInterface $versioning,
+        private WorkflowVersioning $versioning,
         private WorkflowDefinitionRepository $repository,
     ) {
     }

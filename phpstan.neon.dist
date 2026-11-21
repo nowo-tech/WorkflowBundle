@@ -5,6 +5,8 @@ parameters:
         - tests
     excludePaths:
         - vendor/*
+        # Since 2.0: host classes that still implement a removed port; they cannot be loaded by design.
+        - tests/Support/Removed/*
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
     ignoreErrors: []

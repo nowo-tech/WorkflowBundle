@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
-use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Enum\WorkflowPinMode;
 use Nowo\WorkflowBundle\Exception\WorkflowTransitionBlockedException;
@@ -16,8 +15,6 @@ use function array_values;
 
 /**
  * Default {@see WorkflowRuntimeInterface} (since 1.15): {@see WorkflowApplicator} behind a framework-free surface.
- * The applicator keeps asking {@see WorkflowRegistryInterface} (without tenancy), so a host registry or a decorator
- * of it keeps running.
  */
 final readonly class WorkflowRuntime implements WorkflowRuntimeInterface
 {

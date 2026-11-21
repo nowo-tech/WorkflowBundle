@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
-use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Enum\WorkflowType;
 use Nowo\WorkflowBundle\Exception\WorkflowNameCollisionException;
@@ -33,8 +33,10 @@ use function in_array;
  * Workflows are built with the application event dispatcher, so the standard Symfony workflow events
  * (workflow.guard, workflow.<slug>.guard, workflow.<slug>.transition.<name>, …) are dispatched with the
  * definition slug as workflow name: guard listeners can block transitions and listeners can react to them.
+ *
+ * Hosts call {@see WorkflowRuntimeInterface}; the 1.x registry port this class implemented was removed in 2.0.
  */
-final class DatabaseWorkflowRegistry implements WorkflowRegistryInterface, ResetInterface
+final class DatabaseWorkflowRegistry implements ResetInterface
 {
     /** @var array<string, WorkflowInterface> */
     private array $cache = [];

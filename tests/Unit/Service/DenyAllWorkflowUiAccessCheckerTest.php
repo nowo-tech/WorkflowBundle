@@ -7,7 +7,6 @@ namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
 use Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\HttpFoundation\Request;
 
 final class DenyAllWorkflowUiAccessCheckerTest extends TestCase
 {
@@ -15,7 +14,7 @@ final class DenyAllWorkflowUiAccessCheckerTest extends TestCase
     {
         $checker = new DenyAllWorkflowUiAccessChecker();
 
-        self::assertFalse($checker->isGranted(new Request()));
+        self::assertFalse($checker->allows(new WorkflowUiAccessCheck('GET')));
     }
 
     public function testTheFrameworkFreePortGivesTheSameAnswer(): void

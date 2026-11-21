@@ -66,6 +66,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Demo: runs in UiKit's demo platform shell (`nowo-tech/ui-kit-bundle` ^2.60; shared top bar, aside, page header and section cards; no demo stylesheet or `<style>`). Demo only, no bundle change.
+- **`runtime.flush_after_apply` defaults to `false`** (announced in 1.14): when the key is not set, `WorkflowApplicator::apply*()` / `WorkflowRuntimeInterface::apply()` only change the marking and the application persists the subject; the bundle never flushes the application's entity manager by default (REQ-ARCH-001 rule 6). An explicit `true` keeps the 1.x behaviour. **Data loss for applications that relied on the unset default**: changes made to other entities around `apply*()` are no longer written. `WorkflowApplicator`'s `$flushAfterApply` constructor default is `false`.
+- A non-default Doctrine entity manager that maps the bundle entities without `doctrine.entity_manager` fails the build (1.14 to 1.22: a deprecation). Set the option to the name in the message.
+- `doctrine.private_entity_manager: true` is a deprecated no-op (removed in 3.0); `false` fails the build.
+- `WorkflowVersionManagerInterface` is the only versioning port, for calling and for decorating or replacing; `Service\WorkflowVersioning` is `@internal` and the admin UI calls it directly (a decorator of the port does not run for the admin UI).
+- `WorkflowApplicator`'s first constructor argument is `DatabaseWorkflowRegistry` (was the removed `WorkflowRegistryInterface`).
+- A configured `security.access_checker`, a host `WorkflowRuntimeInterface` service or a service registered under, aliased to or decorating a removed port id fails the container build with a message that names what to do; a class that still implements a removed interface is never loaded (no PHP fatal error). An application class that still implements a removed port and is registered by resource discovery (e.g. with `#[AsDecorator]` / `#[AsAlias]`) fails the build too, instead of being dropped silently as unused (a dropped decorator of the UI access port would widen access).
+
+### Removed
+
+- `Contract\WorkflowRegistryInterface` and its service alias (deprecated since 1.15): call `WorkflowRuntimeInterface`.
+- `Contract\WorkflowUiAccessCheckerInterface`, its service alias and the `isGranted(Request)` methods of the built-in checkers (deprecated since 1.14): implement `WorkflowUiAccessPolicyInterface`. `WorkflowUiSecurityPass::MODE_LEGACY` / `MODE_BOTH` are gone (the mode is always `policy`).
+- `Contract\WorkflowVersioningInterface` and its service alias (deprecated since 1.19 as a calling port, owner decision Q2): use `WorkflowVersionManagerInterface`.
+- The host-manager mode of the definitions (`doctrine.private_entity_manager: false`, deprecated since 1.14).
+- The root `enabled` (1.9) and `environments` (1.8) keys and the whole `ui.*` node (1.9), with their mapping code (`Configuration::mapDeprecatedKeys()`, `legacyLayout()`, `DEPRECATED_SINCE`, `REMOVED_DEFAULT_LAYOUT`, `LEGACY_LAYOUT_BRIDGE`) and the `nowo_workflow.environments` / `nowo_workflow.ui.*` container parameters. Setting a removed key fails the build with its replacement.
+- The templates `base.html.twig` (1.x layout bridge), `layout_integrate_base.html.twig` and `_locale_switcher.html.twig`, and the Twig globals `nowo_workflow_layout_template`, `nowo_workflow_css_framework`, `nowo_workflow_icon_set` and `nowo_workflow_form_themes` (deprecated since 1.9); `NowoWorkflowExtension::UI_KIT_ADMIN_LAYOUT`.
+- `WorkflowRuntimePass::REGISTRY_PARAMETER` (`nowo_workflow.runtime.registry`).
+- `BinaryKeyCollationSubscriber::postGenerateSchemaTable()`, an internal no-op deprecated since 1.22.1 (the collation stays on `postGenerateSchema`, foreign keys kept).
+- The build-time deprecation notices of the removed paths.
+
+### Security
+
+- 1.x receives security fixes for 6 months after 2.0.0: Moderate and above are backported to the last 1.x minor, Low ones are fixed in 2.x only; advisories name both lines (`.github/SECURITY.md`, `docs/SECURITY.md`).
 
 ## [1.22.1] - 2026-11-20
 

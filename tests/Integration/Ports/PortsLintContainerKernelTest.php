@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Integration\Ports;
 
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
-use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughLegacyDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughPolicyDecorator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -17,9 +16,9 @@ use Symfony\Component\Filesystem\Filesystem;
 use function sys_get_temp_dir;
 
 /**
- * 1.14: `lint:container` passes for every host shape of the access ports (new port only, deprecated port only, both,
- * a decorator of the deprecated port, the built-in policy, a DDD host), the pass asks the expected port(s), and every
- * shape decides the same way for the same users (admin granted; user, editor and anonymous denied).
+ * `lint:container` passes for every host shape of the access port (a host policy, a decorator of the port, the
+ * built-in policy, a DDD host), and every shape decides the same way for the same users (admin granted; user, editor
+ * and anonymous denied). The shapes on the ports removed in 2.0 fail the build (RemovedPathsKernelTest).
  */
 final class PortsLintContainerKernelTest extends TestCase
 {
@@ -49,12 +48,8 @@ final class PortsLintContainerKernelTest extends TestCase
     public static function variants(): iterable
     {
         yield 'built-in policy' => ['builtin', WorkflowUiSecurityPass::MODE_POLICY];
-        yield 'new port only' => ['new', WorkflowUiSecurityPass::MODE_POLICY];
-        yield 'deprecated port only' => ['legacy', WorkflowUiSecurityPass::MODE_LEGACY];
-        yield 'both ports' => ['both', WorkflowUiSecurityPass::MODE_POLICY];
-        yield 'deprecated-port decorator' => ['decorator', WorkflowUiSecurityPass::MODE_LEGACY];
-        yield 'new-port decorator' => ['policy-decorator', WorkflowUiSecurityPass::MODE_POLICY];
-        yield 'decorators of both ports' => ['both-decorators', WorkflowUiSecurityPass::MODE_BOTH];
+        yield 'host policy' => ['new', WorkflowUiSecurityPass::MODE_POLICY];
+        yield 'policy decorator' => ['policy-decorator', WorkflowUiSecurityPass::MODE_POLICY];
         yield 'DDD host' => ['ddd', WorkflowUiSecurityPass::MODE_POLICY];
     }
 
@@ -79,16 +74,10 @@ final class PortsLintContainerKernelTest extends TestCase
             self::assertSame($status, $response->getStatusCode(), $variant . ' / ' . ($user === '' ? 'anonymous' : $user));
         }
 
-        if ($variant === 'decorator' || $variant === 'both-decorators') {
-            $decorator = self::testContainer($this->kernel)->get('app.workflow_audit');
-            self::assertInstanceOf(PassThroughLegacyDecorator::class, $decorator);
-            // both-decorators: the deprecated port is asked only when the policy granted (admin).
-            self::assertSame($variant === 'decorator' ? 4 : 1, $decorator->calls, 'the host decorator of the deprecated port runs');
-        }
-        if ($variant === 'policy-decorator' || $variant === 'both-decorators') {
+        if ($variant === 'policy-decorator') {
             $decorator = self::testContainer($this->kernel)->get('app.workflow_policy_audit');
             self::assertInstanceOf(PassThroughPolicyDecorator::class, $decorator);
-            self::assertSame(4, $decorator->calls, 'the host decorator of the 1.14 port wraps the role-based policy');
+            self::assertSame(4, $decorator->calls, 'the host decorator of the port wraps the role-based policy');
         }
     }
 }

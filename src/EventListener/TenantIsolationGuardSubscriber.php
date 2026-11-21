@@ -18,7 +18,7 @@ use function is_int;
  * when it is built from the very version {@see WorkflowDefinitionLocator} picks for that subject (its pinned version,
  * else its tenant's, else the global template).
  *
- * So a workflow obtained some other way (`WorkflowRegistryInterface::get()` returns the global template, a workflow
+ * So a workflow obtained some other way (`DatabaseWorkflowRegistry::get()` returns the global template, a workflow
  * kept from another subject, another tenant's definition) cannot move a tenant's subject: every transition is
  * blocked. Runs before every other guard listener.
  *

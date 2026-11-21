@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\EventListener;
 
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\Http\WorkflowUiAccessCheckFactory;
@@ -25,12 +24,9 @@ use function ltrim;
 /**
  * Enforces the Workflow UI access policy before Workflow UI controllers run.
  *
- * Since 1.14 the subscriber asks the framework-free {@see WorkflowUiAccessPolicyInterface} (with a
- * {@see WorkflowUiAccessCheck} built from the main request and the security token) and/or
- * the deprecated {@see WorkflowUiAccessCheckerInterface} (with the Symfony request, exactly as in 1.13).
- * {@see WorkflowUiSecurityPass} decides which: the policy, the deprecated checker (a host service on the deprecated
- * port only, or a host decorator of the deprecated port), or both. When both are wired, both must grant. When neither
- * is wired, every request is denied (fail closed).
+ * The subscriber asks the framework-free {@see WorkflowUiAccessPolicyInterface} with a {@see WorkflowUiAccessCheck}
+ * built from the main request and the security token; {@see WorkflowUiSecurityPass} wires the service behind it. When
+ * no policy is wired, every request is denied (fail closed). The 1.x request-based port was removed in 2.0.
  *
  * When the bundle is disabled ({@code nowo_workflow.enabled: false}) every Workflow UI route answers 404.
  */
@@ -41,18 +37,22 @@ final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
     public const CONTROLLER_NAMESPACE = 'Nowo\\WorkflowBundle\\Controller\\';
 
     /**
-     * Creates the subscriber with the access ports, the web_ui.enabled flag and the token storage (for the
+     * Creates the subscriber with the access policy, the web_ui.enabled flag and the token storage (for the
      * {@see WorkflowActor} of the policy).
      *
-     * @param WorkflowUiAccessCheckerInterface|null $accessChecker deprecated port, asked with the Symfony request
-     * @param WorkflowUiAccessPolicyInterface|null $accessPolicy framework-free port (1.14)
+     * @param null $accessChecker deprecated since 2.0, always null (the 1.x request-based port was removed); removed
+     *                            in 3.0
+     * @param WorkflowUiAccessPolicyInterface|null $accessPolicy the access policy (null = deny every request)
+     *
+     * @phpstan-ignore constructor.unusedParameter (argument deprecated since 2.0, ignored, kept for BC until 3.0)
      */
     public function __construct(
-        private readonly ?WorkflowUiAccessCheckerInterface $accessChecker = null,
+        null $accessChecker = null,
         private readonly bool $enabled = true,
         private readonly ?WorkflowUiAccessPolicyInterface $accessPolicy = null,
         private readonly ?TokenStorageInterface $tokenStorage = null,
     ) {
+        unset($accessChecker);
     }
 
     /**
@@ -88,20 +88,12 @@ final class WorkflowUiAccessSubscriber implements EventSubscriberInterface
     }
 
     /**
-     * Every wired port must grant; no port wired = deny.
+     * The policy decides; no policy wired = deny.
      */
     private function isGranted(Request $request): bool
     {
-        if (!$this->accessPolicy instanceof WorkflowUiAccessPolicyInterface && !$this->accessChecker instanceof WorkflowUiAccessCheckerInterface) {
-            return false;
-        }
-
-        if ($this->accessPolicy instanceof WorkflowUiAccessPolicyInterface
-            && !$this->accessPolicy->allows(WorkflowUiAccessCheckFactory::fromRequest($request, $this->tokenStorage?->getToken()))) {
-            return false;
-        }
-
-        return !$this->accessChecker instanceof WorkflowUiAccessCheckerInterface || $this->accessChecker->isGranted($request);
+        return $this->accessPolicy instanceof WorkflowUiAccessPolicyInterface
+            && $this->accessPolicy->allows(WorkflowUiAccessCheckFactory::fromRequest($request, $this->tokenStorage?->getToken()));
     }
 
     /**

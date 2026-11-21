@@ -9,20 +9,18 @@ use Doctrine\Bundle\DoctrineBundle\DependencyInjection\Compiler\DoctrineOrmMappi
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Nowo\FormKitBundle\NowoFormKitBundle;
 use Nowo\UiKitBundle\NowoUiKitBundle;
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\RemovedPortsPass;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
 use Nowo\WorkflowBundle\NowoWorkflowBundle;
 use Nowo\WorkflowBundle\Service\DemoSeedService;
 use Nowo\WorkflowBundle\Service\WorkflowApplicator;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use Nowo\WorkflowBundle\Tests\Integration\Ddd\Domain\PurchaseOrder;
-use Nowo\WorkflowBundle\Tests\Support\Access\DualPredicate;
-use Nowo\WorkflowBundle\Tests\Support\Access\LegacyPredicateChecker;
-use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughLegacyDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughPolicyDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Access\PolicyPredicate;
 use Nowo\WorkflowBundle\Tests\Support\Access\TestTokenListener;
+use Nowo\WorkflowBundle\Tests\Support\Removed\LegacyOnlyUiAccessChecker;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
@@ -47,28 +45,35 @@ use function sys_get_temp_dir;
 use const PHP_VERSION_ID;
 
 /**
- * 1.14 host shapes for the access ports and the persistence paths (one cache directory per variant):
+ * Host shapes for the access port and the persistence paths (one cache directory per variant):
  *
  * - `builtin`: no access_checker, the built-in role-based policy (access_roles ROLE_ADMIN);
- * - `new`: access_checker on a service implementing only the 1.14 port;
- * - `legacy`: access_checker on a service implementing only the deprecated port;
- * - `both`: access_checker on a service implementing both ports;
- * - `decorator`: the built-in policy with a host decorator on the deprecated port;
- * - `policy-decorator`: the built-in policy with a host decorator on the 1.14 port (it wraps the role-based policy);
- * - `both-decorators`: the built-in policy with host decorators on both ports (both asked);
+ * - `new`: access_checker on a service implementing the access policy port;
+ * - `policy-decorator`: the built-in policy with a host decorator on the port (it wraps the role-based policy);
  * Every variant also maps the host aggregate {@see PurchaseOrder}
- * (on the default manager) and takes `runtime.flush_after_apply` from the constructor.
+ * (on the default manager) and takes `runtime.flush_after_apply` from the constructor (null = not set: false since
+ * 2.0).
  *
  * - `ddd`: a DDD / hexagonal host: plain-PHP aggregate mapped in XML, the bundle entities mapped from the shipped XML
  *   on a dedicated `workflow` entity manager (register_mapping: false), the host's own policy aliased to the 1.14
  *   port, flush_after_apply: false.
  *
- * Persistence shapes without `doctrine.entity_manager` (audit NF2-1 / NF2-3):
+ * Persistence shapes (audit NF2-1 / NF2-3):
  *
  * - `main-default`: the application's default manager is `main` (connection `main`); the bundle mapping lands on a
- *   manager named `default` (connection `default`), as in 1.13;
- * - `mapped-elsewhere`: register_mapping: false, the host maps the bundle XML on a `workflow` manager only;
- * - `host-mapping-pass`: register_mapping: false, the host maps the bundle XML with a DoctrineOrmMappingsPass.
+ *   manager named `default` (connection `default`), as in 1.13; without `doctrine.entity_manager` the build fails
+ *   since 2.0 (Q5), `main-default-explicit` sets it to `default`;
+ * - `mapped-elsewhere`: register_mapping: false, the host maps the bundle XML on a `workflow` manager only; without
+ *   `doctrine.entity_manager` the build fails since 2.0 (Q5), `mapped-elsewhere-explicit` sets it to `workflow`;
+ * - `host-mapping-pass`: register_mapping: false, the host maps the bundle XML with a DoctrineOrmMappingsPass on the
+ *   default manager (derived, no option needed).
+ *
+ * Paths removed in 2.0, each of which must fail the build: `removed-checker` (access_checker on a class that still
+ * implements the removed request-based port), `removed-checker-decorator`, `removed-registry-decorator` and
+ * `removed-versioning-decorator` (host decorators of the removed ports), `private-false`
+ * (`doctrine.private_entity_manager: false`), and `discovered-ui` / `discovered-registry` / `discovered-versioning`
+ * (application classes that still implement a removed port, registered by resource discovery with `#[AsDecorator]` /
+ * `#[AsAlias]`: they cannot be loaded, audit XR-WF-M1).
  *
  * SecurityBundle is not installed: the kernel registers `security.token_storage` and `security.authorization_checker`
  * itself, and {@see TestTokenListener} stands in for the firewall.
@@ -79,9 +84,9 @@ final class PortsTestKernel extends Kernel
 
     public const CACHE_ROOT = '/nowo-workflow-ports-kernel';
 
-    public const VARIANTS = ['builtin', 'new', 'legacy', 'both', 'decorator', 'policy-decorator', 'both-decorators', 'ddd', 'main-default', 'mapped-elsewhere', 'host-mapping-pass'];
+    public const VARIANTS = ['builtin', 'new', 'policy-decorator', 'ddd', 'main-default', 'main-default-explicit', 'mapped-elsewhere', 'mapped-elsewhere-explicit', 'host-mapping-pass', 'removed-checker', 'removed-checker-decorator', 'removed-registry-decorator', 'removed-versioning-decorator', 'private-false', 'discovered-ui', 'discovered-registry', 'discovered-versioning'];
 
-    public function __construct(private readonly string $variant, bool $debug = true, private readonly bool $flushAfterApply = false)
+    public function __construct(private readonly string $variant, bool $debug = true, private readonly ?bool $flushAfterApply = null)
     {
         parent::__construct('test', $debug);
     }
@@ -104,7 +109,13 @@ final class PortsTestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . self::CACHE_ROOT . '/cache/' . $this->variant . ($this->debug ? '-debug' : '') . ($this->flushAfterApply ? '-flush' : '');
+        $flush = match ($this->flushAfterApply) {
+            null  => '',
+            true  => '-flush',
+            false => '-noflush',
+        };
+
+        return sys_get_temp_dir() . self::CACHE_ROOT . '/cache/' . $this->variant . ($this->debug ? '-debug' : '') . $flush;
     }
 
     public function getLogDir(): string
@@ -128,11 +139,13 @@ final class PortsTestKernel extends Kernel
         }
 
         $workflow = [
-            'runtime'  => ['flush_after_apply' => $this->flushAfterApply],
             'security' => ['access_roles' => ['ROLE_ADMIN']],
         ];
+        if ($this->flushAfterApply !== null) {
+            $workflow['runtime'] = ['flush_after_apply' => $this->flushAfterApply];
+        }
 
-        if ($this->variant === 'main-default') {
+        if ($this->variant === 'main-default' || $this->variant === 'main-default-explicit') {
             $container->extension('doctrine', [
                 'dbal' => ['default_connection' => 'default', 'connections' => ['default' => ['url' => 'sqlite:///:memory:'], 'main' => ['url' => 'sqlite:///:memory:']]],
                 'orm'  => $orm + [
@@ -140,7 +153,10 @@ final class PortsTestKernel extends Kernel
                     'entity_managers'        => ['main' => ['connection' => 'main', 'mappings' => ['Host' => ['type' => 'xml', 'dir' => __DIR__ . '/../Ddd/mapping', 'prefix' => 'Nowo\\WorkflowBundle\\Tests\\Integration\\Ddd\\Domain', 'is_bundle' => false]]]],
                 ],
             ]);
-        } elseif ($this->variant === 'mapped-elsewhere') {
+            if ($this->variant === 'main-default-explicit') {
+                $workflow['doctrine'] = ['entity_manager' => 'default'];
+            }
+        } elseif ($this->variant === 'mapped-elsewhere' || $this->variant === 'mapped-elsewhere-explicit') {
             $container->extension('doctrine', [
                 'dbal' => ['default_connection' => 'default', 'connections' => ['default' => ['url' => 'sqlite:///:memory:'], 'workflow' => ['url' => 'sqlite:///:memory:']]],
                 'orm'  => $orm + [
@@ -151,7 +167,7 @@ final class PortsTestKernel extends Kernel
                     ],
                 ],
             ]);
-            $workflow['doctrine'] = ['register_mapping' => false];
+            $workflow['doctrine'] = ['register_mapping' => false] + ($this->variant === 'mapped-elsewhere-explicit' ? ['entity_manager' => 'workflow'] : []);
         } elseif ($this->variant === 'host-mapping-pass') {
             $container->extension('doctrine', [
                 'dbal' => ['url' => 'sqlite:///:memory:'],
@@ -217,32 +233,34 @@ final class PortsTestKernel extends Kernel
                 $services->set('app.workflow_policy', PolicyPredicate::class)->args(['non_impersonated_admin']);
                 $workflow['security']['access_checker'] = 'app.workflow_policy';
                 break;
-            case 'legacy':
-                $services->set('app.workflow_checker', LegacyPredicateChecker::class)->args(['non_impersonated_admin', service('security.token_storage')]);
-                $workflow['security']['access_checker'] = 'app.workflow_checker';
-                break;
-            case 'both':
-                $services->set('app.workflow_dual', DualPredicate::class)->args(['non_impersonated_admin']);
-                $workflow['security']['access_checker'] = 'app.workflow_dual';
-                break;
-            case 'decorator':
-                $services->set('app.workflow_audit', PassThroughLegacyDecorator::class)
-                    ->decorate(WorkflowUiAccessCheckerInterface::class)
-                    ->args([service('.inner')])
-                    ->public();
-                break;
             case 'policy-decorator':
-            case 'both-decorators':
                 $services->set('app.workflow_policy_audit', PassThroughPolicyDecorator::class)
                     ->decorate(WorkflowUiAccessPolicyInterface::class)
                     ->args([service('.inner')])
                     ->public();
-                if ($this->variant === 'both-decorators') {
-                    $services->set('app.workflow_audit', PassThroughLegacyDecorator::class)
-                        ->decorate(WorkflowUiAccessCheckerInterface::class)
-                        ->args([service('.inner')])
-                        ->public();
-                }
+                break;
+            case 'removed-checker':
+                $services->set('app.workflow_checker', LegacyOnlyUiAccessChecker::class);
+                $workflow['security']['access_checker'] = 'app.workflow_checker';
+                break;
+            case 'removed-checker-decorator':
+                $services->set('app.workflow_audit', PassThroughPolicyDecorator::class)->decorate(RemovedPortsPass::UI_ACCESS_CHECKER)->args([service('.inner')]);
+                break;
+            case 'removed-registry-decorator':
+                $services->set('app.workflow_registry_audit', PassThroughPolicyDecorator::class)->decorate(RemovedPortsPass::REGISTRY)->args([service('.inner')]);
+                break;
+            case 'removed-versioning-decorator':
+                $services->set('app.workflow_versioning_audit', PassThroughPolicyDecorator::class)->decorate(RemovedPortsPass::VERSIONING)->args([service('.inner')]);
+                break;
+            case 'private-false':
+                $workflow['doctrine'] = ['private_entity_manager' => false];
+                break;
+            case 'discovered-ui':
+            case 'discovered-registry':
+            case 'discovered-versioning':
+                $directory = ucfirst(substr($this->variant, 11));
+                $services->defaults()->autowire()->autoconfigure();
+                $services->load('Nowo\\WorkflowBundle\\Tests\\Support\\Removed\\Discovered\\' . $directory . '\\', dirname(__DIR__, 2) . '/Support/Removed/Discovered/' . $directory . '/');
                 break;
             case 'ddd':
                 $services->set('app.workflow_policy', PolicyPredicate::class)->args(['non_impersonated_admin']);

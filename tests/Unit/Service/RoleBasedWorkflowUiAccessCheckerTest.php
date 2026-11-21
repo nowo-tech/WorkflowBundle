@@ -7,7 +7,6 @@ namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
 use Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 final class RoleBasedWorkflowUiAccessCheckerTest extends TestCase
@@ -19,7 +18,7 @@ final class RoleBasedWorkflowUiAccessCheckerTest extends TestCase
 
         $checker = new RoleBasedWorkflowUiAccessChecker(['ROLE_ADMIN'], $auth);
 
-        self::assertFalse($checker->isGranted(Request::create('/workflow')));
+        self::assertFalse($checker->allows(new WorkflowUiAccessCheck('GET')));
     }
 
     public function testGrantsWhenRoleMatches(): void
@@ -29,7 +28,7 @@ final class RoleBasedWorkflowUiAccessCheckerTest extends TestCase
 
         $checker = new RoleBasedWorkflowUiAccessChecker(['ROLE_ADMIN'], $auth);
 
-        self::assertTrue($checker->isGranted(Request::create('/workflow')));
+        self::assertTrue($checker->allows(new WorkflowUiAccessCheck('GET')));
     }
 
     public function testDeniesWhenRequiredRolesEmpty(): void
@@ -38,7 +37,7 @@ final class RoleBasedWorkflowUiAccessCheckerTest extends TestCase
 
         $checker = new RoleBasedWorkflowUiAccessChecker([], $auth);
 
-        self::assertFalse($checker->isGranted(Request::create('/workflow')));
+        self::assertFalse($checker->allows(new WorkflowUiAccessCheck('GET')));
     }
 
     public function testTheFrameworkFreePortAsksTheAuthorizationChecker(): void

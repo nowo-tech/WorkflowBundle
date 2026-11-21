@@ -940,12 +940,10 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  * }
  * @psalm-type NowoWorkflowConfig = array{
- *     enabled?: bool|Param, // Deprecated: The "nowo_workflow.enabled.enabled" option is deprecated, use "nowo_workflow.web_ui.enabled" instead. // Deprecated alias of web_ui.enabled.
- *     environments?: list<scalar|Param|null>,
  *     connection?: scalar|Param|null, // Entity manager name used by nowo:workflow:sync-schema (DDL only). The bundle mapping is registered on the default entity manager; for another manager, map NowoWorkflowBundle on it yourself and set doctrine.entity_manager too. // Default: "default"
  *     table_prefix?: scalar|Param|null, // Default: "workflow_"
  *     runtime?: array{
- *         flush_after_apply?: bool|Param, // When true, WorkflowApplicator::apply*() flushes the application's default entity manager after each transition (every pending change of its unit of work, REQ-ARCH-001 rule 6 exception kept for BC). False = apply*() only changes the marking; persist the subject yourself (your repository / transaction boundary). Since 1.14 new installs get false from the Flex recipe; when the key is not set the 1.13 default (true) stays and a deprecation is triggered: the default becomes false in 2.0. // Default: true
+ *         flush_after_apply?: bool|Param, // false (default since 2.0): WorkflowApplicator::apply*() only changes the marking; persist the subject yourself (your repository / transaction boundary, REQ-ARCH-001 rule 6). true = apply*() flushes the application's default entity manager after each transition, which commits every pending change of its unit of work (the 1.x default, kept as an explicit choice of the application). // Default: false
  *         concurrency?: array{ // Since 1.20 (REQ-RUNTIME-003, docs/CONCURRENCY.md): how a transition apply on a persisted Doctrine entity is protected against a concurrent apply. lock (default) = expected-marking compare-and-set under SELECT … FOR UPDATE; optimistic = the subject's #[Version] field decides at the flush; none = no control (1.19 behaviour). A lost race throws WorkflowConflictException (409 + Retry-After, CONFLICT_001).
  *             default?: "lock"|"optimistic"|"none"|Param, // Mode of every workflow not listed under workflows. // Default: "lock"
  *             workflows?: array<string, "lock"|"optimistic"|"none"|Param>,
@@ -954,7 +952,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     doctrine?: array{ // Since 1.14: persistence of the workflow definitions (REQ-ARCH-001 rules 2 and 6).
  *         entity_manager?: scalar|Param|null, // Source manager of the bundle's private entity manager: its connection, mapping configuration and event manager are shared, it is never flushed, cleared or reset by the bundle. null (default) = the manager that maps the bundle entities (the default manager of a standard application). A dedicated manager must exist under doctrine.orm.entity_managers (the build fails otherwise) and map the bundle entities (set doctrine.register_mapping: false and map them there yourself). // Default: null
- *         private_entity_manager?: bool|Param, // Deprecated: The "private_entity_manager" option at path "nowo_workflow.doctrine.private_entity_manager" is deprecated: the private entity manager becomes the only mode in 2.0. Remove the option. // true (default): the admin UI, the demo seeder and the repository read and write the definitions through the bundle's private entity manager, so a definition save never flushes or resets an application manager. false restores the 1.13 behaviour (the application's default manager): deprecated, removed in 2.0. // Default: true
+ *         private_entity_manager?: bool|Param, // Deprecated: The option has no effect since 2.0 (the private manager is the only mode); remove it. // Has no effect since 2.0: the admin UI, the demo seeder and the repository always read and write the definitions through the bundle's private entity manager. true is accepted (deprecated, removed in 3.0); false fails the build. // Default: true
  *         register_mapping?: bool|Param, // true (default): the bundle maps its entities on the default entity manager. false = the application maps them itself (e.g. only on a dedicated manager of a DDD host, from src/Resources/config/doctrine). // Default: true
  *         mapping_type?: "attribute"|"xml"|Param, // The mapping the bundle registers (register_mapping: true): attribute (default) or xml (src/Resources/config/doctrine/*.orm.xml, same tables and columns). // Default: "attribute"
  *     },
@@ -1028,19 +1026,9 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         default_locale?: scalar|Param|null, // Default: "en"
  *         locales?: list<scalar|Param|null>,
  *     },
- *     ui?: array{ // Deprecated since 1.9: use web_ui.*, security.access_roles and nowo_ui_kit.css_framework / icon_set.
- *         path?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.path.path" option is deprecated, use "nowo_workflow.web_ui.path_prefix" instead.
- *         layout_template?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.layout_template.layout_template" option is deprecated, use "nowo_workflow.web_ui.layout_template" (a layout rendering the UiKit canonical blocks; null = nowo_ui_kit.layouts.admin) instead. // 1.x layout (global nowo_workflow_layout_template). Pages render through the deprecated @NowoWorkflowBundle/base.html.twig bridge while it is set.
- *         css_framework?: "bootstrap"|"bootstrap5"|"bootstrap4"|"tailwind"|"foundation"|"custom"|"tabler"|"none"|Param|null, // Deprecated: The "nowo_workflow.ui.css_framework.css_framework" option is deprecated, set "nowo_ui_kit.css_framework" instead. // Seeds nowo_ui_kit.css_framework when the host does not set it. bootstrap / tabler are aliases of bootstrap5. // Default: null
- *         icon_set?: "bootstrap-icons"|"tabler-icons"|"ux_icon"|"svg_inline"|"none"|Param|null, // Deprecated: The "nowo_workflow.ui.icon_set.icon_set" option is deprecated, set "nowo_ui_kit.icon_set" instead. // Seeds nowo_ui_kit.icon_set when the host does not set it. // Default: null
- *         list_page_size?: int|Param, // Deprecated: The "nowo_workflow.ui.list_page_size.list_page_size" option is deprecated, use "nowo_workflow.web_ui.list_page_size" instead.
- *         default_locale?: scalar|Param|null, // Deprecated: The "nowo_workflow.ui.default_locale.default_locale" option is deprecated, use "nowo_workflow.web_ui.default_locale" instead.
- *         locales?: list<scalar|Param|null>,
- *         required_roles?: list<scalar|Param|null>,
- *     },
  *     security?: array{
  *         access_roles?: list<scalar|Param|null>,
- *         access_checker?: scalar|Param|null, // Service id implementing WorkflowUiAccessCheckerInterface. null = RoleBasedWorkflowUiAccessChecker. // Default: null
+ *         access_checker?: scalar|Param|null, // Service id implementing WorkflowUiAccessPolicyInterface. null = RoleBasedWorkflowUiAccessChecker. // Default: null
  *         allow_unauthenticated?: bool|Param, // DEV/DEMO ONLY. When true, UI may load without SecurityBundle. Never true in production. // Default: false
  *     },
  * }

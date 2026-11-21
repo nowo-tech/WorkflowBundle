@@ -15,8 +15,8 @@ use Nowo\WorkflowBundle\Model\WorkflowTransitionResult;
 
 /**
  * Framework-free runtime port of the database workflows (since 1.15, REQ-ARCH-001 rule 3): what a host calls to move
- * its subjects, with scalars and bundle VOs only (no Symfony Workflow type). It replaces
- * {@see WorkflowRegistryInterface} as the port hosts call.
+ * its subjects, with scalars and bundle VOs only (no Symfony Workflow type). It replaced the 1.x registry port
+ * (`WorkflowRegistryInterface`, removed in 2.0).
  *
  * The subject is the host's own object. With tenancy the definition is the one the subject runs (its pinned version,
  * else its tenant's, else the global template, never another tenant's). Guards (permission, conditions, host
@@ -32,8 +32,9 @@ interface WorkflowRuntimeInterface
     public function can(object $subject, string $workflowSlug, string $transition): bool;
 
     /**
-     * Applies the transition (and the automatic transitions it enables), then flushes unless
-     * `runtime.flush_after_apply` is false. A blocked transition is not an error: the result says why.
+     * Applies the transition (and the automatic transitions it enables). It only changes the marking: persist the
+     * subject yourself (since 2.0; with `runtime.flush_after_apply: true` it flushes the application's entity manager
+     * as 1.x did). A blocked transition is not an error: the result says why.
      *
      * Since 1.20 a lost race with a concurrent write on the same subject is an exception (nothing committed; answer
      * 409 + Retry-After, code CONFLICT_001), see docs/CONCURRENCY.md.

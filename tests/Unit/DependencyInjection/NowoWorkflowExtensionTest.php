@@ -18,9 +18,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\DependencyInjection\Reference;
 
-use function array_key_exists;
-use function is_array;
-
 final class NowoWorkflowExtensionTest extends TestCase
 {
     public function testLoadSetsParameters(): void
@@ -54,16 +51,10 @@ final class NowoWorkflowExtensionTest extends TestCase
         self::assertSame('admin/workflow_show.html.twig', $templates['show']);
         self::assertSame(Configuration::DEFAULT_TEMPLATES['index'], $templates['index']);
 
-        // Deprecated 1.x mirrors.
-        self::assertSame('/wf', $container->getParameter('nowo_workflow.ui.path'));
-        self::assertSame('fr', $container->getParameter('nowo_workflow.ui.default_locale'));
-        self::assertSame(['fr', 'en'], $container->getParameter('nowo_workflow.ui.locales'));
-        self::assertSame(20, $container->getParameter('nowo_workflow.ui.list_page_size'));
-        self::assertSame(NowoWorkflowExtension::UI_KIT_ADMIN_LAYOUT, $container->getParameter('nowo_workflow.ui.layout_template'));
-        self::assertSame('bootstrap5', $container->getParameter('nowo_workflow.ui.css_framework'));
-        self::assertNull($container->getParameter('nowo_workflow.ui.css_framework_override'));
-        self::assertSame('bootstrap-icons', $container->getParameter('nowo_workflow.ui.icon_set'));
-        self::assertSame(['ROLE_ADMIN'], $container->getParameter('nowo_workflow.ui.required_roles'));
+        // 2.0: the 1.x mirrors of the removed keys are gone.
+        foreach (['environments', 'ui.path', 'ui.layout_template', 'ui.css_framework', 'ui.css_framework_override', 'ui.icon_set', 'ui.list_page_size', 'ui.default_locale', 'ui.locales', 'ui.required_roles'] as $removed) {
+            self::assertFalse($container->hasParameter('nowo_workflow.' . $removed), $removed);
+        }
         self::assertSame(['ROLE_ADMIN'], $container->getParameter('nowo_workflow.security.access_roles'));
         self::assertFalse($container->getParameter('nowo_workflow.security.allow_unauthenticated'));
     }
@@ -74,7 +65,7 @@ final class NowoWorkflowExtensionTest extends TestCase
         $container->registerExtension(new NowoWorkflowExtension());
         $container->getExtension('nowo_workflow')->load([[]], $container);
 
-        self::assertTrue($container->getParameter('nowo_workflow.runtime.flush_after_apply'));
+        self::assertFalse($container->getParameter('nowo_workflow.runtime.flush_after_apply'), '2.0 default');
 
         $registry   = $container->getDefinition(DatabaseWorkflowRegistry::class);
         $dispatcher = $registry->getArgument('$eventDispatcher');
@@ -88,38 +79,13 @@ final class NowoWorkflowExtensionTest extends TestCase
         self::assertSame('%nowo_workflow.runtime.flush_after_apply%', $applicator->getArgument('$flushAfterApply'));
     }
 
-    public function testFlushAfterApplyCanBeDisabled(): void
+    public function testFlushAfterApplyCanBeEnabledExplicitly(): void
     {
         $container = new ContainerBuilder();
         $container->registerExtension(new NowoWorkflowExtension());
-        $container->getExtension('nowo_workflow')->load([['runtime' => ['flush_after_apply' => false]]], $container);
+        $container->getExtension('nowo_workflow')->load([['runtime' => ['flush_after_apply' => true]]], $container);
 
-        self::assertFalse($container->getParameter('nowo_workflow.runtime.flush_after_apply'));
-    }
-
-    public function testLoadMapsDeprecatedUiKeys(): void
-    {
-        $container = new ContainerBuilder();
-        $container->registerExtension(new NowoWorkflowExtension());
-
-        $container->getExtension('nowo_workflow')->load([[
-            'enabled' => false,
-            'ui'      => [
-                'path'            => '/legacy',
-                'layout_template' => 'base.html.twig',
-                'css_framework'   => 'tailwind',
-                'icon_set'        => 'none',
-            ],
-        ]], $container);
-
-        self::assertFalse($container->getParameter('nowo_workflow.enabled'));
-        self::assertFalse($container->getParameter('nowo_workflow.web_ui.enabled'));
-        self::assertSame('/legacy', $container->getParameter('nowo_workflow.web_ui.path_prefix'));
-        self::assertSame(Configuration::LEGACY_LAYOUT_BRIDGE, $container->getParameter('nowo_workflow.web_ui.layout_template'));
-        self::assertSame('base.html.twig', $container->getParameter('nowo_workflow.ui.layout_template'));
-        self::assertSame('tailwind', $container->getParameter('nowo_workflow.ui.css_framework'));
-        self::assertSame('tailwind', $container->getParameter('nowo_workflow.ui.css_framework_override'));
-        self::assertSame('none', $container->getParameter('nowo_workflow.ui.icon_set'));
+        self::assertTrue($container->getParameter('nowo_workflow.runtime.flush_after_apply'));
     }
 
     public function testFormKitProfileFollowsTheCssStack(): void
@@ -159,24 +125,7 @@ final class NowoWorkflowExtensionTest extends TestCase
         self::assertSame(['attr' => ['class' => 'nowo-ui-input nowo-ui-input--full']], $seed['profiles']['workflow']['defaults']);
     }
 
-    public function testPrependSeedsFormKitFromTheDeprecatedUiCssFramework(): void
-    {
-        $container = new ContainerBuilder();
-        $container->registerExtension(new NowoWorkflowExtension());
-        $this->registerStubExtension($container, 'nowo_form_kit');
-        $this->registerStubExtension($container, 'nowo_ui_kit');
-        $container->prependExtensionConfig('nowo_ui_kit', ['icon_set' => 'none']);
-        $container->prependExtensionConfig('nowo_workflow', ['ui' => ['css_framework' => 'foundation']]);
-
-        $extension = $container->getExtension('nowo_workflow');
-        self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
-        $extension->prepend($container);
-
-        $seed = $container->getExtensionConfig('nowo_form_kit')[0];
-        self::assertSame('foundation', $seed['css_framework']);
-    }
-
-    public function testPrependDoesNotSeedUiKitWithoutDeprecatedKeys(): void
+    public function testPrependNeverSeedsUiKit(): void
     {
         $container = new ContainerBuilder();
         $container->registerExtension(new NowoWorkflowExtension());
@@ -195,9 +144,9 @@ final class NowoWorkflowExtensionTest extends TestCase
             $container = new ContainerBuilder();
             $container->registerExtension(new NowoWorkflowExtension());
             $container->registerExtension(new TwigExtension());
-            $container->prependExtensionConfig('nowo_workflow', [
-                'ui' => ['css_framework' => $cssFramework],
-            ]);
+            $this->registerStubExtension($container, 'nowo_form_kit');
+            $this->registerStubExtension($container, 'nowo_ui_kit');
+            $container->prependExtensionConfig('nowo_ui_kit', ['css_framework' => $cssFramework]);
 
             $extension = $container->getExtension('nowo_workflow');
             self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
@@ -306,63 +255,6 @@ final class NowoWorkflowExtensionTest extends TestCase
         self::assertFalse($workflowReseed);
     }
 
-    public function testPrependSeedsUiKitFromUiConfigWhenHostUnset(): void
-    {
-        $container = new ContainerBuilder();
-        $container->registerExtension(new NowoWorkflowExtension());
-        $this->registerStubExtension($container, 'nowo_ui_kit');
-        $container->prependExtensionConfig('nowo_workflow', [
-            'ui' => [
-                'css_framework' => 'bootstrap',
-                'icon_set'      => 'bootstrap-icons',
-            ],
-        ]);
-
-        $extension = $container->getExtension('nowo_workflow');
-        self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
-        $extension->prepend($container);
-
-        $found = false;
-        foreach ($container->getExtensionConfig('nowo_ui_kit') as $cfg) {
-            if (($cfg['css_framework'] ?? null) === 'bootstrap5'
-                && ($cfg['icon_set'] ?? null) === 'bootstrap-icons'
-            ) {
-                $found = true;
-                break;
-            }
-        }
-        self::assertTrue($found);
-    }
-
-    public function testPrependDoesNotOverrideExplicitUiKitHostConfig(): void
-    {
-        $container = new ContainerBuilder();
-        $container->registerExtension(new NowoWorkflowExtension());
-        $this->registerStubExtension($container, 'nowo_ui_kit');
-        $container->prependExtensionConfig('nowo_ui_kit', [
-            'css_framework' => 'bootstrap5',
-            'icon_set'      => 'none',
-        ]);
-        $container->prependExtensionConfig('nowo_workflow', [
-            'ui' => [
-                'css_framework' => 'custom',
-                'icon_set'      => 'bootstrap-icons',
-            ],
-        ]);
-
-        $extension = $container->getExtension('nowo_workflow');
-        self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
-        $extension->prepend($container);
-
-        $reseeds = 0;
-        foreach ($container->getExtensionConfig('nowo_ui_kit') as $cfg) {
-            if (($cfg['css_framework'] ?? null) === 'custom' || ($cfg['icon_set'] ?? null) === 'bootstrap-icons') {
-                ++$reseeds;
-            }
-        }
-        self::assertSame(0, $reseeds);
-    }
-
     public function testPrependIgnoresNonArrayUiKitConfigs(): void
     {
         $container = new ContainerBuilder();
@@ -373,19 +265,16 @@ final class NowoWorkflowExtensionTest extends TestCase
         $configs                  = $ref->getValue($container);
         $configs['nowo_ui_kit'][] = 'invalid';
         $ref->setValue($container, $configs);
-        $container->prependExtensionConfig('nowo_workflow', ['ui' => ['css_framework' => 'bootstrap5']]);
+        $this->registerStubExtension($container, 'nowo_form_kit');
 
         $extension = $container->getExtension('nowo_workflow');
         self::assertInstanceOf(NowoWorkflowExtension::class, $extension);
         $extension->prepend($container);
 
-        $uiSeeded = false;
-        foreach ($container->getExtensionConfig('nowo_ui_kit') as $cfg) {
-            if (is_array($cfg) && array_key_exists('css_framework', $cfg)) {
-                $uiSeeded = true;
-            }
-        }
-        self::assertTrue($uiSeeded);
+        // The invalid UiKit config is skipped: FormKit is seeded from UiKit's default stack (bootstrap5).
+        $seed = $container->getExtensionConfig('nowo_form_kit')[0];
+        self::assertSame('bootstrap', $seed['css_framework']);
+        self::assertSame(['invalid'], $container->getExtensionConfig('nowo_ui_kit'), 'UiKit is never seeded');
     }
 
     private function registerStubExtension(ContainerBuilder $container, string $alias): void

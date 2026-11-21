@@ -95,7 +95,7 @@ Pinning rules:
 - a published definition subjects are pinned to cannot be deleted (disable it instead); `forgetSubject()` removes a
   subject's pins, after which the definition can be deleted;
 - no automatic marking migration: a subject moves to a newer version only when you remove its pin
-  (`WorkflowVersioning::forgetSubject()`), and then the "follow latest" rule above applies.
+  (`WorkflowVersionManagerInterface::forgetSubject()`), and then the "follow latest" rule above applies.
 
 The versioning operations are also a port for hosts (`cloneTemplate()`, `createDraft()` / `createDraftOf()`,
 `publishDraft()` / `publish()`, `retire()` / `reinstate()`, `delete()`, `forgetSubject()`), e.g. to give each new
@@ -112,15 +112,16 @@ It takes a `Model\WorkflowDefinitionRef` (row id, slug, tenant, version number) 
 give you a reference. A reference is looked up in its own scope (slug and tenant, byte for byte) and then matched on
 the row id, so it can never reach another tenant's version (`WorkflowNotFoundException`).
 
-`Contract\WorkflowVersioningInterface` (since 1.17, the same flows with the `WorkflowDefinition` entity; built-in
-`Service\WorkflowVersioning`) is **deprecated as a calling port since 1.19** and removed in 2.0, but it stays the SPI:
-the admin UI acts on the already authorised entity, never on a new lookup by slug and tenant, the twin above delegates
-every write to it, and a host decorator or replacement of it keeps running and is honoured through the twin.
+`Contract\WorkflowVersioningInterface` (1.17, the same flows with the `WorkflowDefinition` entity) was removed in 2.0
+(owner decision Q2): `WorkflowVersionManagerInterface` is the only versioning port, for calling and for decorating or
+replacing. The internal `Service\WorkflowVersioning` does the work: the admin UI calls it with the already authorised
+entity, never with a new lookup by slug and tenant, and the port above delegates every write to it. A decorator of the
+port therefore applies to the hosts calling it, not to the admin UI.
 
 ## Retiring a clone
 
 Since 1.16 a tenant can **retire** its customized copy of a template (UI action "Retire" on a published version of its
-own definition, permission `publish`; or `WorkflowVersioning::retire($definition)`):
+own definition, permission `publish`; or `WorkflowVersionManagerInterface::retire($ref)`):
 
 - every published version of the clone becomes `retired` (`WorkflowDefinitionStatus::Retired`);
 - **new subjects** of the tenant run the **global template** again (resolution step 2 skips a retired clone);
@@ -131,7 +132,7 @@ own definition, permission `publish`; or `WorkflowVersioning::retire($definition
 - retiring is refused for a global template (disable it instead), for a clone without a published version, and when
   there is no **enabled** global template of that slug (new subjects would have no workflow).
 
-To put the clone back into service: "Reinstate" (`WorkflowVersioning::reinstate()`: its retired versions are published
+To put the clone back into service: "Reinstate" (`WorkflowVersionManagerInterface::reinstate()`: its retired versions are published
 again), publish a new draft of it ("New draft" works on a retired version), or customize the template again
 ("Customize for this organization" / `cloneTemplate()`: the copy becomes the clone's next version). Retiring and
 reinstating are logged (`action: retire_definition` / `reinstate_definition`, with id, slug, version and tenant), like
@@ -223,7 +224,7 @@ $runtime->pin($leave, 'leave', WorkflowPinMode::Repin);
 ```
 
 `WorkflowApplicator` keeps its 1.14 API and resolves the same way. `DatabaseWorkflowRegistry::forSubject($subject,
-$slug)` returns the Symfony workflow of the version the subject runs. `WorkflowRegistryInterface::get($slug)` only knows
+$slug)` returns the Symfony workflow of the version the subject runs. `DatabaseWorkflowRegistry::get($slug)` only knows
 global templates: with tenancy, use the runtime port.
 
 **Defence in depth:** with tenancy every database workflow carries the id of its stored version, and a guard listener
@@ -489,7 +490,7 @@ Without `tenancy.tenant_resolver`:
 - every definition is global, version 1, published, edited in place (exactly 1.14);
 - no isolation guard, no audit middleware or event (unless `audit.enabled: true`), no pins;
 - the UI has no draft, publish or clone action and no guard field (unless a guard port is configured);
-- `WorkflowRuntimeInterface` and `forSubject()` resolve as `WorkflowRegistryInterface::get()`.
+- `WorkflowRuntimeInterface` and `forSubject()` resolve as `DatabaseWorkflowRegistry::get()`.
 
 Tested by `NoResolverEquivalenceKernelTest` (same workflow events in the same order as the 1.14 applicator, same
 markings, and the tenancy-only services (isolation guard, audit dispatcher and middleware) are not registered).
@@ -502,7 +503,7 @@ markings, and the tenancy-only services (isolation guard, audit dispatcher and m
 3. **Deleting** a published tenant definition is refused while any subject is pinned to one of its versions (the UI
    shows the count and suggests disabling it; the pin foreign key is `ON DELETE RESTRICT`, so a pin created at the same
    moment also blocks it); drafts can always be deleted; `forgetSubject()` removes a subject's pins.
-4. **`WorkflowRegistryInterface`** is deprecated for hosts (removed in 2.0), not made `@internal`.
+4. **`WorkflowRegistryInterface`** was deprecated for hosts in 1.15 (not made `@internal`) and removed in 2.0.
 5. **The audit event** is on by default with tenancy and needs doctrine/dbal 4.
 6. **GDPR:** no UserKit export / erasure providers: nothing is stored per user.
 

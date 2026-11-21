@@ -3,8 +3,14 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [Before you upgrade](#before-you-upgrade)
+  - [runtime.flush_after_apply defaults to false](#runtimeflush_after_apply-defaults-to-false)
+  - [doctrine.entity_manager for a non-default mapping manager](#doctrineentity_manager-for-a-non-default-mapping-manager)
+  - [Removed](#removed)
+  - [Composer](#composer)
+  - [Private manager only](#private-manager-only)
+  - [1.x support](#1x-support)
 - [To 1.22.1](#to-1221)
-- [To 1.22.1](#to-1221-1)
 - [To 1.22.0](#to-1220)
 - [To 1.21.0](#to-1210)
 - [To 1.20.0](#to-1200)
@@ -88,13 +94,189 @@
 
 ## Unreleased
 
-## To 1.22.1
-
-From **1.22.0**:
+From **1.22.1** (a major release: `composer update` alone does not cross it):
 
 ```bash
-composer update nowo-tech/workflow-bundle
+composer require nowo-tech/workflow-bundle:^2.0 -W
 ```
+
+2.0 contains only changes that 1.x announced through deprecation notices: an application that runs the last 1.x
+minor without deprecation notices from this bundle upgrades without code changes. After 2.0.0 is released, the 1.x
+line receives security fixes for 6 months: fixes rated Moderate and above are backported to the last 1.x minor;
+Low ones are fixed in 2.x only.
+
+### Before you upgrade
+
+On 1.22.1, clear every deprecation notice of `nowo-tech/workflow-bundle`. They are build-time notices: they show in
+`php bin/console debug:container --deprecations` (and in the deprecation log of your test suite), not in the request
+log. The notices, with their exact text:
+
+| Notice (1.22.1) | What to do |
+| --- | --- |
+| `Not setting "nowo_workflow.runtime.flush_after_apply" is deprecated: it keeps the 1.13 default (true, WorkflowApplicator flushes the application's default entity manager after each transition) and becomes false in 2.0. Set it explicitly: false to persist the subject yourself (what the 1.14 recipe installs), true to keep the current behaviour.` | Set the key explicitly. See [runtime.flush_after_apply defaults to false](#runtimeflush_after_apply-defaults-to-false). |
+| `The "private_entity_manager" option at path "nowo_workflow.doctrine" is deprecated: the private entity manager becomes the only mode in 2.0. Remove the option.` | Remove `doctrine.private_entity_manager`. See [Private manager only](#private-manager-only). |
+| `The workflow definitions are stored through the Doctrine entity manager "X", which is not the default one ("Y"): set nowo_workflow.doctrine.entity_manager: X explicitly.` | Set `doctrine.entity_manager: X`. |
+| `The workflow registry service(s) "…" replace or decorate "Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface", which is deprecated as a port for hosts (removed in 2.0): call "Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface" instead; the built-in runtime keeps asking your registry until then.` | Call `WorkflowRuntimeInterface`; move custom logic to a `workflow.guard` listener or to your own `WorkflowRuntimeInterface` service. |
+| `The Workflow UI access checker "…" (…) implements only "Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface"; implement "Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface" instead (the deprecated interface is removed in 2.0).` | Implement `WorkflowUiAccessPolicyInterface` (table in [To 1.14.0](#workflow-ui-access-port)). |
+| `The Workflow UI access is decided by both "…WorkflowUiAccessPolicyInterface" and the deprecated "…WorkflowUiAccessCheckerInterface" (both must grant) because of the deprecated-port service(s) "…"; migrate them to "…WorkflowUiAccessPolicyInterface" (the deprecated interface is removed in 2.0).` | Move the named services (decorators included) to `WorkflowUiAccessPolicyInterface`. |
+| `The "Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface" service alias is deprecated, use "Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface" instead (removed in 2.0).` | Inject `WorkflowUiAccessPolicyInterface`. |
+| `The "nowo_workflow.enabled" option is deprecated, use "nowo_workflow.web_ui.enabled" instead.` and the same notice for each `nowo_workflow.ui.*` key (`ui.path`, `ui.layout_template`, `ui.css_framework`, `ui.icon_set`, `ui.list_page_size`, `ui.default_locale`, `ui.locales`, `ui.required_roles`) | Move to the new key (table in [To 1.9.0](#configuration)). |
+| `The "nowo_workflow.environments" option is deprecated and has no effect; register the bundle only for the wanted environments in config/bundles.php instead.` | Remove the key. |
+
+Some removals had no runtime notice, only a docblock and the docs. Search your code for them (see
+[Removed](#removed)):
+
+- a host implementation, alias or decorator of `WorkflowVersioningInterface` (deprecated as a port since 1.19);
+- a decorator of `WorkflowUiAccessCheckerInterface` over the built-in policy (no `access_checker` and no alias of
+  `WorkflowUiAccessPolicyInterface` of yours): 1.14 to 1.22 kept asking it without a notice. In 2.0 it is a build
+  error, also when it is registered with `#[AsDecorator]` or `#[AsAlias]` (its class can no longer be loaded, and the
+  bundle refuses to let Symfony drop it, which would widen access). Move its rule to a decorator of
+  `WorkflowUiAccessPolicyInterface`;
+- the 1.x templates and Twig globals (deprecated since 1.9).
+
+Every path that relied on a removed item fails the container build in 2.0 with a message that names what to do and
+points here. Nothing falls back silently.
+
+### runtime.flush_after_apply defaults to false
+
+| `runtime.flush_after_apply` | 1.x | 2.0 |
+| --- | --- | --- |
+| not set | `true` (with a deprecation): `apply*()` flushes the application's default entity manager | `false`: `apply*()` only changes the marking |
+| `false` | only the marking changes | unchanged |
+| `true` | the default manager is flushed after each transition | unchanged (an explicit choice of your application) |
+
+> **Data-loss warning.** When the key is not set, 2.0 no longer flushes your entity manager after `apply*()`. Code
+> that changed other entities before or around `apply*()` and relied on that flush **loses those changes silently**:
+> nothing is written and no error is raised. Set `flush_after_apply: false` on 1.22 first, run your tests, and add
+> your own flush (or repository save) where something was lost. To keep the 1.x behaviour instead, set it to `true`
+> explicitly; it stays supported in 2.x.
+
+```php
+$runtime->apply($leave, 'leave', 'submit');   // changes the marking only
+$entityManager->flush();                      // your unit of work, your transaction
+```
+
+The marking change is still protected by the concurrency mode of the workflow ([CONCURRENCY.md](CONCURRENCY.md)):
+with `false` the expected marking is checked (with a row lock when your transaction is open) and your flush commits
+it. `WorkflowApplicator`'s constructor default for `$flushAfterApply` is `false` as well.
+
+### doctrine.entity_manager for a non-default mapping manager
+
+When `doctrine.entity_manager` is not set and the bundle entities are mapped on a manager that is not your default
+one, 1.14 to 1.22 used that manager with a deprecation. 2.0 fails the build instead:
+
+```text
+The workflow definitions are mapped on the Doctrine entity manager "X", which is not the default one ("Y"): set
+nowo_workflow.doctrine.entity_manager: X explicitly. See UPGRADING.md "To 2.0.0".
+```
+
+Set the option to the name in the message. Standard applications (the bundle mapping on the default manager) are not
+affected.
+
+### Removed
+
+| Removed | Deprecated since | Replacement |
+| --- | --- | --- |
+| `Contract\WorkflowRegistryInterface` (and its service alias) | 1.15 | `Contract\WorkflowRuntimeInterface`; a `workflow.guard` listener for custom rules. A host service registered under, aliased to or decorating the id fails the build. `DatabaseWorkflowRegistry` no longer implements it, and `WorkflowApplicator`'s first argument is the `DatabaseWorkflowRegistry`. |
+| `Contract\WorkflowUiAccessCheckerInterface` (and its service alias), `isGranted(Request)` on the built-in checkers | 1.14 | `Contract\WorkflowUiAccessPolicyInterface::allows(WorkflowUiAccessCheck)`. An `access_checker` class that does not implement it, or still implements the removed interface (it can no longer be loaded), fails the build; so does a service registered under, aliased to or decorating the removed id. |
+| `Contract\WorkflowVersioningInterface` (and its service alias) | 1.19 (as a calling port) | `Contract\WorkflowVersionManagerInterface`, the only versioning port for calling and for decorating or replacing; see [Versioning: decorate the twin](#versioning-decorate-the-twin). |
+| `doctrine.private_entity_manager: false` | 1.14 | Nothing: the private manager is the only mode. `false` fails the build; `true` is accepted as a no-op with a deprecation and removed in 3.0. |
+| Root `enabled` | 1.9 | `web_ui.enabled` |
+| Root `environments` | 1.8 | Register the bundle only for the wanted environments in `config/bundles.php`. |
+| `ui.path` | 1.9 | `web_ui.path_prefix` |
+| `ui.layout_template` | 1.9 | `web_ui.layout_template` (`null` = `nowo_ui_kit.layouts.admin`), with a layout that renders the UiKit canonical blocks |
+| `ui.list_page_size`, `ui.default_locale`, `ui.locales` | 1.9 | `web_ui.list_page_size`, `web_ui.default_locale`, `web_ui.locales` |
+| `ui.required_roles` | 1.9 | `security.access_roles` |
+| `ui.css_framework`, `ui.icon_set` | 1.9 | `nowo_ui_kit.css_framework`, `nowo_ui_kit.icon_set` |
+| Template `@NowoWorkflowBundle/base.html.twig` (1.x layout bridge) | 1.9 | A layout that renders the UiKit canonical blocks, set as `nowo_ui_kit.layouts.admin` or `web_ui.layout_template` ([TEMPLATES.md](TEMPLATES.md)) |
+| Template `@NowoWorkflowBundle/layout_integrate_base.html.twig` | 1.9 | Copy it from the v1.22.1 tag into your application as your `nowo_ui_kit.layouts.admin` bridge |
+| Template `@NowoWorkflowBundle/_locale_switcher.html.twig` | 1.9 | `@NowoUiKitBundle/partials/_locale_switcher.html.twig` with the `nowo_workflow_locales` global |
+| Twig globals `nowo_workflow_layout_template`, `nowo_workflow_css_framework`, `nowo_workflow_icon_set`, `nowo_workflow_form_themes` | 1.9 | UiKit / FormKit configuration (`nowo_ui_kit.*`, the FormKit `workflow` profile, `twig.form_themes`) |
+| Container parameters `nowo_workflow.environments` and `nowo_workflow.ui.*` (mirrors of the keys above) | 1.9 | `nowo_workflow.web_ui.*`, `nowo_workflow.security.access_roles` |
+| `Configuration::mapDeprecatedKeys()`, `Configuration::legacyLayout()`, `Configuration::DEPRECATED_SINCE`, `Configuration::REMOVED_DEFAULT_LAYOUT`, `Configuration::LEGACY_LAYOUT_BRIDGE`, `NowoWorkflowExtension::UI_KIT_ADMIN_LAYOUT` | 1.9 (the mapping of the keys above) | None |
+| `WorkflowUiSecurityPass::MODE_LEGACY` / `MODE_BOTH`, `WorkflowRuntimePass::REGISTRY_PARAMETER` (and the `nowo_workflow.runtime.registry` parameter) | 1.14 / 1.15 (the modes of the removed ports) | None: the access mode is always `policy` |
+| `BinaryKeyCollationSubscriber::postGenerateSchemaTable()` (an internal no-op) | 1.22.1 | None: the collation is applied on `postGenerateSchema` |
+
+Setting a removed root key fails the build with a message that names its replacement (for example `The
+"nowo_workflow.ui" option was removed in 2.0 (deprecated since 1.9): use "nowo_workflow.web_ui.*" …`).
+
+Kept for one more major (deprecated since 2.0, ignored, removed in 3.0): the constructor arguments that only fed the
+removed globals and key (`WorkflowExtension`'s `$layoutTemplate`, `$cssFramework`, `$iconSet`, `$formThemeFramework`;
+`WorkflowPageFactory`'s `$formThemeFramework`) and `WorkflowUiAccessSubscriber`'s first argument (always `null`).
+
+#### Versioning: decorate the twin
+
+`Service\WorkflowVersioning` is internal since 2.0: the admin UI and `WorkflowVersionManager` call it.
+`WorkflowVersionManagerInterface` is the port: call it, and decorate or replace it to change what your callers get.
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
+use Nowo\WorkflowBundle\Model\WorkflowDefinitionRef;
+use Nowo\WorkflowBundle\Model\WorkflowDefinitionView;
+use Symfony\Component\DependencyInjection\Attribute\AsDecorator;
+use Symfony\Component\DependencyInjection\Attribute\AutowireDecorated;
+
+#[AsDecorator(WorkflowVersionManagerInterface::class)]
+final class AuditedVersionManager implements WorkflowVersionManagerInterface
+{
+    public function __construct(#[AutowireDecorated] private WorkflowVersionManagerInterface $inner) {}
+
+    public function publish(WorkflowDefinitionRef $draft): WorkflowDefinitionView
+    {
+        $view = $this->inner->publish($draft);
+        // your audit, notification, …
+        return $view;
+    }
+
+    // … delegate the other methods to $this->inner
+}
+```
+
+The method map from the removed interface is the table in [To 1.19.0](#framework-free-versioning-port-req-arch-001-rule-1).
+Differences to know:
+
+- the admin UI calls the internal service with the definition it authorised, so a decorator of the port does not run
+  for the admin UI's drafts, publishes, retires and deletes (with 1.x a decorator of the removed interface did);
+- a replacement must keep the owner rule of `delete()`: a published definition is not deleted while subjects are
+  pinned to one of its versions (the pin foreign key is `ON DELETE RESTRICT`, so the database refuses it as well);
+- **who may act in the admin UI** is decided by `tenancy.ui.action_checker` (`WorkflowUiActionCheckerInterface`:
+  view, edit and publish per scope; it can be set without tenancy too) on top of the access policy. Put permission
+  rules that lived in a decorator of the removed interface there;
+- **there is no admin-UI versioning event.** An audit log that lived in a decorator of the removed interface needs
+  another place: decorate `WorkflowVersionManagerInterface` for your own callers, and listen to Doctrine events of
+  `WorkflowDefinition` (or to `WorkflowTransitionAppliedEvent` for applied transitions) for the admin UI's changes.
+
+### Composer
+
+No dependency moves to `suggest` in this release, and the PHP, Symfony, Doctrine and database ranges are unchanged.
+
+### Private manager only
+
+The bundle always reads and writes the definitions through its private entity manager (the default since 1.14). For
+an application that set `doctrine.private_entity_manager: false`:
+
+- **your pending changes are no longer flushed by the bundle**: `WorkflowDefinitionRepository::save()` / `remove()`
+  flush the private manager only, never your default manager;
+- definitions returned by `WorkflowDefinitionRepository` (or by `$entityManager->getRepository(WorkflowDefinition::class)`)
+  belong to the private manager: change them and call `$repository->save($definition)`. Your own
+  `$entityManager->flush()` does not write them, and raises no error;
+- a failed definition save no longer resets your entity manager;
+- one of your entities that points at a definition (`ManyToOne` / `OneToOne`) must take a reference from **your**
+  manager, never the instance a bundle service returned, or your flush fails with Doctrine's "A new entity was found
+  through the relationship…":
+
+  ```php
+  $order->setWorkflow($entityManager->getReference(WorkflowDefinition::class, $view->ref->id));
+  ```
+
+The private manager is dropped at every boundary (main request, terminate, Messenger message, console command and
+`kernel.reset`), so FrankenPHP worker mode with the kernel reset off keeps working without configuration.
+
+### 1.x support
+
+1.x receives security fixes for 6 months after 2.0.0: fixes rated Moderate and above are backported to the last 1.x
+minor as a 1.x patch; Low ones are fixed in 2.x only, with the advice to upgrade. Security advisories name the
+affected range of both lines. See [SECURITY.md](SECURITY.md).
 
 ## To 1.22.1
 
@@ -293,7 +475,7 @@ public function onboard(string $organizationId): void
   call** (removed in 2.0). It stays the SPI: the admin UI keeps calling it with the entity it authorised, the twin
   delegates every write to it, and your decorator or replacement of it keeps running and is honoured through the twin.
   Replace versioning behaviour there; decorate the twin to change what *your* callers see.
-- **Still deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#deferred-to-20)): dropping the
+- **Still deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#done-in-20)): dropping the
   aggregate from `WorkflowVersioningInterface` itself, the `runtime.flush_after_apply` default becoming `false`, and
   the removal of the deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` ports.
 
@@ -320,7 +502,7 @@ composer update nowo-tech/workflow-bundle
 - **Decorators.** The admin UI controller now receives `WorkflowVersioningInterface`. If you decorate or replace it,
   the UI actions (clone, publish, retire, reinstate, delete) go through your service; keep refusing `delete()` while
   subjects are pinned (`WorkflowDefinitionInUseException`).
-- **Deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#deferred-to-20)): the
+- **Deferred to 2.0** (needs a major, see [ARCHITECTURE.md](ARCHITECTURE.md#done-in-20)): the
   `runtime.flush_after_apply` default becomes `false` (REQ-ARCH-001 rule 6; set it explicitly now to silence the 1.14
   deprecation), and the deprecated `WorkflowRegistryInterface` / `WorkflowUiAccessCheckerInterface` ports are removed.
 - **Rule 1 on `WorkflowVersioningInterface`.** In 1.17 it takes and returns the bundle's `WorkflowDefinition`

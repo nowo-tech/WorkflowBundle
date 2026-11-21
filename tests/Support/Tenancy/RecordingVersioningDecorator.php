@@ -4,52 +4,73 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Support\Tenancy;
 
-use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
-use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
+use Nowo\WorkflowBundle\Model\WorkflowDefinitionRef;
+use Nowo\WorkflowBundle\Model\WorkflowDefinitionView;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 
 /**
- * A host decorator of the 1.17 versioning port: records each call and delegates (the admin UI must go through it).
+ * A host decorator of the versioning port (the 2.0 "decorate the twin" recipe): records each write and delegates.
+ * Hosts calling the port go through it; the admin UI does not (it calls the internal service with the definition it
+ * authorised).
  */
-final class RecordingVersioningDecorator implements WorkflowVersioningInterface
+final class RecordingVersioningDecorator implements WorkflowVersionManagerInterface
 {
     /** @var list<string> */
     public array $calls = [];
 
-    public function __construct(private readonly WorkflowVersioningInterface $inner)
+    public function __construct(private readonly WorkflowVersionManagerInterface $inner)
     {
     }
 
-    public function cloneTemplate(string $slug, WorkflowTenant $tenant, bool $publish = false): WorkflowDefinition
+    public function currentVersion(string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinitionView
+    {
+        return $this->inner->currentVersion($slug, $tenant);
+    }
+
+    public function draftVersion(string $slug, ?WorkflowTenant $tenant): ?WorkflowDefinitionView
+    {
+        return $this->inner->draftVersion($slug, $tenant);
+    }
+
+    /**
+     * @return list<WorkflowDefinitionView>
+     */
+    public function versions(string $slug, ?WorkflowTenant $tenant): array
+    {
+        return $this->inner->versions($slug, $tenant);
+    }
+
+    public function cloneTemplate(string $slug, WorkflowTenant $tenant, bool $publish = false): WorkflowDefinitionView
     {
         $this->calls[] = 'cloneTemplate';
 
         return $this->inner->cloneTemplate($slug, $tenant, $publish);
     }
 
-    public function createDraft(string $slug, ?WorkflowTenant $tenant): WorkflowDefinition
+    public function createDraft(string $slug, ?WorkflowTenant $tenant): WorkflowDefinitionView
     {
         $this->calls[] = 'createDraft';
 
         return $this->inner->createDraft($slug, $tenant);
     }
 
-    public function createDraftOf(WorkflowDefinition $definition): WorkflowDefinition
+    public function createDraftOf(WorkflowDefinitionRef $definition): WorkflowDefinitionView
     {
         $this->calls[] = 'createDraftOf';
 
         return $this->inner->createDraftOf($definition);
     }
 
-    public function publishDraft(string $slug, ?WorkflowTenant $tenant): WorkflowDefinition
+    public function publishDraft(string $slug, ?WorkflowTenant $tenant): WorkflowDefinitionView
     {
         $this->calls[] = 'publishDraft';
 
         return $this->inner->publishDraft($slug, $tenant);
     }
 
-    public function publish(WorkflowDefinition $draft): WorkflowDefinition
+    public function publish(WorkflowDefinitionRef $draft): WorkflowDefinitionView
     {
         $this->calls[] = 'publish';
 
@@ -58,33 +79,27 @@ final class RecordingVersioningDecorator implements WorkflowVersioningInterface
 
     public function isLockEnabled(): bool
     {
-        $this->calls[] = 'isLockEnabled';
-
         return $this->inner->isLockEnabled();
     }
 
-    public function isStructureLocked(WorkflowDefinition $definition): bool
+    public function isStructureLocked(WorkflowDefinitionRef $definition): bool
     {
-        $this->calls[] = 'isStructureLocked';
-
         return $this->inner->isStructureLocked($definition);
     }
 
-    public function assertStructureAllowed(WorkflowDefinition $definition): void
+    public function assertStructureAllowed(WorkflowDefinitionRef $definition): void
     {
-        $this->calls[] = 'assertStructureAllowed';
-
         $this->inner->assertStructureAllowed($definition);
     }
 
-    public function retire(WorkflowDefinition $definition): WorkflowDefinition
+    public function retire(WorkflowDefinitionRef $definition): WorkflowDefinitionView
     {
         $this->calls[] = 'retire';
 
         return $this->inner->retire($definition);
     }
 
-    public function reinstate(WorkflowDefinition $definition): WorkflowDefinition
+    public function reinstate(WorkflowDefinitionRef $definition): WorkflowDefinitionView
     {
         $this->calls[] = 'reinstate';
 
@@ -93,8 +108,6 @@ final class RecordingVersioningDecorator implements WorkflowVersioningInterface
 
     public function isRetiredScope(string $slug, ?WorkflowTenant $tenant): bool
     {
-        $this->calls[] = 'isRetiredScope';
-
         return $this->inner->isRetiredScope($slug, $tenant);
     }
 
@@ -105,7 +118,7 @@ final class RecordingVersioningDecorator implements WorkflowVersioningInterface
         return $this->inner->forgetSubject($subject, $tenant);
     }
 
-    public function delete(WorkflowDefinition $definition): void
+    public function delete(WorkflowDefinitionRef $definition): void
     {
         $this->calls[] = 'delete';
 

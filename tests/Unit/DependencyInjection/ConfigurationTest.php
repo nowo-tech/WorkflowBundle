@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection;
 
 use Nowo\WorkflowBundle\DependencyInjection\Configuration;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\ArrayNode;
@@ -22,7 +23,8 @@ final class ConfigurationTest extends TestCase
         self::assertArrayNotHasKey('enabled', $config);
         self::assertSame('default', $config['connection']);
         self::assertSame('workflow_', $config['table_prefix']);
-        self::assertTrue($config['runtime']['flush_after_apply']);
+        self::assertFalse($config['runtime']['flush_after_apply'], '2.0: apply*() never flushes the application\'s manager by default');
+        self::assertTrue($config['doctrine']['private_entity_manager']);
         self::assertSame(['default' => 'lock', 'workflows' => [], 'retry_after' => 1], $config['runtime']['concurrency']);
         self::assertTrue($config['web_ui']['enabled']);
         self::assertSame('/workflow', $config['web_ui']['path_prefix']);
@@ -31,15 +33,11 @@ final class ConfigurationTest extends TestCase
         self::assertSame(20, $config['web_ui']['list_page_size']);
         self::assertSame('en', $config['web_ui']['default_locale']);
         self::assertSame(['en', 'es', 'fr', 'it'], $config['web_ui']['locales']);
-        self::assertNull($config['ui']['css_framework']);
-        self::assertNull($config['ui']['icon_set']);
-        self::assertArrayNotHasKey('path', $config['ui']);
-        self::assertArrayNotHasKey('layout_template', $config['ui']);
-        self::assertSame(['ROLE_ADMIN'], $config['ui']['required_roles']);
+        self::assertArrayNotHasKey('ui', $config);
+        self::assertArrayNotHasKey('environments', $config);
         self::assertSame(['ROLE_ADMIN'], $config['security']['access_roles']);
         self::assertNull($config['security']['access_checker']);
         self::assertFalse($config['security']['allow_unauthenticated']);
-        self::assertNull(Configuration::legacyLayout($config));
     }
 
     #[Test]
@@ -66,141 +64,93 @@ final class ConfigurationTest extends TestCase
         self::assertSame(['es', 'en'], $config['web_ui']['locales']);
     }
 
-    #[Test]
-    public function testDeprecatedUiKeysMapToWebUi(): void
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function removedKeys(): iterable
     {
-        $config = (new Processor())->processConfiguration(new Configuration(), [[
-            'enabled' => false,
-            'ui'      => [
-                'path'            => '/admin/workflows',
-                'layout_template' => 'base.html.twig',
-                'css_framework'   => 'tailwind',
-                'icon_set'        => 'none',
-                'list_page_size'  => 5,
-                'default_locale'  => 'es',
-                'locales'         => ['es', 'en'],
-            ],
-        ]]);
-
-        self::assertFalse($config['web_ui']['enabled']);
-        self::assertSame('/admin/workflows', $config['web_ui']['path_prefix']);
-        self::assertSame(Configuration::LEGACY_LAYOUT_BRIDGE, $config['web_ui']['layout_template']);
-        self::assertSame('base.html.twig', Configuration::legacyLayout($config));
-        self::assertSame(5, $config['web_ui']['list_page_size']);
-        self::assertSame('es', $config['web_ui']['default_locale']);
-        self::assertSame(['es', 'en'], $config['web_ui']['locales']);
-        self::assertSame('tailwind', $config['ui']['css_framework']);
-        self::assertSame('none', $config['ui']['icon_set']);
+        yield 'enabled (1.9)' => [['enabled' => false], 'The "nowo_workflow.enabled" option was removed in 2.0 (deprecated since 1.9): use "nowo_workflow.web_ui.enabled"'];
+        yield 'environments (1.8)' => [['environments' => ['prod']], 'The "nowo_workflow.environments" option was removed in 2.0 (deprecated since 1.8): remove it and register the bundle only for the wanted environments in config/bundles.php'];
+        yield 'ui.* (1.9)' => [['ui' => ['path' => '/old']], 'The "nowo_workflow.ui" option was removed in 2.0 (deprecated since 1.9): use "nowo_workflow.web_ui.*"'];
+        yield 'empty ui (1.9)' => [['ui' => null], 'The "nowo_workflow.ui" option was removed in 2.0'];
     }
 
+    /**
+     * 2.0: a key removed after its 1.x deprecation fails with its replacement and a pointer to UPGRADING.md.
+     *
+     * @param array<string, mixed> $config
+     */
     #[Test]
-    public function testCanonicalKeysWinOverDeprecatedAliases(): void
+    #[DataProvider('removedKeys')]
+    public function aRemovedKeyFailsWithItsReplacement(array $config, string $message): void
     {
-        $config = (new Processor())->processConfiguration(new Configuration(), [[
-            'enabled' => false,
-            'ui'      => ['path' => '/old', 'layout_template' => 'base.html.twig'],
-            'web_ui'  => ['enabled' => true, 'path_prefix' => '/new', 'layout_template' => null],
-        ]]);
-
-        self::assertTrue($config['web_ui']['enabled']);
-        self::assertSame('/new', $config['web_ui']['path_prefix']);
-        self::assertNull($config['web_ui']['layout_template']);
-    }
-
-    #[Test]
-    public function testRemovedDefaultLayoutMapsToUiKitLayout(): void
-    {
-        foreach ([Configuration::REMOVED_DEFAULT_LAYOUT, '', null] as $legacy) {
-            $config = (new Processor())->processConfiguration(new Configuration(), [[
-                'ui' => ['layout_template' => $legacy],
-            ]]);
-
-            self::assertNull($config['web_ui']['layout_template']);
-            self::assertNull(Configuration::legacyLayout($config));
+        try {
+            (new Processor())->processConfiguration(new Configuration(), [$config]);
+            self::fail('A removed key must fail.');
+        } catch (InvalidConfigurationException $exception) {
+            self::assertStringContainsString($message, $exception->getMessage());
+            self::assertStringContainsString('See UPGRADING.md "To 2.0.0".', $exception->getMessage());
         }
     }
 
     #[Test]
-    public function testDeprecatedKeysAreFlagged(): void
+    public function noNodeIsDeprecatedExceptThePrivateEntityManagerNoOp(): void
     {
         $tree = (new Configuration())->getConfigTreeBuilder()->buildTree();
         self::assertInstanceOf(ArrayNode::class, $tree);
-        $enabled = $tree->getChildren()['enabled'];
-        self::assertInstanceOf(BaseNode::class, $enabled);
-        self::assertTrue($enabled->isDeprecated());
-        self::assertSame('1.9', $enabled->getDeprecation('enabled', 'nowo_workflow')['version']);
+        self::assertArrayNotHasKey('enabled', $tree->getChildren());
+        self::assertArrayNotHasKey('environments', $tree->getChildren());
+        self::assertArrayNotHasKey('ui', $tree->getChildren());
 
-        $ui = $tree->getChildren()['ui'];
-        self::assertInstanceOf(ArrayNode::class, $ui);
-        foreach (['path', 'layout_template', 'css_framework', 'icon_set', 'list_page_size', 'default_locale', 'locales', 'required_roles'] as $key) {
-            $node = $ui->getChildren()[$key];
-            self::assertInstanceOf(BaseNode::class, $node);
-            self::assertTrue($node->isDeprecated(), $key);
-            $deprecation = $node->getDeprecation($key, 'nowo_workflow.ui');
-            self::assertSame('nowo-tech/workflow-bundle', $deprecation['package']);
-            self::assertStringContainsString('nowo_workflow.ui.' . $key, $deprecation['message']);
+        $deprecated = [];
+        $walk       = static function (BaseNode $node, string $path) use (&$walk, &$deprecated): void {
+            if ($node->isDeprecated()) {
+                $deprecated[] = $path;
+            }
+            if ($node instanceof ArrayNode) {
+                foreach ($node->getChildren() as $name => $child) {
+                    self::assertInstanceOf(BaseNode::class, $child);
+                    $walk($child, $path . '.' . $name);
+                }
+            }
+        };
+        $walk($tree, 'nowo_workflow');
+
+        self::assertSame(['nowo_workflow.doctrine.private_entity_manager'], $deprecated);
+        $doctrine = $tree->getChildren()['doctrine'];
+        self::assertInstanceOf(ArrayNode::class, $doctrine);
+        $node = $doctrine->getChildren()['private_entity_manager'];
+        self::assertInstanceOf(BaseNode::class, $node);
+        $deprecation = $node->getDeprecation('private_entity_manager', 'nowo_workflow.doctrine');
+        self::assertSame('nowo-tech/workflow-bundle', $deprecation['package']);
+        self::assertSame('2.0', $deprecation['version']);
+        self::assertSame('The option has no effect since 2.0 (the private manager is the only mode); remove it.', $deprecation['message']);
+    }
+
+    /**
+     * Q4: `private_entity_manager: true` stays valid (a deprecated no-op until 3.0); `false` fails the build.
+     */
+    #[Test]
+    public function thePrivateEntityManagerOptOutIsRefused(): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [['doctrine' => ['private_entity_manager' => true]]]);
+        self::assertTrue($config['doctrine']['private_entity_manager']);
+
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('nowo_workflow.doctrine.private_entity_manager: false was removed in 2.0');
+        (new Processor())->processConfiguration(new Configuration(), [['doctrine' => ['private_entity_manager' => false]]]);
+    }
+
+    /**
+     * Q3: an explicit `flush_after_apply: true` stays a supported choice of the application.
+     */
+    #[Test]
+    public function anExplicitFlushAfterApplyIsKept(): void
+    {
+        foreach ([true, false] as $value) {
+            $config = (new Processor())->processConfiguration(new Configuration(), [['runtime' => ['flush_after_apply' => $value]]]);
+            self::assertSame($value, $config['runtime']['flush_after_apply']);
         }
-
-        $webUi = $tree->getChildren()['web_ui'];
-        self::assertInstanceOf(ArrayNode::class, $webUi);
-        foreach ($webUi->getChildren() as $node) {
-            self::assertInstanceOf(BaseNode::class, $node);
-            self::assertFalse($node->isDeprecated());
-        }
-    }
-
-    #[Test]
-    public function testMapDeprecatedKeysLeavesCanonicalConfigUntouched(): void
-    {
-        self::assertSame(['connection' => 'custom'], Configuration::mapDeprecatedKeys(['connection' => 'custom']));
-        self::assertSame(['web_ui' => []], Configuration::mapDeprecatedKeys(['web_ui' => null]));
-        self::assertSame(
-            ['ui' => 'invalid', 'security' => 'invalid'],
-            Configuration::mapDeprecatedKeys(['ui' => 'invalid', 'security' => 'invalid']),
-        );
-    }
-
-    #[Test]
-    public function testBootstrapAliasNormalizesToBootstrap5(): void
-    {
-        $config = (new Processor())->processConfiguration(new Configuration(), [[
-            'ui' => ['css_framework' => 'bootstrap'],
-        ]]);
-
-        self::assertSame('bootstrap5', $config['ui']['css_framework']);
-    }
-
-    #[Test]
-    public function testTablerAliasNormalizesToBootstrap5(): void
-    {
-        $config = (new Processor())->processConfiguration(new Configuration(), [[
-            'ui' => ['css_framework' => 'tabler'],
-        ]]);
-
-        self::assertSame('bootstrap5', $config['ui']['css_framework']);
-    }
-
-    #[Test]
-    public function testUiRequiredRolesAliasSecurityAccessRoles(): void
-    {
-        $config = (new Processor())->processConfiguration(new Configuration(), [[
-            'ui' => ['required_roles' => ['ROLE_WORKFLOW']],
-        ]]);
-
-        self::assertSame(['ROLE_WORKFLOW'], $config['security']['access_roles']);
-        self::assertSame(['ROLE_WORKFLOW'], $config['ui']['required_roles']);
-    }
-
-    #[Test]
-    public function testExplicitAccessRolesWinOverUiRequiredRoles(): void
-    {
-        $config = (new Processor())->processConfiguration(new Configuration(), [[
-            'ui'       => ['required_roles' => ['ROLE_WORKFLOW']],
-            'security' => ['access_roles' => ['ROLE_SUPER_ADMIN']],
-        ]]);
-
-        self::assertSame(['ROLE_SUPER_ADMIN'], $config['security']['access_roles']);
-        self::assertSame(['ROLE_SUPER_ADMIN'], $config['ui']['required_roles']);
     }
 
     #[Test]
@@ -213,16 +163,6 @@ final class ConfigurationTest extends TestCase
             'security' => [
                 'access_roles' => [],
             ],
-        ]]);
-    }
-
-    #[Test]
-    public function testInvalidCssFrameworkRejected(): void
-    {
-        $this->expectException(InvalidConfigurationException::class);
-
-        (new Processor())->processConfiguration(new Configuration(), [[
-            'ui' => ['css_framework' => 'material'],
         ]]);
     }
 
@@ -255,29 +195,6 @@ final class ConfigurationTest extends TestCase
         (new Processor())->processConfiguration(new Configuration(), [[
             'security' => ['access_roles' => ['', ''], 'access_checker' => ''],
         ]]);
-    }
-
-    #[Test]
-    public function testEnvironmentsOptionIsDeprecated(): void
-    {
-        $tree = (new Configuration())->getConfigTreeBuilder()->buildTree();
-        self::assertInstanceOf(ArrayNode::class, $tree);
-        $environments = $tree->getChildren()['environments'];
-        $connection   = $tree->getChildren()['connection'];
-        self::assertInstanceOf(BaseNode::class, $environments);
-        self::assertInstanceOf(BaseNode::class, $connection);
-
-        self::assertTrue($environments->isDeprecated());
-        $deprecation = $environments->getDeprecation('environments', 'nowo_workflow');
-        self::assertSame('nowo-tech/workflow-bundle', $deprecation['package']);
-        self::assertSame('1.8', $deprecation['version']);
-        self::assertSame('The "nowo_workflow.environments" option is deprecated and has no effect; register the bundle only for the wanted environments in config/bundles.php instead.', $deprecation['message']);
-        self::assertFalse($connection->isDeprecated());
-
-        $config = (new Processor())->processConfiguration(new Configuration(), [[
-            'environments' => ['prod'],
-        ]]);
-        self::assertSame(['prod'], $config['environments']);
     }
 
     #[Test]

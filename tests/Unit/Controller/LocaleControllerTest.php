@@ -107,7 +107,7 @@ final class LocaleControllerTest extends TestCase
         $request = Request::create('/workflow/locale/fr');
 
         $this->expectException(NotFoundHttpException::class);
-        $this->expectExceptionMessage('Locale "fr" is not enabled in nowo_workflow.ui.locales.');
+        $this->expectExceptionMessage('Locale "fr" is not enabled in nowo_workflow.web_ui.locales.');
 
         $this->controller($request)->switch('fr', $request);
     }

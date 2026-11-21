@@ -115,20 +115,21 @@ final class WorkflowPageFactoryTest extends TestCase
         self::assertSame('/generated/nowo_workflow_definition_show', $page->header->breadcrumbs[2]->href);
     }
 
-    public function testDeprecatedCssFrameworkFormThemesGoThroughTheViewModels(): void
+    /**
+     * 2.0: the forms get no scoped form theme (FormKit styles them); the 1.x `$formThemeFramework` argument of the
+     * removed `ui.css_framework` is accepted and ignored (removed in 3.0).
+     */
+    public function testTheFormsGetNoScopedFormThemeAndTheFormerArgumentIsIgnored(): void
     {
         $definition = WorkflowPageFixtures::purchaseOrder();
         $form       = WorkflowPageFixtures::formView($definition, WorkflowDefinitionFormSection::General);
 
-        $default = WorkflowPageFixtures::factory();
-        self::assertSame([], $default->newForm($form)->formThemes);
-        self::assertSame([], $default->edit($definition, WorkflowDefinitionFormSection::General, $form)->sections[0]->formThemes);
-
-        $legacy = new WorkflowPageFactory(new StubUrlGenerator(), WorkflowPageFixtures::csrf(), null, 'bootstrap5');
-        self::assertSame(['bootstrap_5_layout.html.twig'], $legacy->newForm($form)->formThemes);
-        $edit = $legacy->edit($definition, WorkflowDefinitionFormSection::General, $form);
-        self::assertSame(['bootstrap_5_layout.html.twig'], $edit->sections[0]->formThemes);
-        self::assertSame([], $edit->sections[1]->formThemes, 'only the section with the form');
+        foreach ([WorkflowPageFixtures::factory(), new WorkflowPageFactory(new StubUrlGenerator(), WorkflowPageFixtures::csrf(), null, 'bootstrap5')] as $factory) {
+            self::assertSame([], $factory->newForm($form)->formThemes);
+            $edit = $factory->edit($definition, WorkflowDefinitionFormSection::General, $form);
+            self::assertSame([], $edit->sections[0]->formThemes);
+            self::assertSame([], $edit->sections[1]->formThemes);
+        }
     }
 
     public function testSectionHelpKeys(): void

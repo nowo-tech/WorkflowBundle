@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Enum;
 
 /**
- * Icon rendering strategy for {@code nowo_workflow.ui.icon_set} (REQ-UI-001 / REQ-PHP-001).
+ * Icon set values of the 1.x {@code nowo_workflow.ui.icon_set} key (removed in 2.0; the set is chosen with
+ * {@code nowo_ui_kit.icon_set}), REQ-UI-001 / REQ-PHP-001.
  */
 enum IconSet: string
 {

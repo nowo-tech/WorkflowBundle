@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
 use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 /**
  * Denies Workflow UI access unless the user has at least one configured role.
  */
-final readonly class RoleBasedWorkflowUiAccessChecker implements WorkflowUiAccessPolicyInterface, WorkflowUiAccessCheckerInterface
+final readonly class RoleBasedWorkflowUiAccessChecker implements WorkflowUiAccessPolicyInterface
 {
     /**
      * Creates the checker with the required roles and the Symfony authorization checker.
@@ -31,14 +29,6 @@ final readonly class RoleBasedWorkflowUiAccessChecker implements WorkflowUiAcces
      * so the role hierarchy and the host voters apply); an empty role list denies.
      */
     public function allows(WorkflowUiAccessCheck $check): bool
-    {
-        return $this->hasRequiredRole();
-    }
-
-    /**
-     * Deprecated port (removed in 2.0): same answer as {@see allows()}.
-     */
-    public function isGranted(Request $request): bool
     {
         return $this->hasRequiredRole();
     }

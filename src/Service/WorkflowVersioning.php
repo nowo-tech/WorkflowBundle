@@ -7,7 +7,7 @@ namespace Nowo\WorkflowBundle\Service;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use LogicException;
-use Nowo\WorkflowBundle\Contract\WorkflowVersioningInterface;
+use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Exception\WorkflowDefinitionInUseException;
 use Nowo\WorkflowBundle\Exception\WorkflowInvalidShapeException;
@@ -23,17 +23,22 @@ use function max;
 use function sprintf;
 
 /**
- * Drafts, publishing and template clones of tenant-scoped definitions (since 1.15). Used by the admin UI; hosts call
- * it too, e.g. to give a new organization its own copy of a global template.
+ * Drafts, publishing and template clones of tenant-scoped definitions (since 1.15). Used by the admin UI (with the
+ * definition it authorised) and by {@see WorkflowVersionManager}. Hosts call, decorate or replace
+ * {@see WorkflowVersionManagerInterface} instead (since 2.0 this class is internal and the 1.17 entity port it
+ * implemented, `WorkflowVersioningInterface`, was removed).
  *
  * Versioning model (docs/MULTITENANCY.md, "Versions"): a published version is never edited. Edits go to a draft (the
  * next version number of the same tenant and slug); publishing the draft makes it the version new subjects start
  * with, while subjects already running keep the version they are pinned to. Writes go through the bundle's private
  * entity manager (the repository), never through an application manager.
  *
- * Since 1.17 it implements {@see WorkflowVersioningInterface}, the port hosts and the admin UI type-hint.
+ * Owner rule (2026-11-12): {@see self::delete()} refuses a published definition while subjects are pinned to any of
+ * its versions (the pin foreign key is ON DELETE RESTRICT, so the database refuses it as well).
+ *
+ * @internal
  */
-final readonly class WorkflowVersioning implements WorkflowVersioningInterface
+final readonly class WorkflowVersioning
 {
     /**
      * @param bool $lockCloneStructure `tenancy.lock_clone_structure` (since 1.16): tenant clones keep the places and

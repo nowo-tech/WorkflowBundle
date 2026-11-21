@@ -63,7 +63,7 @@ in your own write unit.
 
 ### What the lock mode does
 
-With `flush_after_apply: true` (the 1.13 default) and a subject of the application's default entity manager:
+With `flush_after_apply: true` (the 1.x default, an explicit choice since 2.0) and a subject of the application's default entity manager:
 
 1. A transaction opens on the subject's connection (transaction-doctrine's `DoctrineTransactionRunner::forConnection()`:
    a savepoint when the host already has a transaction open).
@@ -86,7 +86,7 @@ ORM closes it) is replaced through the registry, as before.
 
 ### flush_after_apply and the host's transaction
 
-With `flush_after_apply: false` (the recipe value), or when the subject belongs to another entity manager than the
+With `flush_after_apply: false` (the default since 2.0), or when the subject belongs to another entity manager than the
 default one, the host owns the unit of work and the bundle flushes nothing:
 
 - with a transaction open on the subject's connection, the marking is read with `SELECT … FOR UPDATE` in a savepoint

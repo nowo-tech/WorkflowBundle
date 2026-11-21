@@ -60,34 +60,20 @@ services:
 
     Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker: ~
 
-    # Fail-closed default aliases; WorkflowUiSecurityPass replaces them after extensions merge (1.14: the
-    # framework-free port, and the deprecated port only for a class that implements it).
+    # Fail-closed default alias; WorkflowUiSecurityPass replaces it after extensions merge.
     Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface:
-        alias: Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker
-
-    Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface:
         alias: Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker
 
     Nowo\WorkflowBundle\EventListener\WorkflowUiAccessSubscriber:
         arguments:
-            $accessChecker: null
             $enabled: '%nowo_workflow.web_ui.enabled%'
             $accessPolicy: '@Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface'
             $tokenStorage: '@?security.token_storage'
-
-    # Deprecated 1.x Twig globals (nowo_workflow_layout_template, nowo_workflow_css_framework…), removed in 2.0.
-    Nowo\WorkflowBundle\Twig\WorkflowExtension:
-        arguments:
-            $layoutTemplate: '%nowo_workflow.ui.layout_template%'
-            $cssFramework: '%nowo_workflow.ui.css_framework%'
-            $iconSet: '%nowo_workflow.ui.icon_set%'
-            $formThemeFramework: '%nowo_workflow.ui.css_framework_override%'
 
     # UiKit view models of the admin pages (REQ-UI-003).
     Nowo\WorkflowBundle\View\WorkflowPageFactory:
         arguments:
             $layout: '%nowo_workflow.web_ui.layout_template%'
-            $formThemeFramework: '%nowo_workflow.ui.css_framework_override%'
 
     Nowo\WorkflowBundle\Doctrine\TableNamePrefixer:
         arguments:
@@ -141,10 +127,6 @@ services:
     Nowo\WorkflowBundle\EventListener\WorkflowConflictResponseSubscriber:
         arguments:
             $retryAfterSeconds: '%nowo_workflow.runtime.concurrency.retry_after%'
-
-    # SPI of WorkflowApplicator (deprecated for callers since 1.15: use WorkflowRuntimeInterface). WorkflowRuntimePass
-    # checks a host replacement or decorator of it.
-    Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface: '@Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry'
 
     # Since 1.15: the framework-free runtime port hosts call (REQ-ARCH-001 rule 3).
     Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface: '@Nowo\WorkflowBundle\Service\WorkflowRuntime'

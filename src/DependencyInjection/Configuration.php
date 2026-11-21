@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\DependencyInjection;
 
 use InvalidArgumentException;
-use Nowo\WorkflowBundle\Enum\CssFramework;
-use Nowo\WorkflowBundle\Enum\IconSet;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchCriteria;
 use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
@@ -16,7 +14,6 @@ use Symfony\Component\Config\Definition\ConfigurationInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 
 use function array_key_exists;
-use function in_array;
 use function is_array;
 use function is_string;
 use function sprintf;
@@ -25,7 +22,8 @@ use function sprintf;
  * Configuration tree for nowo_workflow.
  *
  * Canonical UI keys follow the REQ-UI-003 vocabulary ({@code web_ui.*}, {@code security.*}). The 1.x {@code ui.*}
- * keys and the root {@code enabled} key are deprecated aliases (mapped before normalization, removed in 2.0).
+ * keys and the root {@code enabled} / {@code environments} keys were removed in 2.0: setting one fails the build with
+ * the key to use instead ({@see self::rejectRemovedKeys()}).
  */
 final class Configuration implements ConfigurationInterface
 {
@@ -33,18 +31,16 @@ final class Configuration implements ConfigurationInterface
 
     public const PACKAGE = 'nowo-tech/workflow-bundle';
 
-    public const DEPRECATED_SINCE = '1.9';
-
     /**
-     * 1.x default layout (Bootstrap from a CDN), removed in 1.9: a host that still names it gets the UiKit layout.
+     * Root keys removed in 2.0: key => [deprecated since, what to do instead].
+     *
+     * @var array<string, array{0: string, 1: string}>
      */
-    public const REMOVED_DEFAULT_LAYOUT = '@NowoWorkflowBundle/layout.html.twig';
-
-    /**
-     * Deprecated bridge used when a host still sets {@code ui.layout_template}: it extends that 1.x layout and maps
-     * the UiKit canonical blocks into its stylesheets / body / javascripts blocks.
-     */
-    public const LEGACY_LAYOUT_BRIDGE = '@NowoWorkflowBundle/base.html.twig';
+    private const REMOVED_KEYS = [
+        'enabled'      => ['1.9', 'use "nowo_workflow.web_ui.enabled"'],
+        'environments' => ['1.8', 'remove it and register the bundle only for the wanted environments in config/bundles.php'],
+        'ui'           => ['1.9', 'use "nowo_workflow.web_ui.*" (path_prefix, layout_template, list_page_size, default_locale, locales), "nowo_workflow.security.access_roles" (required_roles) and "nowo_ui_kit.css_framework" / "nowo_ui_kit.icon_set"'],
+    ];
 
     /**
      * Per-page templates ({@code web_ui.templates.<page>}).
@@ -60,18 +56,6 @@ final class Configuration implements ConfigurationInterface
     ];
 
     /**
-     * Deprecated {@code ui.*} key => canonical {@code web_ui.*} key.
-     *
-     * @var array<string, string>
-     */
-    private const UI_ALIASES = [
-        'path'           => 'path_prefix',
-        'list_page_size' => 'list_page_size',
-        'default_locale' => 'default_locale',
-        'locales'        => 'locales',
-    ];
-
-    /**
      * Builds the nowo_workflow configuration tree.
      */
     public function getConfigTreeBuilder(): TreeBuilder
@@ -82,19 +66,9 @@ final class Configuration implements ConfigurationInterface
         $rootNode
             ->beforeNormalization()
                 ->ifArray()
-                ->then(static fn (array $v): array => self::mapDeprecatedKeys($v))
+                ->then(static fn (array $v): array => self::rejectRemovedKeys($v))
             ->end()
             ->children()
-                ->booleanNode('enabled')
-                    ->info('Deprecated alias of web_ui.enabled.')
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, use "nowo_workflow.web_ui.enabled" instead.')
-                ->end()
-                ->arrayNode('environments')
-                    ->info('Deprecated and ignored: the bundle is enabled in every environment it is registered for (config/bundles.php).')
-                    ->prototype('scalar')->end()
-                    ->defaultValue(['dev', 'test', 'prod'])
-                    ->setDeprecated(self::PACKAGE, '1.8', 'The "%path%.%node%" option is deprecated and has no effect; register the bundle only for the wanted environments in config/bundles.php instead.')
-                ->end()
                 ->scalarNode('connection')
                     ->info('Entity manager name used by nowo:workflow:sync-schema (DDL only). The bundle mapping is registered on the default entity manager; for another manager, map NowoWorkflowBundle on it yourself and set doctrine.entity_manager too.')
                     ->defaultValue('default')
@@ -108,8 +82,8 @@ final class Configuration implements ConfigurationInterface
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->booleanNode('flush_after_apply')
-                            ->info('When true, WorkflowApplicator::apply*() flushes the application\'s default entity manager after each transition (every pending change of its unit of work, REQ-ARCH-001 rule 6 exception kept for BC). False = apply*() only changes the marking; persist the subject yourself (your repository / transaction boundary). Since 1.14 new installs get false from the Flex recipe; when the key is not set the 1.13 default (true) stays and a deprecation is triggered: the default becomes false in 2.0.')
-                            ->defaultTrue()
+                            ->info('false (default since 2.0): WorkflowApplicator::apply*() only changes the marking; persist the subject yourself (your repository / transaction boundary, REQ-ARCH-001 rule 6). true = apply*() flushes the application\'s default entity manager after each transition, which commits every pending change of its unit of work (the 1.x default, kept as an explicit choice of the application).')
+                            ->defaultFalse()
                         ->end()
                         ->arrayNode('concurrency')
                             ->info('Since 1.20 (REQ-RUNTIME-003, docs/CONCURRENCY.md): how a transition apply on a persisted Doctrine entity is protected against a concurrent apply. lock (default) = expected-marking compare-and-set under SELECT … FOR UPDATE; optimistic = the subject\'s #[Version] field decides at the flush; none = no control (1.19 behaviour). A lost race throws WorkflowConflictException (409 + Retry-After, CONFLICT_001).')
@@ -149,9 +123,13 @@ final class Configuration implements ConfigurationInterface
                             ->end()
                         ->end()
                         ->booleanNode('private_entity_manager')
-                            ->info('true (default): the admin UI, the demo seeder and the repository read and write the definitions through the bundle\'s private entity manager, so a definition save never flushes or resets an application manager. false restores the 1.13 behaviour (the application\'s default manager): deprecated, removed in 2.0.')
+                            ->info('Has no effect since 2.0: the admin UI, the demo seeder and the repository always read and write the definitions through the bundle\'s private entity manager. true is accepted (deprecated, removed in 3.0); false fails the build.')
                             ->defaultTrue()
-                            ->setDeprecated(self::PACKAGE, '1.14', 'The "%node%" option at path "%path%" is deprecated: the private entity manager becomes the only mode in 2.0. Remove the option.')
+                            ->setDeprecated(self::PACKAGE, '2.0', 'The option has no effect since 2.0 (the private manager is the only mode); remove it.')
+                            ->validate()
+                                ->ifTrue(static fn (mixed $v): bool => $v === false)
+                                ->thenInvalid('nowo_workflow.doctrine.private_entity_manager: false was removed in 2.0: the bundle always stores the definitions through its private entity manager. Remove the option, save definitions through WorkflowDefinitionRepository::save() and see UPGRADING.md "To 2.0.0".')
+                            ->end()
                         ->end()
                         ->booleanNode('register_mapping')
                             ->info('true (default): the bundle maps its entities on the default entity manager. false = the application maps them itself (e.g. only on a dedicated manager of a DDD host, from src/Resources/config/doctrine).')
@@ -178,7 +156,6 @@ final class Configuration implements ConfigurationInterface
                     ->end()
                 ->end()
                 ->append($this->webUiNode())
-                ->append($this->deprecatedUiNode())
                 ->arrayNode('security')
                     ->addDefaultsIfNotSet()
                     ->children()
@@ -189,7 +166,7 @@ final class Configuration implements ConfigurationInterface
                             ->example(['ROLE_ADMIN'])
                         ->end()
                         ->scalarNode('access_checker')
-                            ->info('Service id implementing WorkflowUiAccessCheckerInterface. null = RoleBasedWorkflowUiAccessChecker.')
+                            ->info('Service id implementing WorkflowUiAccessPolicyInterface. null = RoleBasedWorkflowUiAccessChecker.')
                             ->defaultNull()
                         ->end()
                         ->booleanNode('allow_unauthenticated')
@@ -222,19 +199,6 @@ final class Configuration implements ConfigurationInterface
                     && ($config['web_ui']['enabled'] ?? true) === true
                     && (!is_string($config['tenancy']['ui']['tenant_resolver'] ?? null) || !is_string($config['tenancy']['ui']['action_checker'] ?? null)))
                 ->thenInvalid('With tenancy (nowo_workflow.tenancy.tenant_resolver) and the Workflow UI enabled, set nowo_workflow.tenancy.ui.tenant_resolver and nowo_workflow.tenancy.ui.action_checker (or disable web_ui): the UI must know the tenant of each request and who may view, edit and publish (deny by default).')
-            ->end()
-            ->validate()
-                ->always(static function (array $config): array {
-                    $ui = $config['ui'];
-                    if (is_string($ui['css_framework'] ?? null)) {
-                        $config['ui']['css_framework'] = CssFramework::from($ui['css_framework'])->normalized()->value;
-                    }
-
-                    // 1.x mirror: ui.required_roles is the deprecated alias of security.access_roles.
-                    $config['ui']['required_roles'] = $config['security']['access_roles'];
-
-                    return $config;
-                })
             ->end();
 
         return $treeBuilder;
@@ -441,108 +405,22 @@ final class Configuration implements ConfigurationInterface
         return $node;
     }
 
-    private function deprecatedUiNode(): ArrayNodeDefinition
-    {
-        $node = (new TreeBuilder('ui'))->getRootNode();
-        $node
-            ->info('Deprecated since 1.9: use web_ui.*, security.access_roles and nowo_ui_kit.css_framework / icon_set.')
-            ->addDefaultsIfNotSet()
-            ->children()
-                ->scalarNode('path')
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, use "nowo_workflow.web_ui.path_prefix" instead.')
-                ->end()
-                ->scalarNode('layout_template')
-                    ->info('1.x layout (global nowo_workflow_layout_template). Pages render through the deprecated @NowoWorkflowBundle/base.html.twig bridge while it is set.')
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, use "nowo_workflow.web_ui.layout_template" (a layout rendering the UiKit canonical blocks; null = nowo_ui_kit.layouts.admin) instead.')
-                ->end()
-                ->enumNode('css_framework')
-                    ->info('Seeds nowo_ui_kit.css_framework when the host does not set it. bootstrap / tabler are aliases of bootstrap5.')
-                    ->values([...CssFramework::values(), null])
-                    ->defaultNull()
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, set "nowo_ui_kit.css_framework" instead.')
-                ->end()
-                ->enumNode('icon_set')
-                    ->info('Seeds nowo_ui_kit.icon_set when the host does not set it.')
-                    ->values([...IconSet::values(), null])
-                    ->defaultNull()
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, set "nowo_ui_kit.icon_set" instead.')
-                ->end()
-                ->integerNode('list_page_size')
-                    ->min(0)
-                    ->max(500)
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, use "nowo_workflow.web_ui.list_page_size" instead.')
-                ->end()
-                ->scalarNode('default_locale')
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, use "nowo_workflow.web_ui.default_locale" instead.')
-                ->end()
-                ->arrayNode('locales')
-                    ->scalarPrototype()->end()
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, use "nowo_workflow.web_ui.locales" instead.')
-                ->end()
-                ->arrayNode('required_roles')
-                    ->info('BC alias of security.access_roles.')
-                    ->scalarPrototype()->end()
-                    ->setDeprecated(self::PACKAGE, self::DEPRECATED_SINCE, 'The "%path%.%node%" option is deprecated, use "nowo_workflow.security.access_roles" instead.')
-                ->end()
-            ->end();
-
-        return $node;
-    }
-
     /**
-     * Copies the deprecated 1.x keys to their canonical names (an explicit canonical key wins). The old keys stay in
-     * place so the config component reports their deprecation.
+     * Keys removed in 2.0 (deprecated since 1.8 / 1.9): fail with what to set instead, not with a bare "unrecognized
+     * option".
      *
      * @param array<mixed> $v
      *
      * @return array<mixed>
      */
-    public static function mapDeprecatedKeys(array $v): array
+    public static function rejectRemovedKeys(array $v): array
     {
-        $webUi = is_array($v['web_ui'] ?? null) ? $v['web_ui'] : [];
-
-        if (array_key_exists('enabled', $v) && !array_key_exists('enabled', $webUi)) {
-            $webUi['enabled'] = $v['enabled'];
-        }
-
-        $ui = is_array($v['ui'] ?? null) ? $v['ui'] : [];
-        foreach (self::UI_ALIASES as $old => $new) {
-            if (array_key_exists($old, $ui) && !array_key_exists($new, $webUi)) {
-                $webUi[$new] = $ui[$old];
+        foreach (self::REMOVED_KEYS as $key => $replacement) {
+            if (array_key_exists($key, $v)) {
+                throw new InvalidConfigurationException(sprintf('The "%s.%s" option was removed in 2.0 (deprecated since %s): %s. See UPGRADING.md "To 2.0.0".', self::ALIAS, $key, $replacement[0], $replacement[1]));
             }
         }
 
-        if (array_key_exists('layout_template', $ui) && !array_key_exists('layout_template', $webUi)) {
-            $legacy                   = $ui['layout_template'];
-            $webUi['layout_template'] = in_array($legacy, [null, '', self::REMOVED_DEFAULT_LAYOUT], true)
-                ? null
-                : self::LEGACY_LAYOUT_BRIDGE;
-        }
-
-        if (array_key_exists('required_roles', $ui) && !isset($v['security']['access_roles'])) {
-            $security                 = is_array($v['security'] ?? null) ? $v['security'] : [];
-            $security['access_roles'] = $ui['required_roles'];
-            $v['security']            = $security;
-        }
-
-        if ($webUi !== [] || array_key_exists('web_ui', $v)) {
-            $v['web_ui'] = $webUi;
-        }
-
         return $v;
-    }
-
-    /**
-     * The 1.x layout a host still configures through the deprecated {@code ui.layout_template} (null when unset or
-     * when it names the removed default layout).
-     *
-     * @param array<mixed> $config processed configuration
-     */
-    public static function legacyLayout(array $config): ?string
-    {
-        $ui     = is_array($config['ui'] ?? null) ? $config['ui'] : [];
-        $legacy = $ui['layout_template'] ?? null;
-
-        return is_string($legacy) && $legacy !== '' && $legacy !== self::REMOVED_DEFAULT_LAYOUT ? $legacy : null;
     }
 }

@@ -7,7 +7,6 @@ namespace Nowo\WorkflowBundle\DependencyInjection\Compiler;
 use Closure;
 use Doctrine\DBAL\Driver\Connection;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
-use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Doctrine\WorkflowManagerRegistry;
@@ -27,10 +26,9 @@ use function preg_match;
 use function rtrim;
 use function sprintf;
 use function str_starts_with;
-use function trigger_deprecation;
 
 /**
- * Private entity manager wiring (1.14.0, REQ-ARCH-001 rule 6):
+ * Private entity manager wiring (1.14.0; the only mode since 2.0, REQ-ARCH-001 rule 6):
  *
  * - fails the build when `nowo_workflow.doctrine.entity_manager` names a manager DoctrineBundle does not know (a
  *   mistyped name included), or a manager that does not map the bundle entities;
@@ -41,8 +39,8 @@ use function trigger_deprecation;
  *   source and the rollback middleware use the same manager. Mappings that a host {@see RegisterMappingsPass} (e.g.
  *   DoctrineOrmMappingsPass) adds later in the build are taken into account (audit NF2-3). When a chain cannot be
  *   inspected, nothing is derived and the private manager falls back to `getManagerForClass()` at runtime; the build
- *   fails only when every chain was inspected and none maps the bundle entities. A derived manager that is not the
- *   default one triggers a deprecation asking to set `doctrine.entity_manager`;
+ *   fails only when every chain was inspected and none maps the bundle entities. Since 2.0 a derived manager that is
+ *   not the default one fails the build (1.14 to 1.22 triggered a deprecation): set `doctrine.entity_manager`;
  * - attaches {@see PrivateEntityManagerMiddleware} only to the connection of that source manager: the host's other
  *   connections are never wrapped. When the manager is left to the runtime rule, it goes on the connection of every
  *   manager that rule may pick, in order (audit NF3-1).
@@ -199,7 +197,8 @@ final class PrivateEntityManagerPass implements CompilerPassInterface
      * @param list<int|string> $managers
      * @param array<string, list<string>> $pending
      *
-     * @throws InvalidConfigurationException when every chain was inspected and none maps the bundle entities
+     * @throws InvalidConfigurationException when every chain was inspected and none maps the bundle entities, or when
+     *                                       the manager that maps them is not the default one (since 2.0)
      */
     private function derive(ContainerBuilder $container, array $managers, array $pending): ?string
     {
@@ -211,7 +210,8 @@ final class PrivateEntityManagerPass implements CompilerPassInterface
             if ($maps) {
                 $default = $container->hasParameter('doctrine.default_entity_manager') ? $container->getParameter('doctrine.default_entity_manager') : null;
                 if ($default !== null && $default !== (string) $manager) {
-                    trigger_deprecation(Configuration::PACKAGE, '1.14', 'The workflow definitions are stored through the Doctrine entity manager "%s", which is not the default one ("%s"): set nowo_workflow.doctrine.entity_manager: %s explicitly.', (string) $manager, is_string($default) ? $default : '', (string) $manager);
+                    // 1.14 to 1.22: a deprecation; since 2.0 the source manager of a non-default mapping is set explicitly.
+                    throw new InvalidConfigurationException(sprintf('The workflow definitions are mapped on the Doctrine entity manager "%s", which is not the default one ("%s"): set nowo_workflow.doctrine.entity_manager: %s explicitly. See UPGRADING.md "To 2.0.0".', (string) $manager, is_string($default) ? $default : '', (string) $manager));
                 }
 
                 return (string) $manager;

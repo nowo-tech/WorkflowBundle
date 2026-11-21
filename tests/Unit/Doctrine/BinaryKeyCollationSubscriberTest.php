@@ -19,10 +19,8 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Mapping\ClassMetadataFactory;
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
-use Doctrine\ORM\Tools\Event\GenerateSchemaTableEventArgs;
 use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
-use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -115,19 +113,6 @@ final class BinaryKeyCollationSubscriberTest extends TestCase
         $schema = $args->getSchema();
         (new BinaryKeyCollationSubscriber())->postGenerateSchema($args);
         self::assertSame($schema, $args->getSchema(), 'tables not generated (schema filter): nothing to collate');
-    }
-
-    #[Test]
-    public function theDeprecatedTableEventDoesNothing(): void
-    {
-        $table = new Table('workflow_subject_pin');
-        $table->addColumn('subject_ref', 'string', ['length' => 128]);
-        $args = new GenerateSchemaTableEventArgs(new ClassMetadata(WorkflowSubjectPin::class), new Schema([$table]), $table);
-
-        (new BinaryKeyCollationSubscriber())->postGenerateSchemaTable($args);
-
-        self::assertFalse($args->classTableWasMutated());
-        self::assertNull($table->getColumn('subject_ref')->getCollation());
     }
 
     #[Test]

@@ -5,27 +5,24 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Unit\DependencyInjection\Compiler;
 
 use LogicException;
-use Nowo\WorkflowBundle\Contract\WorkflowUiAccessCheckerInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowUiAccessPolicyInterface;
+use Nowo\WorkflowBundle\DependencyInjection\Compiler\RemovedPortsPass;
 use Nowo\WorkflowBundle\DependencyInjection\Compiler\WorkflowUiSecurityPass;
 use Nowo\WorkflowBundle\EventListener\WorkflowUiAccessSubscriber;
 use Nowo\WorkflowBundle\Service\AllowAllWorkflowUiAccessChecker;
 use Nowo\WorkflowBundle\Service\DenyAllWorkflowUiAccessChecker;
 use Nowo\WorkflowBundle\Service\RoleBasedWorkflowUiAccessChecker;
-use Nowo\WorkflowBundle\Tests\Support\Access\DualPredicate;
-use Nowo\WorkflowBundle\Tests\Support\Access\LegacyPredicateChecker;
 use Nowo\WorkflowBundle\Tests\Support\Access\NotAPort;
-use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughLegacyDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Access\PassThroughPolicyDecorator;
 use Nowo\WorkflowBundle\Tests\Support\Access\PolicyPredicate;
+use Nowo\WorkflowBundle\Tests\Support\Legacy\WorkflowUiAccessCheckerInterfaceV1130;
 use Nowo\WorkflowBundle\Tests\Support\Legacy\WorkflowUiSecurityPassV1130;
+use Nowo\WorkflowBundle\Tests\Support\Removed\LegacyOnlyUiAccessChecker;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use stdClass;
-use Symfony\Component\DependencyInjection\Compiler\DecoratorServicePass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 
@@ -35,9 +32,9 @@ use function set_error_handler;
 use const E_USER_DEPRECATED;
 
 /**
- * 1.14 port wiring of {@see WorkflowUiSecurityPass} (REQ-ARCH-001 rule 3): which service sits behind each port and
- * which port(s) the subscriber asks, for every host shape; plus the 1.13.0 wiring equivalence for every host that
- * does not use the new port.
+ * Port wiring of {@see WorkflowUiSecurityPass} (REQ-ARCH-001 rule 3): which service sits behind the access policy
+ * port for every host shape, the build errors of 2.0 for a checker on the removed request-based port, plus the 1.13.0
+ * wiring equivalence for the built-in policies.
  */
 final class WorkflowUiSecurityPassPortsTest extends TestCase
 {
@@ -62,18 +59,17 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     }
 
     #[Test]
-    public function builtInRoleBasedSitsBehindBothPortsAndOnlyTheNewPortIsAsked(): void
+    public function builtInRoleBasedSitsBehindThePort(): void
     {
         $container = $this->container(security: true);
 
         (new WorkflowUiSecurityPass())->process($container);
 
         self::assertSame(RoleBasedWorkflowUiAccessChecker::class, (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-        self::assertSame(RoleBasedWorkflowUiAccessChecker::class, (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class));
-        self::assertTrue($container->getAlias(WorkflowUiAccessCheckerInterface::class)->isDeprecated());
+        self::assertFalse($container->hasAlias(RemovedPortsPass::UI_ACCESS_CHECKER), 'the removed port is never aliased');
         self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
         $arguments = $container->getDefinition(WorkflowUiAccessSubscriber::class)->getArguments();
-        self::assertNull($arguments['$accessChecker']);
+        self::assertArrayNotHasKey('$accessChecker', $arguments);
         self::assertEquals(new Reference(WorkflowUiAccessPolicyInterface::class), $arguments['$accessPolicy']);
         self::assertInstanceOf(Reference::class, $arguments['$tokenStorage']);
         self::assertSame('security.token_storage', (string) $arguments['$tokenStorage']);
@@ -81,7 +77,7 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     }
 
     #[Test]
-    public function aNewPortServiceIsAskedAndGetsNoDeprecatedAlias(): void
+    public function aPolicyServiceIsAsked(): void
     {
         $container = $this->container(accessChecker: 'app.policy');
         $container->register('app.policy', PolicyPredicate::class);
@@ -89,66 +85,55 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
         (new WorkflowUiSecurityPass())->process($container);
 
         self::assertSame('app.policy', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-        self::assertFalse($container->hasAlias(WorkflowUiAccessCheckerInterface::class), 'no deprecated alias for a class that does not implement it');
         self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
         self::assertSame([], $this->deprecations);
     }
 
+    /**
+     * 2.0: a configured checker that still implements only the removed request-based port cannot even be loaded; the
+     * build fails with a message naming the class and the port to implement, never with a PHP fatal error.
+     */
     #[Test]
-    public function aDeprecatedPortServiceKeepsThe113WiringWithADeprecation(): void
+    public function aCheckerOnTheRemovedPortFailsTheBuild(): void
     {
-        $container = $this->container(accessChecker: 'app.checker');
-        $container->register('app.checker', LegacyPredicateChecker::class);
+        $container = $this->container(accessChecker: 'app.legacy');
+        $container->register('app.legacy', LegacyOnlyUiAccessChecker::class);
 
-        (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame('app.checker', (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class));
-        self::assertTrue($container->getAlias(WorkflowUiAccessCheckerInterface::class)->isDeprecated());
-        self::assertSame(WorkflowUiSecurityPass::MODE_LEGACY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-        $arguments = $container->getDefinition(WorkflowUiAccessSubscriber::class)->getArguments();
-        self::assertEquals(new Reference(WorkflowUiAccessCheckerInterface::class), $arguments['$accessChecker']);
-        self::assertNull($arguments['$accessPolicy']);
-        self::assertNull($arguments['$tokenStorage']);
-        self::assertCount(1, $this->deprecations);
-        self::assertStringContainsString('implements only', $this->deprecations[0]);
+        try {
+            (new WorkflowUiSecurityPass())->process($container);
+            self::fail('A checker on the removed port must fail the build.');
+        } catch (LogicException $exception) {
+            self::assertStringContainsString('"app.legacy"', $exception->getMessage());
+            self::assertStringContainsString(LegacyOnlyUiAccessChecker::class, $exception->getMessage());
+            self::assertStringContainsString(RemovedPortsPass::UI_ACCESS_CHECKER, $exception->getMessage());
+            self::assertStringContainsString(WorkflowUiAccessPolicyInterface::class, $exception->getMessage());
+            self::assertStringContainsString('UPGRADING.md "To 2.0.0"', $exception->getMessage());
+        }
     }
 
     #[Test]
-    public function aDualServiceIsAskedThroughTheNewPort(): void
+    public function aCheckerOfAMissingClassFailsTheBuild(): void
     {
-        $container = $this->container(accessChecker: 'app.dual');
-        $container->register('app.dual', DualPredicate::class);
+        $container = $this->container(accessChecker: 'app.typo');
+        $container->register('app.typo', 'App\\Security\\NoSuchChecker');
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('cannot be loaded');
 
         (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame('app.dual', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-        self::assertSame('app.dual', (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class));
-        self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
     }
 
     #[Test]
-    public function aDualServiceWithADeprecatedPortDecoratorAsksBothPorts(): void
+    public function aConfiguredPolicyServiceNeverReplacesTheHostsOwnAlias(): void
     {
-        $container = $this->container(accessChecker: 'app.dual');
-        $container->register('app.dual', DualPredicate::class);
-        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class);
-
-        (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame(WorkflowUiSecurityPass::MODE_BOTH, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-    }
-
-    #[Test]
-    public function aConfiguredNewPortServiceNeverReplacesTheHostsOwnAlias(): void
-    {
-        $container = $this->container(accessChecker: 'app.dual');
-        $container->register('app.dual', DualPredicate::class);
+        $container = $this->container(accessChecker: 'app.other');
+        $container->register('app.other', PolicyPredicate::class);
         $container->register('app.policy', PolicyPredicate::class);
         $container->setAlias(WorkflowUiAccessPolicyInterface::class, 'app.policy');
 
         try {
             (new WorkflowUiSecurityPass())->process($container);
-            self::fail('NF2-4a: two different 1.14 services.');
+            self::fail('NF2-4a: two different policy services.');
         } catch (LogicException $exception) {
             self::assertStringContainsString('"app.policy"', $exception->getMessage());
         }
@@ -161,45 +146,7 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     }
 
     #[Test]
-    public function aDeprecatedPortDecoratorOverANewPortOnlyServiceFailsTheBuild(): void
-    {
-        $container = $this->container(accessChecker: 'app.policy');
-        $container->register('app.policy', PolicyPredicate::class);
-        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class);
-        $container->register('app.optional', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class, null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
-
-        try {
-            (new WorkflowUiSecurityPass())->process($container);
-            self::fail('NF2-4b: a required deprecated-port decorator would be dropped.');
-        } catch (LogicException $exception) {
-            self::assertStringContainsString('"app.audit"', $exception->getMessage());
-            self::assertStringNotContainsString('"app.optional"', $exception->getMessage(), 'NF3-3: an optional decorator is not a failure.');
-        }
-    }
-
-    /**
-     * Audit NF3-3: a deprecated-port decorator registered with on_invalid: ignore asked to be dropped when there is
-     * nothing to decorate: the build passes, only the 1.14 port is asked and Symfony removes the decorator.
-     */
-    #[Test]
-    public function anOptionalDeprecatedPortDecoratorOverANewPortOnlyServiceIsDropped(): void
-    {
-        $container = $this->container(accessChecker: 'app.policy');
-        $container->register('app.policy', PolicyPredicate::class);
-        $container->register('app.optional', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class, null, 0, ContainerInterface::IGNORE_ON_INVALID_REFERENCE);
-
-        (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-        self::assertFalse($container->hasAlias(WorkflowUiAccessCheckerInterface::class));
-        self::assertSame('app.policy', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-
-        (new DecoratorServicePass())->process($container);
-        self::assertFalse($container->hasDefinition('app.optional'), 'Symfony drops it (nothing to decorate).');
-    }
-
-    #[Test]
-    public function aServiceOnNeitherPortFailsTheBuild(): void
+    public function aServiceThatDoesNotImplementThePortFailsTheBuild(): void
     {
         $container = $this->container(accessChecker: 'app.wrong');
         $container->register('app.wrong', NotAPort::class);
@@ -211,31 +158,25 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     }
 
     #[Test]
-    public function aFactoryServiceKeepsThe113WiringWithoutDeprecation(): void
+    public function aFactorySyntheticOrMissingServiceIsAliasedAsItIs(): void
     {
-        $container = $this->container(accessChecker: 'app.factory');
-        $container->register('app.factory', LegacyPredicateChecker::class)->setFactory([stdClass::class, 'create']);
+        $shapes = [
+            'app.factory'   => static fn (ContainerBuilder $c): Definition => $c->register('app.factory', PolicyPredicate::class)->setFactory([stdClass::class, 'create']),
+            'app.synthetic' => static fn (ContainerBuilder $c): Definition => $c->register('app.synthetic')->setSynthetic(true),
+            'app.missing'   => null,
+        ];
+        foreach ($shapes as $id => $register) {
+            $container = $this->container(accessChecker: $id);
+            if ($register !== null) {
+                $register($container);
+            }
 
-        (new WorkflowUiSecurityPass())->process($container);
+            (new WorkflowUiSecurityPass())->process($container);
 
-        self::assertSame('app.factory', (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class));
-        self::assertFalse($container->getAlias(WorkflowUiAccessCheckerInterface::class)->isDeprecated());
-        self::assertSame(WorkflowUiSecurityPass::MODE_LEGACY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
+            self::assertSame($id, (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
+            self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
+        }
         self::assertSame([], $this->deprecations);
-    }
-
-    #[Test]
-    public function aSyntheticOrMissingServiceKeepsThe113Wiring(): void
-    {
-        $container = $this->container(accessChecker: 'app.synthetic');
-        $container->register('app.synthetic')->setSynthetic(true);
-
-        (new WorkflowUiSecurityPass())->process($container);
-        self::assertSame(WorkflowUiSecurityPass::MODE_LEGACY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-
-        $container = $this->container(accessChecker: 'app.missing');
-        (new WorkflowUiSecurityPass())->process($container);
-        self::assertSame('app.missing', (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class));
     }
 
     #[Test]
@@ -249,7 +190,6 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
         (new WorkflowUiSecurityPass())->process($container);
 
         self::assertSame('app.alias', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-        self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
     }
 
     #[Test]
@@ -264,7 +204,19 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     }
 
     #[Test]
-    public function theHostsOwnNewPortAliasWinsOverTheBuiltIn(): void
+    public function aDefinitionWhoseClassIsNotAStringIsAliasedAsItIs(): void
+    {
+        $container = $this->container(accessChecker: 'app.dynamic');
+        $container->setParameter('app.checker_class', ['not', 'a', 'class']);
+        $container->register('app.dynamic', '%app.checker_class%');
+
+        (new WorkflowUiSecurityPass())->process($container);
+
+        self::assertSame('app.dynamic', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
+    }
+
+    #[Test]
+    public function theHostsOwnPortAliasWinsOverTheBuiltIn(): void
     {
         $container = $this->container(security: true);
         $container->register('app.policy', PolicyPredicate::class);
@@ -273,12 +225,11 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
         (new WorkflowUiSecurityPass())->process($container);
 
         self::assertSame('app.policy', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-        self::assertSame(RoleBasedWorkflowUiAccessChecker::class, (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class));
         self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
     }
 
     #[Test]
-    public function theHostsOwnNewPortDefinitionWins(): void
+    public function theHostsOwnPortDefinitionWins(): void
     {
         $container = $this->container(allowUnauthenticated: true);
         $container->removeAlias(WorkflowUiAccessPolicyInterface::class);
@@ -291,49 +242,7 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     }
 
     #[Test]
-    public function aDeprecatedPortDecoratorOverTheBuiltInKeepsThe113Path(): void
-    {
-        $container = $this->container(security: true);
-        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class);
-
-        (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame(WorkflowUiSecurityPass::MODE_LEGACY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-        self::assertSame(RoleBasedWorkflowUiAccessChecker::class, (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class));
-    }
-
-    #[Test]
-    public function aDeprecatedPortDecoratorWithTheHostsNewPortAsksBoth(): void
-    {
-        $container = $this->container(security: true);
-        $container->register('app.policy', PolicyPredicate::class);
-        $container->setAlias(WorkflowUiAccessPolicyInterface::class, 'app.policy');
-        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class);
-
-        (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame(WorkflowUiSecurityPass::MODE_BOTH, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-    }
-
-    #[Test]
-    public function aNewPortDecoratorAndADeprecatedPortDecoratorAreBothAsked(): void
-    {
-        $container = $this->container(security: true);
-        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class);
-        $container->register('app.new_audit', PassThroughPolicyDecorator::class)->setDecoratedService(WorkflowUiAccessPolicyInterface::class);
-
-        (new WorkflowUiSecurityPass())->process($container);
-
-        // NF-1b: the deprecated-port decorator is never dropped (dropping it could widen access).
-        self::assertSame(WorkflowUiSecurityPass::MODE_BOTH, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-        // NF-1a: the 1.14 decorator wraps the built-in selected by the configuration, not the deny-all default.
-        self::assertSame(RoleBasedWorkflowUiAccessChecker::class, (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-        self::assertCount(1, $this->deprecations);
-        self::assertStringContainsString('"app.audit"', $this->deprecations[0]);
-    }
-
-    #[Test]
-    public function aNewPortDecoratorAloneWrapsTheConfiguredBuiltIn(): void
+    public function aPortDecoratorAloneWrapsTheConfiguredBuiltIn(): void
     {
         foreach ([[true, false, RoleBasedWorkflowUiAccessChecker::class], [false, true, AllowAllWorkflowUiAccessChecker::class]] as [$security, $allow, $builtIn]) {
             $container = $this->container(security: $security, allowUnauthenticated: $allow);
@@ -341,6 +250,7 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
 
             (new WorkflowUiSecurityPass())->process($container);
 
+            // NF-1a: the decorator wraps the built-in selected by the configuration, not the deny-all default.
             self::assertSame($builtIn, (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
             self::assertSame(WorkflowUiSecurityPass::MODE_POLICY, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
         }
@@ -348,65 +258,7 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     }
 
     #[Test]
-    public function aNewPortDecoratorOverADeprecatedPortOnlyCheckerFailsTheBuild(): void
-    {
-        foreach (['app.checker', 'app.factory'] as $checker) {
-            $container = $this->container(accessChecker: $checker);
-            $container->register('app.new_audit', PassThroughPolicyDecorator::class)->setDecoratedService(WorkflowUiAccessPolicyInterface::class);
-
-            try {
-                (new WorkflowUiSecurityPass())->process($container);
-                self::fail('A 1.14 decorator must not wrap the deny-all default.');
-            } catch (LogicException $exception) {
-                self::assertStringContainsString('"app.new_audit"', $exception->getMessage());
-            }
-        }
-    }
-
-    #[Test]
-    public function aDeprecatedPortDecoratorWithANewPortDecoratorOverADualServiceAsksBoth(): void
-    {
-        $container = $this->container(accessChecker: 'app.dual');
-        $container->register('app.dual', DualPredicate::class);
-        $container->register('app.audit', PassThroughLegacyDecorator::class)->setDecoratedService(WorkflowUiAccessCheckerInterface::class);
-        $container->register('app.new_audit', PassThroughPolicyDecorator::class)->setDecoratedService(WorkflowUiAccessPolicyInterface::class);
-
-        (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame(WorkflowUiSecurityPass::MODE_BOTH, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-        self::assertSame('app.dual', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-    }
-
-    #[Test]
-    public function aDeprecatedPortServiceWithTheHostsNewPortAsksBoth(): void
-    {
-        $container = $this->container(accessChecker: 'app.checker');
-        $container->register('app.checker', LegacyPredicateChecker::class);
-        $container->register('app.policy', PolicyPredicate::class);
-        $container->setAlias(WorkflowUiAccessPolicyInterface::class, 'app.policy');
-
-        (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame(WorkflowUiSecurityPass::MODE_BOTH, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-        self::assertSame('app.policy', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-        self::assertStringContainsString('"app.checker"', $this->deprecations[1] ?? '', 'the both-ports deprecation names the service to migrate');
-    }
-
-    #[Test]
-    public function aFactoryServiceWithTheHostsNewPortAsksBoth(): void
-    {
-        $container = $this->container(accessChecker: 'app.factory');
-        $container->register('app.factory', LegacyPredicateChecker::class)->setFactory([stdClass::class, 'create']);
-        $container->register('app.policy', PolicyPredicate::class);
-        $container->setAlias(WorkflowUiAccessPolicyInterface::class, 'app.policy');
-
-        (new WorkflowUiSecurityPass())->process($container);
-
-        self::assertSame(WorkflowUiSecurityPass::MODE_BOTH, $container->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER));
-    }
-
-    #[Test]
-    public function disabledWithoutSecurityKeepsTheHostsNewPort(): void
+    public function disabledWithoutSecurityKeepsTheHostsPort(): void
     {
         $container = $this->container();
         $container->setParameter('nowo_workflow.enabled', false);
@@ -416,11 +268,10 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
         (new WorkflowUiSecurityPass())->process($container);
 
         self::assertSame('app.policy', (string) $container->getAlias(WorkflowUiAccessPolicyInterface::class));
-        self::assertSame(DenyAllWorkflowUiAccessChecker::class, (string) $container->getAlias(WorkflowUiAccessCheckerInterface::class));
     }
 
     #[Test]
-    public function withoutTheSubscriberOnlyTheAliasesAreSet(): void
+    public function withoutTheSubscriberOnlyTheAliasIsSet(): void
     {
         $container = $this->container(allowUnauthenticated: true);
         $container->removeDefinition(WorkflowUiAccessSubscriber::class);
@@ -431,40 +282,34 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{array{security?: bool, allowUnauthenticated?: bool, accessChecker?: string|null, enabled?: bool}}>
+     * @return iterable<string, array{array{security?: bool, allowUnauthenticated?: bool, enabled?: bool}}>
      */
-    public static function hostsWithoutTheNewPort(): iterable
+    public static function hostsOnTheBuiltIns(): iterable
     {
         yield 'role based' => [['security' => true]];
         yield 'role based, disabled' => [['security' => true, 'enabled' => false]];
         yield 'allow_unauthenticated' => [['allowUnauthenticated' => true]];
         yield 'allow_unauthenticated with security' => [['allowUnauthenticated' => true, 'security' => true]];
         yield 'disabled without security' => [['enabled' => false]];
-        yield 'deprecated-port checker' => [['accessChecker' => 'app.checker']];
-        yield 'deprecated-port checker with security' => [['accessChecker' => 'app.checker', 'security' => true]];
-        yield 'unknown checker class' => [['accessChecker' => 'app.factory']];
     }
 
     /**
-     * The service the 1.14 subscriber asks is the service the 1.13.0 pass put behind the deprecated port.
+     * The service the subscriber asks is the built-in the 1.13.0 pass put behind its (request-based) port.
      *
-     * @param array{security?: bool, allowUnauthenticated?: bool, accessChecker?: string|null, enabled?: bool} $shape
+     * @param array{security?: bool, allowUnauthenticated?: bool, enabled?: bool} $shape
      */
     #[Test]
-    #[DataProvider('hostsWithoutTheNewPort')]
+    #[DataProvider('hostsOnTheBuiltIns')]
     public function theAskedServiceIsThe113One(array $shape): void
     {
         $legacy = $this->container(...$shape);
+        $legacy->setAlias(WorkflowUiAccessCheckerInterfaceV1130::class, DenyAllWorkflowUiAccessChecker::class);
         (new WorkflowUiSecurityPassV1130())->process($legacy);
 
         $current = $this->container(...$shape);
         (new WorkflowUiSecurityPass())->process($current);
 
-        $expected = (string) $legacy->getAlias(WorkflowUiAccessCheckerInterface::class);
-        $mode     = $current->getParameter(WorkflowUiSecurityPass::MODE_PARAMETER);
-        $port     = $mode === WorkflowUiSecurityPass::MODE_POLICY ? WorkflowUiAccessPolicyInterface::class : WorkflowUiAccessCheckerInterface::class;
-        self::assertNotSame(WorkflowUiSecurityPass::MODE_BOTH, $mode);
-        self::assertSame($expected, (string) $current->getAlias($port));
+        self::assertSame((string) $legacy->getAlias(WorkflowUiAccessCheckerInterfaceV1130::class), (string) $current->getAlias(WorkflowUiAccessPolicyInterface::class));
         if ($legacy->hasDefinition(RoleBasedWorkflowUiAccessChecker::class)) {
             self::assertEquals($legacy->getDefinition(RoleBasedWorkflowUiAccessChecker::class)->getArguments(), $current->getDefinition(RoleBasedWorkflowUiAccessChecker::class)->getArguments());
         }
@@ -480,10 +325,7 @@ final class WorkflowUiSecurityPassPortsTest extends TestCase
         $container->register(AllowAllWorkflowUiAccessChecker::class, AllowAllWorkflowUiAccessChecker::class);
         $container->register(DenyAllWorkflowUiAccessChecker::class, DenyAllWorkflowUiAccessChecker::class);
         $container->setAlias(WorkflowUiAccessPolicyInterface::class, DenyAllWorkflowUiAccessChecker::class);
-        $container->setAlias(WorkflowUiAccessCheckerInterface::class, DenyAllWorkflowUiAccessChecker::class);
         $container->register(WorkflowUiAccessSubscriber::class, WorkflowUiAccessSubscriber::class);
-        $container->register('app.checker', LegacyPredicateChecker::class);
-        $container->register('app.factory', LegacyPredicateChecker::class)->setFactory([stdClass::class, 'create']);
         if ($security) {
             $container->setDefinition('security.authorization_checker', new Definition());
         }

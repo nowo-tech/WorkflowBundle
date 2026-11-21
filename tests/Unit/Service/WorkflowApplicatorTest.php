@@ -7,7 +7,6 @@ namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use InvalidArgumentException;
-use Nowo\WorkflowBundle\Contract\WorkflowRegistryInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowTransition;
@@ -26,9 +25,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Workflow\Event\GuardEvent;
 use Symfony\Component\Workflow\Exception\NotEnabledTransitionException;
 use Symfony\Component\Workflow\Exception\UndefinedTransitionException;
-use Symfony\Component\Workflow\Marking;
 use Symfony\Component\Workflow\TransitionBlocker;
-use Symfony\Component\Workflow\WorkflowInterface;
 
 final class WorkflowApplicatorTest extends TestCase
 {
@@ -43,6 +40,30 @@ final class WorkflowApplicatorTest extends TestCase
         $em->expects(self::once())->method('flush');
 
         $applicator = $this->applicator($definition, $em);
+        $applicator->apply($subject, 'order_approval', 'approve');
+
+        self::assertSame('approved', $subject->getStatus());
+    }
+
+    /**
+     * 2.0 (REQ-ARCH-001 rule 6): without $flushAfterApply the applicator only changes the marking; the application
+     * persists the subject (1.x flushed its manager by default).
+     */
+    public function testTheDefaultOnlyChangesTheMarking(): void
+    {
+        $definition = $this->orderDefinition();
+        $repository = $this->createMock(WorkflowDefinitionRepository::class);
+        $repository->method('findOneBySlug')->with('order_approval')->willReturn($definition);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+
+        $applicator = new WorkflowApplicator(
+            new DatabaseWorkflowRegistry($repository, new WorkflowDefinitionBuilder()),
+            $repository,
+            new WorkflowResolver($repository),
+            $em,
+        );
+        $subject = new WorkflowApplicatorTestSubject('draft');
         $applicator->apply($subject, 'order_approval', 'approve');
 
         self::assertSame('approved', $subject->getStatus());
@@ -227,30 +248,6 @@ final class WorkflowApplicatorTest extends TestCase
 
         $this->expectException(WorkflowNotFoundException::class);
         $applicator->apply(new WorkflowApplicatorTestSubject('draft'), 'order_approval', 'approve');
-    }
-
-    public function testGetMarkingReturnsEmptyStringWhenMarkingHasNoPlaces(): void
-    {
-        $definition = $this->orderDefinition();
-        $subject    = new WorkflowApplicatorTestSubject('draft');
-
-        $workflow = $this->createMock(WorkflowInterface::class);
-        $workflow->method('getMarking')->willReturn(new Marking([]));
-
-        $registry = $this->createMock(WorkflowRegistryInterface::class);
-        $registry->method('get')->with('order_approval')->willReturn($workflow);
-
-        $repository = $this->createMock(WorkflowDefinitionRepository::class);
-        $repository->method('findOneBySlug')->with('order_approval')->willReturn($definition);
-
-        $applicator = new WorkflowApplicator(
-            $registry,
-            $repository,
-            new WorkflowResolver($repository),
-            $this->createMock(EntityManagerInterface::class),
-        );
-
-        self::assertSame('', $applicator->getMarking($subject, 'order_approval'));
     }
 
     public function testFailedFlushResetsClosedEntityManagerSoNextRequestCanFlush(): void

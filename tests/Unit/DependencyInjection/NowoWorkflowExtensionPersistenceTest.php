@@ -30,7 +30,8 @@ use function set_error_handler;
 use const E_USER_DEPRECATED;
 
 /**
- * 1.14: private entity manager wiring, the flush_after_apply deprecation and the XML mapping option.
+ * Private entity manager wiring (the only mode since 2.0), the flush_after_apply default (false since 2.0, no notice)
+ * and the XML mapping option.
  */
 final class NowoWorkflowExtensionPersistenceTest extends TestCase
 {
@@ -57,7 +58,7 @@ final class NowoWorkflowExtensionPersistenceTest extends TestCase
     #[Test]
     public function theDefinitionsGoThroughThePrivateManagerByDefault(): void
     {
-        $container = $this->load(['runtime' => ['flush_after_apply' => false]]);
+        $container = $this->load([]);
 
         self::assertTrue($container->hasDefinition(WorkflowEntityManager::class));
         self::assertSame([['method' => 'reset']], $container->getDefinition(WorkflowEntityManager::class)->getTag('kernel.reset'));
@@ -71,7 +72,8 @@ final class NowoWorkflowExtensionPersistenceTest extends TestCase
         $resettables = $container->getDefinition(WorkflowUnitOfWorkSubscriber::class)->getArgument('$resettables');
         self::assertInstanceOf(IteratorArgument::class, $resettables);
         self::assertCount(1, $resettables->getValues());
-        self::assertSame([], $this->deprecations, 'flush_after_apply set explicitly: no deprecation');
+        self::assertFalse($container->getParameter('nowo_workflow.runtime.flush_after_apply'), '2.0 default');
+        self::assertSame([], $this->deprecations, 'no Workflow deprecation with the default configuration');
     }
 
     #[Test]
@@ -88,33 +90,29 @@ final class NowoWorkflowExtensionPersistenceTest extends TestCase
         self::assertSame('%nowo_workflow.runtime.concurrency.retry_after%', $container->getDefinition(WorkflowConflictResponseSubscriber::class)->getArgument('$retryAfterSeconds'));
     }
 
+    /**
+     * Q4: `private_entity_manager: true` is a deprecated no-op; the private manager is wired as without it.
+     */
     #[Test]
-    public function theDeprecatedOptOutKeepsThe113Wiring(): void
+    public function thePrivateEntityManagerKeyIsANoOp(): void
     {
-        $container = $this->load(['runtime' => ['flush_after_apply' => true], 'doctrine' => ['private_entity_manager' => false, 'entity_manager' => 'workflow']]);
+        $container = $this->load(['doctrine' => ['private_entity_manager' => true, 'entity_manager' => 'workflow']]);
 
-        self::assertFalse($container->hasDefinition(WorkflowEntityManager::class));
-        self::assertFalse($container->hasDefinition(WorkflowManagerRegistry::class));
+        self::assertTrue($container->hasDefinition(WorkflowEntityManager::class));
+        self::assertTrue($container->hasDefinition(WorkflowManagerRegistry::class));
         self::assertSame('workflow', $container->getParameter(PrivateEntityManagerPass::ENTITY_MANAGER_PARAMETER));
-        self::assertSame([], $container->getDefinition(WorkflowDefinitionRepository::class)->getArguments());
-    }
-
-    #[Test]
-    public function notSettingFlushAfterApplyKeepsTrueWithADeprecation(): void
-    {
-        $container = $this->load([]);
-
-        self::assertTrue($container->getParameter('nowo_workflow.runtime.flush_after_apply'));
+        self::assertEquals(new Reference(WorkflowManagerRegistry::class), $container->getDefinition(WorkflowDefinitionRepository::class)->getArgument('$registry'));
         self::assertCount(1, $this->deprecations);
-        self::assertStringContainsString('flush_after_apply', $this->deprecations[0]);
+        self::assertStringContainsString('The option has no effect since 2.0 (the private manager is the only mode); remove it.', $this->deprecations[0]);
     }
 
     #[Test]
-    public function aLaterFileSettingFlushAfterApplyCounts(): void
+    public function anExplicitFlushAfterApplyIsPassedWithoutANotice(): void
     {
         $container = new ContainerBuilder();
         (new NowoWorkflowExtension())->load([['web_ui' => ['enabled' => true]], ['runtime' => []], [], ['runtime' => ['flush_after_apply' => true]]], $container);
 
+        self::assertTrue($container->getParameter('nowo_workflow.runtime.flush_after_apply'));
         self::assertSame([], $this->deprecations);
     }
 
