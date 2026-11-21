@@ -7,7 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain;
 /**
  * Plain-PHP host subject of the tenancy tests (DDD style: no bundle base class, XML mapping, ids as strings).
  */
-class LeaveRequest
+class LeaveRequest implements TenantSubject
 {
     private ?int $id = null; // @phpstan-ignore property.unusedType (assigned by Doctrine)
 

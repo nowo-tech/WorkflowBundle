@@ -13,6 +13,7 @@ use Nowo\WorkflowBundle\Contract\WorkflowRuntimeInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowSlugResolverInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\DependencyInjection\NowoWorkflowExtension;
+use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\NowoWorkflowBundle;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\WorkflowApplicator;
@@ -55,6 +56,8 @@ use const PHP_VERSION_ID;
  * - `tenancy`: standard host, one SQLite connection, every tenancy / guard port and the audit event, the UI mounted
  *   under `/organizations/{uuid}/settings/workflow` (web_ui.path_prefix, Beacon's shape);
  * - `tenancy-locked`: `tenancy` with `tenancy.lock_clone_structure` (1.16);
+ * - `tenancy-relations`: `tenancy` plus host entities with relations (an expense claim with ManyToOne to an employee
+ *   and to the bundle's definition), the shape of a host whose entities point at each other and at a bundle row;
  * - `tenancy-ddd`: DDD host, the bundle's XML mapping on a dedicated `workflow` manager and connection, the host's
  *   subject on the default one;
  * - `plain`: no tenancy port at all (the 1.14 behaviour), UI at `/workflow`;
@@ -136,6 +139,9 @@ final class TenancyTestKernel extends Kernel
             $workflow['connection'] = 'workflow';
             $workflow['doctrine']   = ['entity_manager' => 'workflow', 'register_mapping' => false];
         } else {
+            if ($this->variant === 'tenancy-relations') {
+                $host['HostRelations'] = ['type' => 'xml', 'dir' => __DIR__ . '/relations-mapping', 'prefix' => 'Nowo\\WorkflowBundle\\Tests\\Integration\\Tenancy\\Relations', 'is_bundle' => false];
+            }
             $container->extension('doctrine', [
                 'dbal' => ['url' => 'sqlite:///:memory:'],
                 'orm'  => $orm + ['mappings' => $host],
@@ -154,7 +160,7 @@ final class TenancyTestKernel extends Kernel
         $services->set(AnyUserTokenListener::class)->args([service('security.token_storage')])->tag('kernel.event_subscriber');
         $services->set('security.csrf.token_storage', ArrayCsrfTokenStorage::class)->public();
         $services->set(RecordingAuditListener::class)->tag('kernel.event_subscriber')->public();
-        foreach ([WorkflowApplicator::class, WorkflowResolver::class, DatabaseWorkflowRegistry::class, WorkflowVersioning::class, SubjectPinStore::class] as $id) {
+        foreach ([WorkflowApplicator::class, WorkflowResolver::class, DatabaseWorkflowRegistry::class, WorkflowVersioning::class, SubjectPinStore::class, WorkflowEntityManager::class] as $id) {
             $services->alias('test.' . $id, $id)->public();
         }
 

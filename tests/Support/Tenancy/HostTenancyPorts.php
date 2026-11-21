@@ -20,6 +20,7 @@ use Nowo\WorkflowBundle\Model\WorkflowUiAccessCheck;
 use Nowo\WorkflowBundle\Model\WorkflowUiAction;
 use Nowo\WorkflowBundle\Model\WorkflowUiActionCheck;
 use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\LeaveRequest;
+use Nowo\WorkflowBundle\Tests\Integration\Tenancy\Domain\TenantSubject;
 
 use function is_string;
 use function str_starts_with;
@@ -27,7 +28,7 @@ use function str_starts_with;
 /**
  * The host side of the tenancy tests, Beacon style: one class implementing every port.
  *
- * - tenant of a leave request: its organization; subject reference: its UUID;
+ * - tenant of a subject (a leave request, an expense claim): its organization; subject reference: its UUID;
  * - UI scope: the `{uuid}` of the route prefix (`global` = the templates);
  * - UI actions: `root` everything everywhere; `admin-<org>` view / edit / publish in <org>; `viewer-<org>` view in
  *   <org> only; nobody else;
@@ -38,12 +39,12 @@ final class HostTenancyPorts implements WorkflowTenantResolverInterface, Workflo
 {
     public function tenantOf(WorkflowSubject $subject): ?WorkflowTenant
     {
-        return $subject->object instanceof LeaveRequest && $subject->object->getOrganization() !== '' ? new WorkflowTenant($subject->object->getOrganization()) : null;
+        return $subject->object instanceof TenantSubject && $subject->object->getOrganization() !== '' ? new WorkflowTenant($subject->object->getOrganization()) : null;
     }
 
     public function referenceOf(WorkflowSubject $subject): ?WorkflowSubjectRef
     {
-        return $subject->object instanceof LeaveRequest ? new WorkflowSubjectRef($subject->object->getUuid()) : null;
+        return $subject->object instanceof TenantSubject ? new WorkflowSubjectRef($subject->object->getUuid()) : null;
     }
 
     public function tenantFor(WorkflowUiAccessCheck $request): ?WorkflowTenant
