@@ -2,65 +2,64 @@
 
 {% block title %}{{ 'playground.resolver.title'|trans({}, 'demo') }}{% endblock %}
 
-{% block body %}
-    <div class="nowo-ui-page-header"><h1 class="nowo-ui-page-header__title">{{ 'playground.resolver.title'|trans({}, 'demo') }}</h1></div>
-    <p class="nowo-ui-muted">{{ 'playground.resolver.intro'|trans({}, 'demo') }}</p>
+{% block nowo_ui_page_header %}
+    {{ include(nowo_ui_partial('page_header'), {title: 'playground.resolver.title'|trans({}, 'demo'), intro: 'playground.resolver.intro'|trans({}, 'demo')}) }}
+{% endblock %}
 
-    {{ form_start(filter_form) }}
-        <section class="nowo-ui-card">
-            <div class="nowo-ui-card__body">
-                <div class="nowo-ui-form__columns">
-                {% for child in filter_form %}
-                    {% if not child.rendered %}
-                        {{ form_row(child) }}
-                    {% endif %}
-                {% endfor %}
-                </div>
-                <div class="nowo-ui-form__actions">
-                    <button type="submit" class="nowo-ui-btn nowo-ui-btn--primary">{{ 'playground.resolver.resolve'|trans({}, 'demo') }}</button>
-                </div>
-            </div>
-        </section>
-    {{ form_end(filter_form) }}
-
+{% block nowo_ui_flashes %}
     {% if error %}
-        <div class="nowo-ui-flash nowo-ui-flash--error" role="alert"><strong>{{ 'playground.resolver.error'|trans({}, 'demo') }}:</strong> {{ error }}</div>
+        {{ include('@NowoUiKit/demo_platform/_flashes.html.twig', {flash_messages: {error: ['playground.resolver.error'|trans({}, 'demo') ~ ': ' ~ error]}}) }}
+    {% else %}
+        {{ parent() }}
     {% endif %}
+{% endblock %}
+
+{% block body %}
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'playground.resolver.title'|trans({}, 'demo'), kind: 'form', filter_form: filter_form} %}
+        {% block section_body %}
+            {{ form_start(filter_form, {attr: {id: 'resolver-form'}}) }}
+                    {% for child in filter_form %}
+                        {% if not child.rendered %}{{ form_row(child) }}{% endif %}
+                    {% endfor %}
+            {{ form_end(filter_form) }}
+        {% endblock %}
+        {% block section_footer %}
+            <button type="submit" form="resolver-form" class="nowo-ui-btn nowo-ui-btn--primary">{{ 'playground.resolver.resolve'|trans({}, 'demo') }}</button>
+        {% endblock %}
+    {% endembed %}
 
     {% if resolved %}
-        <section class="nowo-ui-card">
-            <div class="nowo-ui-card__header"><h2 class="nowo-ui-card__title">{{ 'playground.resolver.resolved'|trans({}, 'demo') }}</h2></div>
-            <div class="nowo-ui-card__body">
+        {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'playground.resolver.resolved'|trans({}, 'demo'), kind: 'detail', resolved: resolved} %}
+            {% block section_body %}
                 <p><strong>{{ resolved.name }}</strong> (<code class="nowo-ui-code">{{ resolved.slug }}</code>)</p>
                 <p class="nowo-ui-muted">Priority {{ resolved.priority }} · {{ resolved.matchRules|length }} rule(s)</p>
-            </div>
-        </section>
+            {% endblock %}
+        {% endembed %}
     {% endif %}
 
     {% if matches %}
-        <section class="nowo-ui-card">
-            <div class="nowo-ui-card__header"><h2 class="nowo-ui-card__title">{{ 'playground.resolver.all_matches'|trans({}, 'demo') }}</h2></div>
-            <div class="nowo-ui-card__body">
+        {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: 'playground.resolver.all_matches'|trans({}, 'demo'), kind: 'table', matches: matches} %}
+            {% block section_body %}
                 <table class="nowo-ui-data-table">
                     <thead>
-                        <tr><th>Slug</th><th>{{ 'playground.resolver.rules'|trans({}, 'demo') }}</th><th>Priority</th><th>{{ 'playground.resolver.specificity'|trans({}, 'demo') }}</th></tr>
+                        <tr><th scope="col">Slug</th><th scope="col" class="nowo-ui-cell--wrap">{{ 'playground.resolver.rules'|trans({}, 'demo') }}</th><th scope="col" class="nowo-ui-cell--num">Priority</th><th scope="col" class="nowo-ui-cell--num">{{ 'playground.resolver.specificity'|trans({}, 'demo') }}</th></tr>
                     </thead>
                     <tbody>
                         {% for match in matches %}
                             <tr>
                                 <td><code class="nowo-ui-code">{{ match.slug }}</code></td>
-                                <td>
+                                <td class="nowo-ui-cell--wrap">
                                     {% if match.defaultMatcher %}<em>default</em>{% else %}
                                         {% for rule in match.matchRules %}{{ rule.parameterKey }}={{ rule.parameterValue }} {% endfor %}
                                     {% endif %}
                                 </td>
-                                <td>{{ match.priority }}</td>
-                                <td>{{ match.matchRules|length }}</td>
+                                <td class="nowo-ui-cell--num">{{ match.priority }}</td>
+                                <td class="nowo-ui-cell--num">{{ match.matchRules|length }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
-            </div>
-        </section>
+            {% endblock %}
+        {% endembed %}
     {% endif %}
 {% endblock %}

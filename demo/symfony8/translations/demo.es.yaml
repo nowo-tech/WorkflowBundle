@@ -11,6 +11,8 @@ nav:
   documents: Documentos
   expenses: Gastos
   purchase_orders: 'Órdenes de compra'
+  section_playground: 'Laboratorio'
+  section_admin: 'Administración'
   toggle: 'Alternar navegación'
 
 home:

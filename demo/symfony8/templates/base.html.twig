@@ -1,40 +1,27 @@
-{#- REQ-DEMO-014: the demo shell is UiKit's admin layout with UiKit's default theme (nowo-ui.css from the bundle's own
-    asset package, no CSS framework, no CDN, inline SVG icons). The Workflow pages render in it too
-    (nowo_ui_kit.layouts.admin). -#}
-{% extends '@NowoUiKit/layout/admin.html.twig' %}
+{#- REQ-DEMO-014: the demo runs inside UiKit's shared demo platform shell (@NowoUiKit/demo_platform/layout.html.twig):
+    the same top bar, aside, content width, theme and footer as every other nowo-tech bundle demo. This file only
+    declares the demo (nowo_ui_demo_platform); the Workflow pages render through it too (nowo_ui_kit.layouts). -#}
+{% extends '@NowoUiKit/demo_platform/layout.html.twig' %}
+{% set _locales = [] %}
+{% for locale in nowo_workflow_locales %}
+    {% set _locales = _locales|merge([{code: locale, label: ('locale.' ~ locale)|trans({}, 'NowoWorkflowBundle'), href: path('demo_locale_switch', {_locale: locale})}]) %}
+{% endfor %}
+{% set nowo_ui_demo_platform = {
+    bundle: 'Workflow',
+    home_route: 'demo_home',
+    repository: 'https://github.com/nowo-tech/WorkflowBundle',
+    translation_domain: 'demo',
+    locales: _locales|length > 1 ? _locales : [],
+    nav: [
+        {label: 'nav.home', route: 'demo_home'},
+        {label: 'nav.resolver', route: 'demo_resolver', section: 'nav.section_playground'},
+        {label: 'nav.change_requests', route: 'demo_change_requests', active: ['demo_change_requests*'], section: 'nav.section_playground'},
+        {label: 'nav.orders', route: 'demo_orders', active: ['demo_orders*'], section: 'nav.section_playground'},
+        {label: 'nav.documents', route: 'demo_documents', active: ['demo_documents*'], section: 'nav.section_playground'},
+        {label: 'nav.expenses', route: 'demo_expenses', active: ['demo_expenses*'], section: 'nav.section_playground'},
+        {label: 'nav.purchase_orders', route: 'demo_purchase_orders', active: ['demo_purchase_orders*'], section: 'nav.section_playground'},
+        {label: 'nav.crud', route: 'nowo_workflow_dashboard', active: ['nowo_workflow*'], section: 'nav.section_admin'},
+    ],
+} %}
 
-{% block nowo_ui_document_title %}{% block title %}{{ 'title'|trans({}, 'demo') }}{% endblock %}{% endblock %}
-
-{% block nowo_ui_navigation %}
-    {% set _route = app.request.attributes.get('_route')|default('') %}
-    {% set _locales = [] %}
-    {% for locale in nowo_workflow_locales %}
-        {% set _locales = _locales|merge([{
-            code: locale,
-            label: ('locale.' ~ locale)|trans({}, 'NowoWorkflowBundle'),
-            href: path('demo_locale_switch', {_locale: locale}),
-            current: locale == app.request.locale,
-        }]) %}
-    {% endfor %}
-    <header class="nowo-ui-header" data-testid="demo-masthead">
-        <a class="nowo-ui-brand" href="{{ path('demo_home') }}">{{ 'brand'|trans({}, 'demo') }}</a>
-        <nav class="nowo-ui-menu" aria-label="{{ 'brand'|trans({}, 'demo') }}">
-            <a class="nowo-ui-link" href="{{ path('demo_home') }}"{% if _route == 'demo_home' %} aria-current="page"{% endif %}>{{ 'nav.home'|trans({}, 'demo') }}</a>
-            <a class="nowo-ui-link" href="{{ path('demo_resolver') }}"{% if _route == 'demo_resolver' %} aria-current="page"{% endif %}>{{ 'nav.resolver'|trans({}, 'demo') }}</a>
-            <a class="nowo-ui-link" href="{{ path('nowo_workflow_dashboard') }}"{% if _route starts with 'nowo_workflow' %} aria-current="page"{% endif %}>{{ 'nav.crud'|trans({}, 'demo') }}</a>
-            <a class="nowo-ui-link" href="{{ path('demo_change_requests') }}"{% if _route == 'demo_change_requests' %} aria-current="page"{% endif %}>{{ 'nav.change_requests'|trans({}, 'demo') }}</a>
-            <a class="nowo-ui-link" href="{{ path('demo_orders') }}"{% if _route == 'demo_orders' %} aria-current="page"{% endif %}>{{ 'nav.orders'|trans({}, 'demo') }}</a>
-            <a class="nowo-ui-link" href="{{ path('demo_documents') }}"{% if _route == 'demo_documents' %} aria-current="page"{% endif %}>{{ 'nav.documents'|trans({}, 'demo') }}</a>
-            <a class="nowo-ui-link" href="{{ path('demo_expenses') }}"{% if _route == 'demo_expenses' %} aria-current="page"{% endif %}>{{ 'nav.expenses'|trans({}, 'demo') }}</a>
-            <a class="nowo-ui-link" href="{{ path('demo_purchase_orders') }}"{% if _route == 'demo_purchase_orders' %} aria-current="page"{% endif %}>{{ 'nav.purchase_orders'|trans({}, 'demo') }}</a>
-        </nav>
-        <div class="nowo-ui-header__end">
-            {% if _locales|length > 1 %}
-                {{ include('@NowoUiKitBundle/partials/_locale_switcher.html.twig', { locales: _locales, current: app.request.locale, compact: true }, false) }}
-            {% endif %}
-            {{ include('@NowoUiKitBundle/partials/_theme_toggle.html.twig', { compact: true }, false) }}
-        </div>
-    </header>
-{% endblock %}
-
-{% block nowo_ui_content %}{% block body %}{% endblock %}{% endblock %}
+{% block nowo_ui_document_title %}{% block title %}{{ 'title'|trans({}, 'demo') }}{% endblock %} — Symfony 8{% endblock %}

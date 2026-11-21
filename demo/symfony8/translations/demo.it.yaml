@@ -11,6 +11,8 @@ nav:
   documents: Documenti
   expenses: Spese
   purchase_orders: 'Ordini di acquisto'
+  section_playground: 'Laboratorio'
+  section_admin: 'Amministrazione'
   toggle: 'Attiva/disattiva navigazione'
 
 home:

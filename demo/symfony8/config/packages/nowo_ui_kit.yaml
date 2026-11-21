@@ -1,8 +1,11 @@
 # REQ-DEMO-014: UiKit's default theme, unchanged (no CSS framework, no CDN, no token override); the demo shell
-# (templates/base.html.twig) is the admin layout of every Workflow page. Icons are inline SVG (no icon font from a CDN).
+# (templates/base.html.twig, UiKit's demo platform layout) is the admin and guest layout of every Workflow page.
+# Icons are inline SVG (no icon font from a CDN).
 nowo_ui_kit:
     css_framework: custom
+    base_stylesheet: true
     icon_set: svg_inline
     row_actions_display: icon
     layouts:
         admin: base.html.twig
+        guest: base.html.twig

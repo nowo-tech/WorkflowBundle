@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c2e2f9e75895a70a38f52e0041d4ca96",
+    "content-hash": "125cb80725e3f738a820c9d91c370ca4",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -1301,16 +1301,16 @@
         },
         {
             "name": "nowo-tech/ui-kit-bundle",
-            "version": "v2.52.1",
+            "version": "v2.60.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/UiKitBundle.git",
-                "reference": "2715214cf4c459b6aad33ba366d75b8cd0e4385f"
+                "reference": "cd142ddce9afc51681e85f64d5fc96ef0c14302e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/2715214cf4c459b6aad33ba366d75b8cd0e4385f",
-                "reference": "2715214cf4c459b6aad33ba366d75b8cd0e4385f",
+                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/cd142ddce9afc51681e85f64d5fc96ef0c14302e",
+                "reference": "cd142ddce9afc51681e85f64d5fc96ef0c14302e",
                 "shasum": ""
             },
             "require": {
@@ -1357,7 +1357,8 @@
                 "symfony/validator": "Colour validation in the optional appearance forms"
             },
             "bin": [
-                "bin/nowo-ui-token-lint"
+                "bin/nowo-ui-token-lint",
+                "bin/nowo-ui-demo-style-lint"
             ],
             "type": "symfony-bundle",
             "autoload": {
@@ -1399,16 +1400,16 @@
                 "issues": "https://github.com/nowo-tech/UiKitBundle/issues",
                 "source": "https://github.com/nowo-tech/UiKitBundle"
             },
-            "time": "2026-11-16T16:23:57+00:00",
-            "published-time": "2026-11-16T16:27:15+00:00"
+            "time": "2026-11-20T20:27:14+00:00",
+            "published-time": "2026-11-20T20:30:01+00:00"
         },
         {
             "name": "nowo-tech/workflow-bundle",
-            "version": "dev-main",
+            "version": "dev-chore/demo-platform-shell",
             "dist": {
                 "type": "path",
                 "url": "/var/workflow-bundle",
-                "reference": "28516f9c614ff867fd4f3062bcb050c47831e6ba"
+                "reference": "dbd06fc41669ad88c3ce631b5d9d1e06148c29c3"
             },
             "require": {
                 "doctrine/doctrine-bundle": "^2.13 || ^3.2.4",

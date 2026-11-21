@@ -1,0 +1,73 @@
+{#- One playground page in the demo platform layout grammar (orders, documents, expenses, purchase orders): page header,
+    a form card with the create form, and a table card with the items and their transition forms.
+    Variables: ns (translation key of the playground), items, create_form, extra (optional callable-free key: 'document_type', 'tenant_department', 'tenant_region_tier'). -#}
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ ('playground.' ~ ns ~ '.title')|trans({}, 'demo') }}{% endblock %}
+
+{% block nowo_ui_page_header %}
+    {% set _toolbar %}{% if ns == 'orders' %}<a class="nowo-ui-btn nowo-ui-btn--outline" href="{{ path('demo_change_requests') }}">{{ 'nav.change_requests'|trans({}, 'demo') }}</a>{% endif %}{% endset %}
+    {{ include(nowo_ui_partial('page_header'), {title: ('playground.' ~ ns ~ '.title')|trans({}, 'demo'), intro: ns == 'orders' ? 'playground.orders.hint'|trans({}, 'demo') : null, toolbar: _toolbar}) }}
+{% endblock %}
+
+{% block body %}
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: ('playground.' ~ ns ~ '.create')|trans({}, 'demo'), kind: 'form', create_form: create_form, ns: ns} %}
+        {% block section_body %}
+            {{ form_start(create_form, {attr: {id: 'playground-create'}}) }}
+                    {% for child in create_form %}
+                        {% if not child.rendered %}{{ form_row(child) }}{% endif %}
+                    {% endfor %}
+            {{ form_end(create_form) }}
+        {% endblock %}
+        {% block section_footer %}
+            <button type="submit" form="playground-create" class="nowo-ui-btn nowo-ui-btn--primary">{{ ('playground.' ~ ns ~ '.create')|trans({}, 'demo') }}</button>
+        {% endblock %}
+    {% endembed %}
+
+    {% embed '@NowoUiKit/demo_platform/_section.html.twig' with {title: ('playground.' ~ ns ~ '.title')|trans({}, 'demo'), kind: 'table', items: items, ns: ns, empty: items is empty, state_message: 'playground.no_items'|trans({}, 'demo')} %}
+        {% block section_body %}
+            <table class="nowo-ui-data-table">
+                <thead>
+                    <tr>
+                        <th scope="col" class="nowo-ui-cell--num">#</th>
+                        <th scope="col">{{ 'playground.orders.title_field'|trans({}, 'demo') }}</th>
+                        {% if ns != 'orders' %}<th scope="col">{{ ns == 'documents' ? 'document_type' : (ns == 'expenses' ? 'tenant / department' : 'tenant / region / tier') }}</th>{% endif %}
+                        <th scope="col">Status</th>
+                        <th scope="col">{{ 'playground.resolved'|trans({}, 'demo') }}</th>
+                        <th scope="col">Transitions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td class="nowo-ui-cell--num">{{ item.entity.id }}</td>
+                            <td class="nowo-ui-cell--wrap">{{ item.entity.title }}</td>
+                            {% if ns == 'documents' %}
+                                <td><span class="nowo-ui-badge nowo-ui-badge--neutral">{{ item.entity.documentType }}</span></td>
+                            {% elseif ns == 'expenses' %}
+                                <td><span class="nowo-ui-badge nowo-ui-badge--neutral">{{ item.entity.tenant }}/{{ item.entity.department }}</span></td>
+                            {% elseif ns == 'purchase_orders' %}
+                                <td><span class="nowo-ui-badge nowo-ui-badge--neutral">{{ item.entity.tenant }}/{{ item.entity.region }}/{{ item.entity.amountTier }}</span></td>
+                            {% endif %}
+                            <td><span class="nowo-ui-badge nowo-ui-badge--primary">{{ item.marking }}</span></td>
+                            <td><code class="nowo-ui-code">{{ item.workflow_slug }}</code></td>
+                            <td>
+                                <div class="nowo-ui-row-actions">
+                                    {% for transition in item.transitions %}
+                                        {% set transition_form = item.transition_forms[transition] %}
+                                        {{ form_start(transition_form) }}
+                                            {% for child in transition_form %}{% if not child.rendered %}{{ form_row(child) }}{% endif %}{% endfor %}
+                                            <button type="submit" class="nowo-ui-btn nowo-ui-btn--sm nowo-ui-btn--outline">{{ transition }}</button>
+                                        {{ form_end(transition_form) }}
+                                    {% else %}
+                                        <span class="nowo-ui-muted">{{ 'playground.no_transitions'|trans({}, 'demo') }}</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endblock %}
+    {% endembed %}
+{% endblock %}

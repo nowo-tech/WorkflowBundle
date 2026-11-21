@@ -11,6 +11,8 @@ nav:
   documents: Documents
   expenses: Expenses
   purchase_orders: 'Purchase orders'
+  section_playground: 'Playground'
+  section_admin: 'Administration'
   toggle: 'Toggle navigation'
 
 home:
