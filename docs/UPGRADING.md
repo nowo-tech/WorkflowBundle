@@ -123,8 +123,9 @@ php bin/console doctrine:migrations:migrate
   again) was `SELECT MAX(version)+1`. It now comes from a per-scope counter row, claimed with an atomic
   `UPDATE … SET last_version = last_version + 1` in the transaction that inserts the version. See
   [CONCURRENCY.md, "Definition versions"](CONCURRENCY.md#definition-versions).
-- **The table.** What the diff generates without a table prefix (with `nowo_workflow.table_prefix` the table is
-  `<prefix>definition_sequence`):
+- **The table.** What to run, without a table prefix (with `nowo_workflow.table_prefix` the table is
+  `<prefix>definition_sequence`). The diff generates this without the trailing table-level
+  `DEFAULT CHARACTER SET … COLLATE`; add it yourself and keep it when you compare against the diff:
 
   ```sql
   -- MySQL 8.0.17+ (MariaDB: COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`, in the columns and in the table default)
@@ -137,7 +138,8 @@ php bin/console doctrine:migrations:migrate
   columns, not for the two that exist (those carry their own `COLLATE`). A text column added later without an explicit
   `COLLATE` inherits the table default, and without this clause that is the server's accent- and case-insensitive one
   (typically `utf8mb4_0900_ai_ci`); a join against `tenant_key` or `slug` then fails with MySQL error 1267 (illegal
-  mix of collations), long after and far from the change that caused it.
+  mix of collations), long after and far from the change that caused it. `nowo:workflow:sync-schema` builds the table from the ORM metadata and has the same gap: after
+  using it (or the diff without the edit), run the repair statement below.
 - **Repairing a table created without it.** Run
   `ALTER TABLE workflow_definition_sequence DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;` (MariaDB:
   `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`). It changes only the default for columns added from now on. **Never
