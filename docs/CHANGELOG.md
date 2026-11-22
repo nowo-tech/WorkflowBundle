@@ -66,6 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Documentation: the `workflow_definition_sequence` `CREATE TABLE` in UPGRADING ("To 2.2.0") now sets the table's default collation to the database's uniform collation** (`DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`, not the binary key collation), and recommends setting `doctrine.dbal.default_table_options` once in the host, since Doctrine's schema routes (`doctrine:schema:update --dump-sql`, `doctrine:migrations:diff`, `nowo:workflow:sync-schema`) emit the clause only then. The page states what that buys (new tables follow the uniform collation; no more 1267 between ordinary text columns) and what it does not (it does not stop a new column from folding case and accents, nor a 1267 against a binary key column; only declaring the column as an exact key does). UPGRADING also gives the `information_schema.TABLES.TABLE_COLLATION` check, the repair `ALTER TABLE`, and warns never to use `ALTER TABLE … CONVERT TO CHARACTER SET`, which would rewrite `tenant_key` and `slug` out of their binary collation. No code change.
+
 ## [2.2.0] - 2026-11-22
 
 ### Changed
