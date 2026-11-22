@@ -2,7 +2,7 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/workflow-bundle`  
-**Last audited**: 2026-11-20 (v1.21.0)
+**Last audited**: 2026-11-22 (v2.1.1)
 
 This file proves that **every production source artifact** under `src/` is referenced by the baseline specification. Test-only files under `tests/` and `*.test.ts` under `src/` are out of Packagist scope. Built assets under `Resources/public/` are documented as Vite/build outputs.
 
@@ -13,6 +13,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | `DependencyInjection/Compiler/TwigPathsPass.php` | Compiler pass | FR-DI-002 |
 | `DependencyInjection/Compiler/WorkflowUiSecurityPass.php` | UI security wiring | FR-SEC-007 |
 | `DependencyInjection/Compiler/CsrfProtectionPass.php` | CSRF fail-closed when the UI is enabled | FR-SEC-008 |
+| `DependencyInjection/Compiler/RemovedPortsPass.php` | Fails the build on a service still wired to a port removed in 2.0 | FR-DI-004 |
 | `DependencyInjection/Configuration.php` | Config tree (`ui.*`, `security.*`) | FR-CFG-001, FR-UI-001, FR-SEC-007 |
 | `DependencyInjection/NowoWorkflowExtension.php` | DI extension | FR-CFG-002 |
 | `NowoWorkflowBundle.php` | Bundle entry | FR-BUNDLE-001 |
@@ -93,10 +94,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
 | `Contract/WorkflowContextAwareInterface.php` | Public contract | FR-API-001 |
-| `Contract/WorkflowRegistryInterface.php` | Public contract | FR-API-001 |
-| `Contract/WorkflowUiAccessCheckerInterface.php` | Public contract | FR-API-001 |
 | `Contract/WorkflowSlugResolverInterface.php` | Public port: slug a subject or context runs (1.17, REQ-ARCH-001 rule 1) | FR-API-001 |
-| `Contract/WorkflowVersioningInterface.php` | Public port: tenant versions, clones, retire, delete (1.17, REQ-ARCH-001 rule 1) | FR-API-001 |
 
 ## Twig PHP
 
@@ -145,10 +143,7 @@ This file proves that **every production source artifact** under `src/` is refer
 
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
-| `Resources/views/_locale_switcher.html.twig` | Shared partial template | FR-VIEW-010 |
-| `Resources/views/base.html.twig` | Page shell + parent() stacking | FR-UI-001, FR-VIEW-001 |
 | `Resources/views/dashboard/index.html.twig` | Dashboard template | FR-VIEW-003 |
-| `Resources/views/layout_integrate_base.html.twig` | Optional host layout bridge | FR-UI-001 |
 | `Resources/views/workflow_definition/_flow_diagram.html.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/form.html.twig` | Workflow editor template | FR-VIEW-007 |
 | `Resources/views/workflow_definition/index.html.twig` | Workflow editor template | FR-VIEW-007 |
@@ -209,6 +204,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Contract/WorkflowRequestSearchGateInterface.php` | Host port: gate of the request search (1.21) | FR-ACL-001, FR-API-001 |
 | `Contract/WorkflowRequestSearchNarrowerInterface.php` | Host port: narrows the request search (1.21) | FR-ACL-001, FR-API-001 |
 | `Contract/WorkflowRequestTitleResolverInterface.php` | Host port: titles of found requests (1.21) | FR-API-001 |
+| `Contract/WorkflowDefinitionCatalogInterface.php` | Framework-free catalog port: list and install templates (2.1, B7) | FR-CAT-001, FR-API-001 |
 
 ## Model value objects
 
@@ -235,6 +231,8 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Model/WorkflowSubjectVariables.php` | Whitelisted scalar facts for conditions | FR-GUARD-001, FR-EXPR-001 |
 | `Enum/WorkflowConcurrencyMode.php` | Concurrency mode of a transition apply (1.20) | FR-WF-004 |
 | `Model/WorkflowRequestRef.php` | One request found by a search (1.21) | FR-ACL-001, FR-API-001 |
+| `Model/WorkflowDefinitionPage.php` | One page of the catalog list: read models only (2.1) | FR-CAT-001 |
+| `Model/WorkflowTemplateInstallation.php` | Outcome of a template install: the tenant's definition and `created` (2.1) | FR-CAT-001 |
 
 ## Versioning and tenancy services
 
@@ -244,6 +242,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | `DependencyInjection/Compiler/WorkflowRuntimePass.php` | Runtime port wiring | FR-RT-001, FR-DI-003 |
 | `Service/WorkflowVersioning.php` | Drafts, publish, clone, retire, delete | FR-VER-001 |
 | `Service/WorkflowVersionManager.php` | Default versioning port over the versioning SPI | FR-VER-002 |
+| `Service/WorkflowDefinitionCatalog.php` | Default catalog port: list and idempotent race-safe template install (2.1) | FR-CAT-001 |
 | `Tenancy/CloneStructureLock.php` | Locks a tenant clone to the template structure | FR-VER-004 |
 | `Tenancy/SubjectPinStore.php` | Reads and writes subject pins with plain DBAL | FR-VER-003 |
 | `Tenancy/TenancyContext.php` | The host's runtime tenancy ports in one place | FR-TEN-001 |
@@ -301,29 +300,29 @@ This file proves that **every production source artifact** under `src/` is refer
 
 | Category | Files | Mapped |
 | --- | ---: | ---: |
-| Bundle & DI | 6 | 6 |
+| Bundle & DI | 7 | 7 |
 | CLI | 2 | 2 |
 | Controllers | 3 | 3 |
 | Persistence | 5 | 5 |
 | Forms | 7 | 7 |
 | Domain models | 4 | 4 |
 | Application services | 20 | 20 |
-| Contracts & attributes | 5 | 5 |
+| Contracts & attributes | 2 | 2 |
 | Twig PHP | 2 | 2 |
 | Persistence integration | 5 | 5 |
 | Exceptions | 2 | 2 |
 | Symfony config | 2 | 2 |
 | Translations | 7 | 7 |
-| Twig views | 12 | 12 |
+| Twig views | 9 | 9 |
 | Public assets | 6 | 6 |
 | Doctrine private entity manager | 18 | 18 |
-| Ports (host contracts) | 13 | 13 |
-| Model value objects | 21 | 21 |
-| Versioning and tenancy services | 15 | 15 |
+| Ports (host contracts) | 14 | 14 |
+| Model value objects | 23 | 23 |
+| Versioning and tenancy services | 16 | 16 |
 | Expression guards | 3 | 3 |
 | Events and audit | 8 | 8 |
 | Commands and shape validation | 3 | 3 |
 | Further exceptions | 7 | 7 |
-| **Total production sources** | **176** | **176** |
+| **Total production sources** | **175** | **175** |
 
 Audit: `git ls-files src | wc -l` → 176.
