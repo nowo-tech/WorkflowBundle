@@ -138,8 +138,20 @@ php bin/console doctrine:migrations:migrate
   columns, not for the two that exist (those carry their own `COLLATE`). A text column added later without an explicit
   `COLLATE` inherits the table default, and without this clause that is the server's accent- and case-insensitive one
   (typically `utf8mb4_0900_ai_ci`); a join against `tenant_key` or `slug` then fails with MySQL error 1267 (illegal
-  mix of collations), long after and far from the change that caused it. `nowo:workflow:sync-schema` builds the table from the ORM metadata and has the same gap: after
-  using it (or the diff without the edit), run the repair statement below.
+  mix of collations), long after and far from the change that caused it. Neither route that builds the DDL from the ORM metadata
+  emits the table default: `doctrine:schema:update --dump-sql` (and a migration written from that dump, as one host
+  did) and `nowo:workflow:sync-schema`. With `sync-schema` there is also no statement the host can read and correct, it
+  executes the DDL itself, so the host must run the repair `ALTER TABLE` below afterwards. **The clause cannot be
+  checked by looking at the new table's columns:** every existing column can be correct while the table default is
+  wrong, and `SHOW CREATE TABLE` read column by column will look fine. Check the table instead:
+
+  ```sql
+  SELECT TABLE_COLLATION FROM information_schema.TABLES
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'workflow_definition_sequence';
+  ```
+
+  Expected: `utf8mb4_0900_bin` (MySQL 8.0.17+), `utf8mb4_nopad_bin` (MariaDB), `utf8mb4_bin` (older MySQL). Anything
+  ending in `_ai_ci` means the table needs the repair.
 - **Repairing a table created without it.** Run
   `ALTER TABLE workflow_definition_sequence DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;` (MariaDB:
   `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`). It changes only the default for columns added from now on. **Never

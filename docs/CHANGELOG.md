@@ -68,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Documentation: the `workflow_definition_sequence` `CREATE TABLE` in UPGRADING ("To 2.2.0") now sets the table's default collation** (the generated diff and `nowo:workflow:sync-schema` omit it, so the page says to add it or run the repair statement) (`DEFAULT CHARACTER SET utf8mb4 COLLATE <binary>`) so a column added later without an explicit `COLLATE` cannot inherit the server's case-insensitive default and fail joins with MySQL error 1267. UPGRADING also gives the repair statement for an existing table and warns never to use `ALTER TABLE … CONVERT TO CHARACTER SET`, which would rewrite `tenant_key` and `slug` out of their binary collation. No code change.
+- **Documentation: the `workflow_definition_sequence` `CREATE TABLE` in UPGRADING ("To 2.2.0") now sets the table's default collation** (neither `doctrine:schema:update --dump-sql` nor `nowo:workflow:sync-schema` emits it, so the page says to add it or run the repair statement, and gives the `information_schema.TABLES.TABLE_COLLATION` query to verify) (`DEFAULT CHARACTER SET utf8mb4 COLLATE <binary>`) so a column added later without an explicit `COLLATE` cannot inherit the server's case-insensitive default and fail joins with MySQL error 1267. UPGRADING also gives the repair statement for an existing table and warns never to use `ALTER TABLE … CONVERT TO CHARACTER SET`, which would rewrite `tenant_key` and `slug` out of their binary collation. No code change.
 
 ## [2.2.0] - 2026-11-22
 
