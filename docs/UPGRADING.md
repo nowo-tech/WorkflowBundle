@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 2.1.1](#to-211)
 - [To 2.1.0](#to-210)
   - [To 2.1.0](#to-210-1)
 - [To 2.0.0](#to-200)
@@ -96,6 +97,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 2.1.1
+
+From **2.1.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 ## To 2.1.0
 
