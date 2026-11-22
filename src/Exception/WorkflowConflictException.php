@@ -11,7 +11,8 @@ use Throwable;
 /**
  * A transition apply lost a race with a concurrent write on the same subject (since 1.20, REQ-RUNTIME-003): the
  * subject's marking changed after this request loaded it, the versioned UPDATE found a newer version, or the row lock
- * met a deadlock or a lock wait timeout. Nothing of the apply was committed, so a retry (after reloading the subject)
+ * met a deadlock or a lock wait timeout. Since 2.2 also a definition version number that could not be claimed
+ * ({@see self::REASON_VERSION_CLAIM}). Nothing of the apply was committed, so a retry (after reloading the subject)
  * is safe: HTTP answers 409 + `Retry-After` with the code {@see self::CODE}.
  *
  * It is a TransientStorageFailure and a LockConflictExceptionInterface, so a host using nowo-tech/transaction-doctrine's
@@ -36,6 +37,12 @@ final class WorkflowConflictException extends TransientStorageFailure implements
 
     /** Deadlock, lock wait timeout or serialization failure while locking or writing the subject. */
     public const REASON_LOCK = 'lock';
+
+    /**
+     * Since 2.2: a definition version number could not be claimed (a concurrent first claim of the scope's counter is
+     * hidden by this transaction's snapshot: PostgreSQL REPEATABLE READ / SERIALIZABLE). Nothing was written; retry.
+     */
+    public const REASON_VERSION_CLAIM = 'version_claim';
 
     /**
      * @param string $workflowSlug Workflow of the apply

@@ -26,7 +26,7 @@ final class WorkflowExactKeyColumnsTest extends TestCase
         );
     }
 
-    public function testDeclaresTheKeyColumnsOfBothTables(): void
+    public function testDeclaresTheKeyColumnsOfEveryKeyedTable(): void
     {
         self::assertSame([
             'workflow_definition.tenant_key',
@@ -34,6 +34,8 @@ final class WorkflowExactKeyColumnsTest extends TestCase
             'workflow_subject_pin.tenant_key',
             'workflow_subject_pin.workflow_slug',
             'workflow_subject_pin.subject_ref',
+            'workflow_definition_sequence.tenant_key',
+            'workflow_definition_sequence.slug',
         ], $this->describe(TableNamePrefixer::DEFAULT_PREFIX));
     }
 
@@ -47,6 +49,8 @@ final class WorkflowExactKeyColumnsTest extends TestCase
             'acme_subject_pin.tenant_key',
             'acme_subject_pin.workflow_slug',
             'acme_subject_pin.subject_ref',
+            'acme_definition_sequence.tenant_key',
+            'acme_definition_sequence.slug',
         ], $this->describe('acme_'));
     }
 

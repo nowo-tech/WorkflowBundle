@@ -63,7 +63,7 @@ A published version is **never edited**. The lifecycle of each `(tenant, slug)`:
 | Step | What happens | UI action (permission) |
 |------|--------------|------------------------|
 | Clone a template | The template's current published version is copied into the tenant as **draft v1** (`template_version` records which template version it came from). | "Customize for this organization" (`edit`) |
-| New draft | The current published version is copied as the **next version number**, status draft. One open draft at a time. | "New draft" (`edit`) |
+| New draft | The current published version is copied as the **next version number**, status draft. One open draft at a time. Since 2.2 the number comes from the scope's counter row (`workflow_definition_sequence`), claimed in the draft's transaction: unique and increasing, never reused while the scope has versions, possibly with gaps ([CONCURRENCY.md](CONCURRENCY.md#definition-versions)). | "New draft" (`edit`) |
 | Edit | Only drafts are edited (general, match rules, places, transitions and their guards). The slug is fixed once created. | Edit (`edit`) |
 | Publish | The draft becomes the version **new subjects** start with. | Publish (`publish`) |
 | Delete | A draft: only the draft. A published definition: every version of the slug in that scope, **refused while any subject is pinned to one of them** (owner decision 2026-11-12: `WorkflowDefinitionInUseException`, the UI shows the count and suggests disabling instead). | Delete (`publish`) |

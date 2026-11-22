@@ -381,7 +381,9 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
             ->setArgument('$logger', new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE));
         // Internal since 2.0: the admin UI and WorkflowVersionManager call it with the definitions they loaded.
         $container->register(WorkflowVersioning::class, WorkflowVersioning::class)->setAutowired(true)->setPublic(false)
-            ->setArgument('$lockCloneStructure', $enabled && $tenancy['lock_clone_structure']);
+            ->setArgument('$lockCloneStructure', $enabled && $tenancy['lock_clone_structure'])
+            // Since 2.2: the Retry-After of a conflict while claiming a version number.
+            ->setArgument('$retryAfterSeconds', '%nowo_workflow.runtime.concurrency.retry_after%');
         // Since 1.19, the only versioning port since 2.0 (REQ-ARCH-001 rule 1): hosts call it, and decorate or replace
         // it to change what their callers get.
         $container->register(WorkflowVersionManager::class, WorkflowVersionManager::class)->setAutowired(true)->setPublic(false);
