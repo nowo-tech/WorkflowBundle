@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 2.2.1](#to-221)
 - [To 2.2.0](#to-220)
   - [To 2.2.0](#to-220-1)
 - [To 2.1.1](#to-211)
@@ -100,6 +101,14 @@
 
 ## Unreleased
 
+## To 2.2.1
+
+From **2.2.0**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
 ## To 2.2.0
 
 From **2.1.1**:
@@ -123,15 +132,76 @@ php bin/console doctrine:migrations:migrate
   again) was `SELECT MAX(version)+1`. It now comes from a per-scope counter row, claimed with an atomic
   `UPDATE … SET last_version = last_version + 1` in the transaction that inserts the version. See
   [CONCURRENCY.md, "Definition versions"](CONCURRENCY.md#definition-versions).
-- **The table.** What the diff generates without a table prefix (with `nowo_workflow.table_prefix` the table is
-  `<prefix>definition_sequence`):
+- **The table.** What to run, without a table prefix (with `nowo_workflow.table_prefix` the table is
+  `<prefix>definition_sequence`). The diff generates the trailing table-level
+  `DEFAULT CHARACTER SET … COLLATE` only when the host sets `default_table_options` (see below); otherwise add it
+  yourself, and keep it when you compare against the diff:
 
   ```sql
-  -- MySQL 8.0.17+ (MariaDB: COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`)
-  CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, slug VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
-  -- PostgreSQL
+  -- MySQL 8.0.17+ (MariaDB: the key columns take COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`).
+  -- The trailing table default is NOT the key collation: use your database's uniform collation (`utf8mb4_unicode_ci` here).
+  CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, slug VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci`;
+  -- PostgreSQL (no table-level collation there, nothing to add)
   CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) NOT NULL, slug VARCHAR(128) NOT NULL, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
   ```
+
+- **Set the table default once, in the host (recommended).** The table's default collation applies to *future*
+  columns, not to the two that exist (those carry their own binary `COLLATE`). A text column added later without an
+  explicit `COLLATE` inherits the table default. Doctrine builds every table from `default_table_options`, so the host
+  should configure it once instead of patching each table:
+
+  ```yaml
+  # config/packages/doctrine.yaml
+  doctrine:
+      dbal:
+          default_table_options:
+              charset: utf8mb4
+              collation: utf8mb4_unicode_ci   # the database's uniform collation, NOT the exact-key one
+  ```
+
+  **This is the database's uniform collation (the example is `utf8mb4_unicode_ci`; use your own), not the binary
+  one.** The exact-key columns (`tenant_key`, `slug`) are declared separately and are binary NO PAD precisely because
+  the database default is not; putting a binary collation here would make every new table binary, break the
+  uniform-collation check (`check-collations`, `collation_check.expected_collation`), change how ordinary text (names,
+  titles) compares, and leave the exact-key columns indistinguishable from the rest. With the setting,
+  `doctrine:schema:update --dump-sql`, `doctrine:migrations:diff` and `nowo:workflow:sync-schema` emit the
+  `DEFAULT CHARACTER SET … COLLATE` clause on their own, for this table and every other one. Without it those routes
+  create the table with the server's default.
+
+  **What the setting buys:** every new table follows the database's declared uniform collation, so the uniformity
+  check passes, behaviour is predictable, and two ordinary text columns can no longer end up on different collations
+  (MySQL error 1267 between them) depending on how each table was created.
+
+  **What it does not buy:** it does not stop a new column from folding case and accents (a uniform collation is
+  case- and accent-insensitive, exactly like the server default), and it does not prevent error 1267 when such a column
+  is joined against `tenant_key` or `slug`. The only protection against folding is to declare the column as an exact
+  key with the binary NO PAD collation, which is what REQ-SEC-006 asks for and what the exact-key check verifies per
+  column. With the setting there is a single possible reason for that 1267, and it is informative: an ordinary column
+  was joined against an exact key and should probably have been declared as one. Without the setting the same error
+  also appears because tables disagree with each other, and the two causes cannot be told apart.
+- **Why the statement above carries the clause anyway.** A host that has not configured `default_table_options`, or that
+  runs the `CREATE TABLE` by hand, needs it written out (with its own uniform collation in place of
+  `utf8mb4_unicode_ci`); keeping it does no harm to a host that has configured it.
+  `nowo:workflow:sync-schema` is the worst case without the setting: it executes the DDL itself, so there is no
+  statement to read and correct, and the only remedy left is the repair `ALTER TABLE` below.
+- **Check the table, not its columns.** The clause cannot be verified by looking at the new table's columns: every
+  existing column can be correct while the table default is wrong, and `SHOW CREATE TABLE` read column by column will
+  look fine. Check the table instead:
+
+  ```sql
+  SELECT TABLE_COLLATION FROM information_schema.TABLES
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'workflow_definition_sequence';
+  ```
+
+  Expected: your database's uniform collation (not `utf8mb4_0900_bin`: the binary collation is checked per column, by
+  the exact-key check). A different value, typically the server default `utf8mb4_0900_ai_ci`, means the table needs the
+  repair.
+- **Repairing a table created without it.** Run
+  `ALTER TABLE workflow_definition_sequence DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;` (with your
+  database's uniform collation). It changes only the default for columns added from now on. **Never use
+  `ALTER TABLE … CONVERT TO CHARACTER SET …` for this:** `CONVERT TO` rewrites every column, which would move
+  `tenant_key` and `slug` out of their binary collation and start folding look-alike tenant keys, the exact failure
+  REQ-SEC-006 exists to prevent.
 
 - **No data migration needed.** The counter row of a scope is created at its first claim, seeded with the highest
   version already stored. To backfill every scope at once anyway (optional, in the same migration, after the
