@@ -303,10 +303,10 @@ final readonly class WorkflowVersioning
 
     /**
      * Every version of the scope, read under the counter claim of {@see WorkflowDefinitionRepository::insertNextVersion()}
-     * (since 2.2). The claim waited for any concurrent writer of the scope to commit. In a transaction the bundle opened,
-     * the claim was its first statement, so a plain read sees that commit (on MySQL / MariaDB REPEATABLE READ the
-     * snapshot starts after the claim). Inside the caller's transaction the snapshot may be older: the versions are read
-     * as last committed ({@see WorkflowDefinitionRepository::findVersionsAsCommitted()}, the 2.1.1 locking read).
+     * (since 2.2). The claim waited for any concurrent writer of the scope to commit. A transaction the bundle opened
+     * runs at READ COMMITTED (MySQL / MariaDB: set by the repository; PostgreSQL: its default), so a plain read sees that
+     * commit. Inside the caller's transaction the snapshot may be older: the versions are read as last committed
+     * ({@see WorkflowDefinitionRepository::findVersionsAsCommitted()}, the 2.1.1 locking read).
      *
      * @return list<WorkflowDefinition>
      */
