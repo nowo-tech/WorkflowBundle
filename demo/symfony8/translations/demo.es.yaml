@@ -6,7 +6,7 @@ nav:
   home: Inicio
   resolver: 'Laboratorio resolver'
   crud: 'CRUD Workflow'
-  change_requests: 'Change requests'
+  change_requests: 'Solicitudes de cambio'
   orders: Pedidos
   documents: Documentos
   expenses: Gastos

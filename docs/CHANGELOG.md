@@ -67,6 +67,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Demo: the Spanish demo catalogue showed the navigation entry `nav.change_requests` in English ("Change requests"); it now reads "Solicitudes de cambio". Demo only, no bundle change.
+
 ## [2.2.1] - 2026-11-22
 
 ### Fixed
