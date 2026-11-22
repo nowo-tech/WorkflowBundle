@@ -124,8 +124,9 @@ php bin/console doctrine:migrations:migrate
   `UPDATE … SET last_version = last_version + 1` in the transaction that inserts the version. See
   [CONCURRENCY.md, "Definition versions"](CONCURRENCY.md#definition-versions).
 - **The table.** What to run, without a table prefix (with `nowo_workflow.table_prefix` the table is
-  `<prefix>definition_sequence`). The diff generates this without the trailing table-level
-  `DEFAULT CHARACTER SET … COLLATE`; add it yourself and keep it when you compare against the diff:
+  `<prefix>definition_sequence`). The diff generates the trailing table-level
+  `DEFAULT CHARACTER SET … COLLATE` only when the host sets `default_table_options` (see below); otherwise add it
+  yourself, and keep it when you compare against the diff:
 
   ```sql
   -- MySQL 8.0.17+ (MariaDB: COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`, in the columns and in the table default)
@@ -134,16 +135,33 @@ php bin/console doctrine:migrations:migrate
   CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) NOT NULL, slug VARCHAR(128) NOT NULL, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
   ```
 
-- **Keep the table default collation.** The trailing `DEFAULT CHARACTER SET utf8mb4 COLLATE …` matters for *future*
+- **Set the table default once, in the host (recommended).** The table's default collation matters for *future*
   columns, not for the two that exist (those carry their own `COLLATE`). A text column added later without an explicit
-  `COLLATE` inherits the table default, and without this clause that is the server's accent- and case-insensitive one
-  (typically `utf8mb4_0900_ai_ci`); a join against `tenant_key` or `slug` then fails with MySQL error 1267 (illegal
-  mix of collations), long after and far from the change that caused it. Neither route that builds the DDL from the ORM metadata
-  emits the table default: `doctrine:schema:update --dump-sql` (and any migration written from that
-  dump) and `nowo:workflow:sync-schema`. With `sync-schema` there is also no statement the host can read and correct, it
-  executes the DDL itself, so the host must run the repair `ALTER TABLE` below afterwards. **The clause cannot be
-  checked by looking at the new table's columns:** every existing column can be correct while the table default is
-  wrong, and `SHOW CREATE TABLE` read column by column will look fine. Check the table instead:
+  `COLLATE` inherits the table default, and when that is the server's accent- and case-insensitive one (typically
+  `utf8mb4_0900_ai_ci`) a join against `tenant_key` or `slug` fails with MySQL error 1267 (illegal mix of collations),
+  long after and far from the change that caused it. Doctrine builds every table from `default_table_options`, so the
+  host should configure it once instead of patching each table:
+
+  ```yaml
+  # config/packages/doctrine.yaml
+  doctrine:
+      dbal:
+          default_table_options:
+              charset: utf8mb4
+              collation: utf8mb4_0900_bin   # MariaDB: utf8mb4_nopad_bin; older MySQL: utf8mb4_bin
+  ```
+
+  With that, `doctrine:schema:update --dump-sql`, `doctrine:migrations:diff` and `nowo:workflow:sync-schema` emit the
+  `DEFAULT CHARACTER SET … COLLATE` clause on their own, for this table and every other one, and nothing has to be
+  remembered per table. Use the one binary collation your application already uses uniformly. Without the setting those
+  routes create the table with the server's default.
+- **Why the statement above carries the clause anyway.** A host that has not configured `default_table_options`, or that
+  runs the `CREATE TABLE` by hand, needs it written out; keeping it does no harm to a host that has configured it.
+  `nowo:workflow:sync-schema` is the worst case without the setting: it executes the DDL itself, so there is no
+  statement to read and correct, and the only remedy left is the repair `ALTER TABLE` below.
+- **Check the table, not its columns.** The clause cannot be verified by looking at the new table's columns: every
+  existing column can be correct while the table default is wrong, and `SHOW CREATE TABLE` read column by column will
+  look fine. Check the table instead:
 
   ```sql
   SELECT TABLE_COLLATION FROM information_schema.TABLES
