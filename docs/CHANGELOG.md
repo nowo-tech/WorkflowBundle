@@ -64,6 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Template install inside the host's transaction** (REQ-RUNTIME-003, audit YP-L1): when two `WorkflowDefinitionCatalogInterface::installTemplate()` calls for one template and tenant raced and the loser ran inside a transaction the host had opened, the loser threw a `LogicException` instead of returning the winner's definition with `created = false` (on MySQL / MariaDB its re-read answered from the REPEATABLE READ snapshot taken before the winner's commit). The loser now reads the winner as last committed: after the unique key refuses its write (rolled back to the private manager's savepoint only), MySQL / MariaDB (without `innodb_snapshot_isolation`) read the winner's definition, places and transitions with a locking read (`LOCK IN SHARE MODE`, shared locks held until the host's transaction ends); PostgreSQL READ COMMITTED and SQLite read it with a plain read. The host's transaction is never committed or rolled back by the bundle and stays usable. The `LogicException` remains documented for the two cases where the winner cannot be read without breaking the host's transaction: DBAL 3 with savepoints off (the refused write marks it rollback-only; the message now says so, and nothing more is read) and a snapshot older than the winner that cannot be read past: PostgreSQL REPEATABLE READ / SERIALIZABLE, and MariaDB REPEATABLE READ with `innodb_snapshot_isolation` on (its default since 11.6.2, where a locking read of a newer row fails with ER_CHECKREAD; the bundle checks the variable and does not attempt it). Both now throw a `LogicException` whose message names the case. Stored data was always correct (exactly one definition). New `WorkflowDefinitionRepository::findVersionsAsCommitted()`. Covered by in-transaction race tests on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16 with DBAL 3 and 4, now part of the CI database matrix. A racing `publish: true` loser may still receive the winner's draft with `created = false`. No BC break.
+
 ## [2.1.0] - 2026-11-22
 
 ### Added

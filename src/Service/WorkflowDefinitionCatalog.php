@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Service;
 
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use LogicException;
 use Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -23,6 +24,7 @@ use function ceil;
 use function count;
 use function max;
 use function min;
+use function sprintf;
 
 /**
  * Default {@see WorkflowDefinitionCatalogInterface} (since 2.1): reads through {@see WorkflowDefinitionRepository} and
@@ -31,8 +33,8 @@ use function min;
  *
  * The service holds no state between calls (REQ-RUNTIME-002): every call reads the store. The install is idempotent
  * and race-safe by construction: it reads the tenant's scope first, writes with the unique `tenant_key, slug, version`
- * key as the arbiter, and when that key refuses the write (a concurrent install won) it reads the scope again and
- * answers the winner's definition.
+ * key as the arbiter, and when that key refuses the write (a concurrent install won) it reads the winner as last
+ * committed (since 2.1.1 also inside the caller's transaction) and answers the winner's definition.
  */
 final readonly class WorkflowDefinitionCatalog implements WorkflowDefinitionCatalogInterface
 {
@@ -91,15 +93,47 @@ final readonly class WorkflowDefinitionCatalog implements WorkflowDefinitionCata
         try {
             return new WorkflowTemplateInstallation(WorkflowDefinitionView::fromDefinition($this->versioning->cloneTemplate($templateKey, $tenant, $publish)), true);
         } catch (LogicException $refused) {
-            // A concurrent install created the tenant's definition between the read and the write (the unique key
-            // refused ours): that definition is the installed one. Anything else is the lock refusing the clone.
-            $winner = $this->newest($templateKey, $tenant);
-            if (!$winner instanceof WorkflowDefinition) {
-                throw $refused;
-            }
-
-            return new WorkflowTemplateInstallation(WorkflowDefinitionView::fromDefinition($winner), false);
+            return new WorkflowTemplateInstallation(WorkflowDefinitionView::fromDefinition($this->winner($templateKey, $tenant, $refused)), false);
         }
+    }
+
+    /**
+     * The definition a concurrent install stored, after cloneTemplate() refused this one (REQ-RUNTIME-003, audit
+     * YP-L1).
+     *
+     * - The unique key refused the write (a concurrent install won): inside the caller's transaction the refused write
+     *   was rolled back to the private manager's savepoint, the caller's transaction is untouched and the winner is
+     *   read as last committed ({@see WorkflowDefinitionRepository::findVersionsAsCommitted()}: a locking read on
+     *   MySQL / MariaDB, whose REPEATABLE READ snapshot may predate the winner's commit). When there was no savepoint
+     *   (DBAL 3 with savepoints off) the refused write marked the caller's transaction rollback-only: nothing is read
+     *   and a LogicException says so. When the caller's snapshot still hides the winner (PostgreSQL REPEATABLE READ /
+     *   SERIALIZABLE, MariaDB with `innodb_snapshot_isolation`), a LogicException says so too. The transaction is never
+     *   committed nor rolled back here.
+     * - Any other refusal (the tenant already had the slug, the clone-structure lock): the scope is read again and the
+     *   refusal is rethrown when it holds nothing.
+     *
+     * @throws LogicException when no winner can be read (see {@see WorkflowDefinitionCatalogInterface::installTemplate()})
+     */
+    private function winner(string $templateKey, WorkflowTenant $tenant, LogicException $refused): WorkflowDefinition
+    {
+        if (!$refused->getPrevious() instanceof UniqueConstraintViolationException) {
+            return $this->newest($templateKey, $tenant) ?? throw $refused;
+        }
+
+        $connection = $this->repository->connection();
+        if ($connection->isTransactionActive() && $connection->isRollbackOnly()) {
+            throw new LogicException(sprintf('A concurrent install of workflow "%s" won, but the refused write marked your transaction rollback-only (no savepoint: turn savepoints on with DBAL 3). Roll it back and install again.', $templateKey), 0, $refused);
+        }
+
+        $winner = $this->repository->findVersionsAsCommitted($templateKey, $tenant)[0] ?? null;
+        if ($winner instanceof WorkflowDefinition) {
+            return $winner;
+        }
+        if ($connection->isTransactionActive()) {
+            throw new LogicException(sprintf('A concurrent install of workflow "%s" won, but your transaction\'s snapshot predates it (REPEATABLE READ / SERIALIZABLE on PostgreSQL, or MariaDB with innodb_snapshot_isolation): read it again after your commit.', $templateKey), 0, $refused);
+        }
+
+        throw $refused;
     }
 
     /**

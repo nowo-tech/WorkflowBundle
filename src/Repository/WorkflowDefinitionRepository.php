@@ -6,7 +6,11 @@ namespace Nowo\WorkflowBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\LockMode;
+use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
+use Doctrine\DBAL\Platforms\MariaDBPlatform;
 use Doctrine\ORM\Mapping\ClassMetadata;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -28,6 +32,7 @@ use function is_numeric;
 use function is_string;
 use function max;
 use function mb_strtolower;
+use function mb_strtoupper;
 use function min;
 use function usort;
 
@@ -278,6 +283,72 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
     public function findVersions(string $slug, ?WorkflowTenant $tenant): array
     {
         return $this->scopeRows($slug, $tenant);
+    }
+
+    /**
+     * Every version of a slug in exactly this scope, newest first, as last committed (since 2.1.1, audit YP-L1): the
+     * read a loser of a unique-key race uses to find the winner inside the caller's open transaction.
+     *
+     * On MySQL / MariaDB (InnoDB) a plain read inside a REPEATABLE READ transaction answers from the transaction's
+     * snapshot, which may predate the winner's commit; this read is a locking read (`LOCK IN SHARE MODE`), which reads
+     * the latest committed rows. The places and transitions are fetched in the same locking statement, so the returned
+     * definitions never lazy-load them from the older snapshot. The shared locks are held until the caller's
+     * transaction ends (a concurrent change of these rows waits for it). Without an open transaction, on MariaDB with
+     * `innodb_snapshot_isolation` on (a locking read of a newer row fails there), and on the other platforms
+     * (PostgreSQL READ COMMITTED reads every committed row; its REPEATABLE READ snapshot hides rows from a locking read
+     * too; SQLite has one writer), it is the plain read of {@see findVersions()}.
+     *
+     * Slug and tenant key are re-checked byte for byte in PHP, as in {@see findVersions()}.
+     *
+     * @return list<WorkflowDefinition>
+     */
+    public function findVersionsAsCommitted(string $slug, ?WorkflowTenant $tenant): array
+    {
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive() || !$this->lockingReadSeesCommittedRows($connection)) {
+            return $this->scopeRows($slug, $tenant);
+        }
+
+        $key = WorkflowTenant::storageKey($tenant);
+        /** @var list<WorkflowDefinition> $rows */
+        $rows = $this->createQueryBuilder('d')
+            ->addSelect('p', 't')
+            ->leftJoin('d.places', 'p')
+            ->leftJoin('d.transitions', 't')
+            ->where('d.slug = :slug')
+            ->andWhere('d.tenantKey = :tenant')
+            ->setParameter('slug', $slug)
+            ->setParameter('tenant', $key)
+            ->orderBy('d.version', 'DESC')
+            ->addOrderBy('d.id', 'DESC')
+            ->getQuery()
+            // A row already in the identity map is overwritten with the committed state (collections included).
+            ->setHint(Query::HINT_REFRESH, true)
+            ->setLockMode(LockMode::PESSIMISTIC_READ)
+            ->getResult();
+
+        return array_values(array_filter($rows, static fn (WorkflowDefinition $row): bool => $row->getSlug() === $slug && $row->getTenantKey() === $key));
+    }
+
+    /**
+     * Whether a locking read inside the open transaction reads the latest committed rows without failing: MySQL, and
+     * MariaDB unless `innodb_snapshot_isolation` is on (the default since MariaDB 11.6.2), where a locking read of a
+     * row committed after the transaction's snapshot fails with ER_CHECKREAD ("Record has changed since last read")
+     * and must not be attempted inside the caller's transaction.
+     */
+    private function lockingReadSeesCommittedRows(Connection $connection): bool
+    {
+        $platform = $connection->getDatabasePlatform();
+        if (!$platform instanceof AbstractMySQLPlatform) {
+            return false;
+        }
+        if (!$platform instanceof MariaDBPlatform) {
+            return true;
+        }
+        // information_schema answers no row (never an error) on a server without the variable (before 10.6.18 / 11.4.2).
+        $snapshotIsolation = $connection->fetchOne("SELECT VARIABLE_VALUE FROM information_schema.SESSION_VARIABLES WHERE VARIABLE_NAME = 'INNODB_SNAPSHOT_ISOLATION'");
+
+        return !is_string($snapshotIsolation) || !in_array(mb_strtoupper($snapshotIsolation), ['ON', '1'], true);
     }
 
     /**

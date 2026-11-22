@@ -61,14 +61,19 @@ interface WorkflowDefinitionCatalogInterface
      *
      * Two concurrent installs of the same template for one tenant leave exactly one definition (the unique
      * `tenant_key, slug, version` key decides; the loser returns the winner's definition with `created = false`).
-     * That answer is guaranteed outside a transaction the caller opened. Inside one, the loser's re-read may not see
-     * the winner's row (MySQL REPEATABLE READ snapshot) and a LogicException is thrown: re-read after the commit. On
-     * DBAL 3 (no savepoints) the refused write also leaves the caller's transaction unusable. Either way exactly one
+     * Since 2.1.1 that also holds inside a transaction the caller opened: the refused write rolls back to its savepoint
+     * only and the loser reads the winner as last committed (a locking read on MySQL / MariaDB, whose REPEATABLE READ
+     * snapshot may predate the winner's commit; the shared locks last until the caller's transaction ends). The
+     * caller's transaction is never committed or rolled back by the bundle. A LogicException remains only when the
+     * winner cannot be read without breaking the caller's transaction: DBAL 3 with savepoints off (the refused write
+     * marked that transaction rollback-only: roll it back and install again), or a transaction whose snapshot predates
+     * the winner and cannot be read past (PostgreSQL REPEATABLE READ / SERIALIZABLE, MariaDB REPEATABLE READ with
+     * `innodb_snapshot_isolation` on, its default since 11.6.2: re-read after the commit). Either way exactly one
      * definition is stored. A racing `$publish = true` loser may receive the winner's draft with `created = false`.
      *
      * @throws WorkflowNotFoundException when there is no published global template with that key
      * @throws WorkflowStructureLockedException when $publish is set and the lock refuses the clone
-     * @throws LogicException when a concurrent install won inside the caller's transaction and the winner is not visible yet (see above)
+     * @throws LogicException when a concurrent install won inside the caller's transaction and the winner cannot be read without breaking it: DBAL 3 with savepoints off (transaction left rollback-only), or a snapshot older than the winner that cannot be read past (PostgreSQL REPEATABLE READ / SERIALIZABLE, MariaDB with innodb_snapshot_isolation; see above)
      */
     public function installTemplate(string $templateKey, WorkflowTenant $tenant, bool $publish = false): WorkflowTemplateInstallation;
 }

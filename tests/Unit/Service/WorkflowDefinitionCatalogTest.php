@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Tests\Unit\Service;
 
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver\Exception as DriverException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use InvalidArgumentException;
@@ -159,14 +160,59 @@ final class WorkflowDefinitionCatalogTest extends TestCase
         $tenant     = new WorkflowTenant('org-a');
         $winner     = $this->stored($tenant, 12, 1);
         $repository = $this->repository();
-        $repository->method('findVersions')->willReturnOnConsecutiveCalls([], [$winner]);
+        $repository->method('findVersions')->willReturn([]);
         $repository->method('findCurrent')->willReturn($this->stored(null, 1, 1));
         $repository->method('existsInScope')->willReturn(false);
+        $repository->method('connection')->willReturn($this->connection(false, false));
         $repository->method('save')->willThrowException(new UniqueConstraintViolationException($this->createStub(DriverException::class), null));
+        // 2.1.1 (YP-L1): the winner is read as last committed, not from the caller's snapshot.
+        $repository->expects(self::once())->method('findVersionsAsCommitted')->with('leave', $tenant)->willReturn([$winner]);
         $result = $this->catalog($repository)->installTemplate('leave', $tenant);
 
         self::assertFalse($result->created);
         self::assertSame(12, $result->definition->ref->id);
+    }
+
+    #[Test]
+    public function insideTheCallersTransactionTheWinnerIsAnsweredWhenTheTransactionIsStillUsable(): void
+    {
+        $tenant     = new WorkflowTenant('org-a');
+        $repository = $this->repository();
+        $repository->method('findVersions')->willReturn([]);
+        $repository->method('findCurrent')->willReturn($this->stored(null, 1, 1));
+        $repository->method('existsInScope')->willReturn(false);
+        $repository->method('connection')->willReturn($this->connection(true, false));
+        $repository->method('save')->willThrowException(new UniqueConstraintViolationException($this->createStub(DriverException::class), null));
+        $repository->method('findVersionsAsCommitted')->willReturn([$this->stored($tenant, 14, 1)]);
+        $result = $this->catalog($repository)->installTemplate('leave', $tenant);
+
+        self::assertFalse($result->created);
+        self::assertSame(14, $result->definition->ref->id);
+    }
+
+    #[Test]
+    public function aRefusedWriteThatLeftTheCallersTransactionRollbackOnlyThrowsAndReadsNothing(): void
+    {
+        $tenant     = new WorkflowTenant('org-a');
+        $repository = $this->repository();
+        $repository->method('findVersions')->willReturn([]);
+        $repository->method('findCurrent')->willReturn($this->stored(null, 1, 1));
+        $repository->method('existsInScope')->willReturn(false);
+        $connection = $this->connection(true, true);
+        $connection->expects(self::never())->method('commit');
+        $connection->expects(self::never())->method('rollBack');
+        $repository->method('connection')->willReturn($connection);
+        $repository->method('save')->willThrowException(new UniqueConstraintViolationException($this->createStub(DriverException::class), null));
+        $repository->expects(self::never())->method('findVersionsAsCommitted');
+
+        try {
+            $this->catalog($repository)->installTemplate('leave', $tenant);
+            self::fail('LogicException expected');
+        } catch (LogicException $exception) {
+            self::assertStringContainsString('rollback-only', $exception->getMessage());
+            self::assertInstanceOf(LogicException::class, $exception->getPrevious());
+            self::assertInstanceOf(UniqueConstraintViolationException::class, $exception->getPrevious()->getPrevious());
+        }
     }
 
     #[Test]
@@ -177,10 +223,61 @@ final class WorkflowDefinitionCatalogTest extends TestCase
         $repository->method('findVersions')->willReturn([]);
         $repository->method('findCurrent')->willReturn($this->stored(null, 1, 1));
         $repository->method('existsInScope')->willReturn(false);
+        $repository->method('connection')->willReturn($this->connection(false, false));
+        $repository->method('findVersionsAsCommitted')->willReturn([]);
         $repository->method('save')->willThrowException(new UniqueConstraintViolationException($this->createStub(DriverException::class), null));
 
         $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('The tenant already has a workflow "leave".');
         $this->catalog($repository)->installTemplate('leave', $tenant);
+    }
+
+    #[Test]
+    public function aWinnerHiddenByTheCallersSnapshotThrowsALogicExceptionThatSaysSo(): void
+    {
+        $tenant     = new WorkflowTenant('org-a');
+        $repository = $this->repository();
+        $repository->method('findVersions')->willReturn([]);
+        $repository->method('findCurrent')->willReturn($this->stored(null, 1, 1));
+        $repository->method('existsInScope')->willReturn(false);
+        $connection = $this->connection(true, false);
+        $connection->expects(self::never())->method('rollBack');
+        $repository->method('connection')->willReturn($connection);
+        $repository->method('findVersionsAsCommitted')->willReturn([]);
+        $repository->method('save')->willThrowException(new UniqueConstraintViolationException($this->createStub(DriverException::class), null));
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('snapshot predates it');
+        $this->catalog($repository)->installTemplate('leave', $tenant);
+    }
+
+    #[Test]
+    public function aRefusalOtherThanTheUniqueKeyReadsTheScopeAgain(): void
+    {
+        $tenant     = new WorkflowTenant('org-a');
+        $repository = $this->repository();
+        // The first read saw nothing, the clone's own check then saw the tenant's definition: a plain read answers it.
+        $repository->method('findVersions')->willReturnOnConsecutiveCalls([], [$this->stored($tenant, 15, 1)], [$this->stored($tenant, 15, 1)]);
+        $repository->method('findCurrent')->willReturn($this->stored(null, 1, 1));
+        $repository->method('existsInScope')->willReturn(true);
+        $repository->expects(self::never())->method('connection');
+        $repository->expects(self::never())->method('findVersionsAsCommitted');
+        $result = $this->catalog($repository)->installTemplate('leave', $tenant);
+
+        self::assertFalse($result->created);
+        self::assertSame(15, $result->definition->ref->id);
+    }
+
+    /**
+     * @return Connection&MockObject
+     */
+    private function connection(bool $inTransaction, bool $rollbackOnly): MockObject
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('isTransactionActive')->willReturn($inTransaction);
+        $connection->method('isRollbackOnly')->willReturn($rollbackOnly);
+
+        return $connection;
     }
 
     /**
