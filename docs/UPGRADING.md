@@ -129,18 +129,20 @@ php bin/console doctrine:migrations:migrate
   yourself, and keep it when you compare against the diff:
 
   ```sql
-  -- MySQL 8.0.17+ (MariaDB: COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`, in the columns and in the table default)
-  CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, slug VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_0900_bin`;
+  -- MySQL 8.0.17+ (MariaDB: the key columns take COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`).
+  -- The trailing table default is NOT the key collation: use your database's uniform collation (`utf8mb4_unicode_ci` here).
+  CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, slug VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci`;
   -- PostgreSQL (no table-level collation there, nothing to add)
   CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) NOT NULL, slug VARCHAR(128) NOT NULL, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
   ```
 
 - **Set the table default once, in the host (recommended).** The table's default collation matters for *future*
-  columns, not for the two that exist (those carry their own `COLLATE`). A text column added later without an explicit
-  `COLLATE` inherits the table default, and when that is the server's accent- and case-insensitive one (typically
-  `utf8mb4_0900_ai_ci`) a join against `tenant_key` or `slug` fails with MySQL error 1267 (illegal mix of collations),
-  long after and far from the change that caused it. Doctrine builds every table from `default_table_options`, so the
-  host should configure it once instead of patching each table:
+  columns, not for the two that exist (those carry their own binary `COLLATE`). A text column added later without an
+  explicit `COLLATE` inherits the table default; when that is the server's own default (typically
+  `utf8mb4_0900_ai_ci`) instead of the database's uniform collation, the column no longer matches the rest of the
+  database and a join against it fails with MySQL error 1267 (illegal mix of collations), long after and far from the
+  change that caused it. Doctrine builds every table from `default_table_options`, so the host should configure it
+  once instead of patching each table:
 
   ```yaml
   # config/packages/doctrine.yaml
@@ -148,15 +150,19 @@ php bin/console doctrine:migrations:migrate
       dbal:
           default_table_options:
               charset: utf8mb4
-              collation: utf8mb4_0900_bin   # MariaDB: utf8mb4_nopad_bin; older MySQL: utf8mb4_bin
+              collation: utf8mb4_unicode_ci   # the database's uniform collation, NOT the exact-key one
   ```
 
-  With that, `doctrine:schema:update --dump-sql`, `doctrine:migrations:diff` and `nowo:workflow:sync-schema` emit the
-  `DEFAULT CHARACTER SET … COLLATE` clause on their own, for this table and every other one, and nothing has to be
-  remembered per table. Use the one binary collation your application already uses uniformly. Without the setting those
-  routes create the table with the server's default.
+  **This is the database's uniform collation, not the binary one.** The exact-key columns (`tenant_key`, `slug`) are
+  declared separately and are binary NO PAD precisely because the database default is not; putting a binary collation
+  here would make every new table binary, break the uniform-collation check (`check-collations`,
+  `collation_check.expected_collation`), change how ordinary text (names, titles) compares, and leave the exact-key
+  columns indistinguishable from the rest. With the setting, `doctrine:schema:update --dump-sql`,
+  `doctrine:migrations:diff` and `nowo:workflow:sync-schema` emit the `DEFAULT CHARACTER SET … COLLATE` clause on their
+  own, for this table and every other one. Without it those routes create the table with the server's default.
 - **Why the statement above carries the clause anyway.** A host that has not configured `default_table_options`, or that
-  runs the `CREATE TABLE` by hand, needs it written out; keeping it does no harm to a host that has configured it.
+  runs the `CREATE TABLE` by hand, needs it written out (with its own uniform collation in place of
+  `utf8mb4_unicode_ci`); keeping it does no harm to a host that has configured it.
   `nowo:workflow:sync-schema` is the worst case without the setting: it executes the DDL itself, so there is no
   statement to read and correct, and the only remedy left is the repair `ALTER TABLE` below.
 - **Check the table, not its columns.** The clause cannot be verified by looking at the new table's columns: every
@@ -168,12 +174,13 @@ php bin/console doctrine:migrations:migrate
    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'workflow_definition_sequence';
   ```
 
-  Expected: `utf8mb4_0900_bin` (MySQL 8.0.17+), `utf8mb4_nopad_bin` (MariaDB), `utf8mb4_bin` (older MySQL). Anything
-  ending in `_ai_ci` means the table needs the repair.
+  Expected: your database's uniform collation (not `utf8mb4_0900_bin`: the binary collation is checked per column, by
+  the exact-key check). A different value, typically the server default `utf8mb4_0900_ai_ci`, means the table needs the
+  repair.
 - **Repairing a table created without it.** Run
-  `ALTER TABLE workflow_definition_sequence DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;` (MariaDB:
-  `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`). It changes only the default for columns added from now on. **Never
-  use `ALTER TABLE … CONVERT TO CHARACTER SET …` for this:** `CONVERT TO` rewrites every column, which would move
+  `ALTER TABLE workflow_definition_sequence DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;` (with your
+  database's uniform collation). It changes only the default for columns added from now on. **Never use
+  `ALTER TABLE … CONVERT TO CHARACTER SET …` for this:** `CONVERT TO` rewrites every column, which would move
   `tenant_key` and `slug` out of their binary collation and start folding look-alike tenant keys, the exact failure
   REQ-SEC-006 exists to prevent.
 
