@@ -317,7 +317,7 @@ jobs:
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped tests/Integration/Doctrine/PostgreSqlSubjectPinForeignKeyTest.php
 
   databases:
-    # REQ-RUNTIME-003: the two-connection race tests (applies, row locks, two processes, definition versions) against
+    # REQ-RUNTIME-003: the two-connection race tests (applies, installs, row locks, two processes, definition version counter, a real deadlock) against
     # real servers with real row locks, on DBAL 3 and DBAL 4. Required check on main.
     name: Databases (${{ matrix.db.image }}, DBAL ${{ matrix.dbal }})
     runs-on: ubuntu-latest
@@ -337,6 +337,7 @@ jobs:
             url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
             test: tests/Integration/Concurrency/ConcurrentApplyMySqlTest.php
             install_test: tests/Integration/Concurrency/ConcurrentInstallMySqlTest.php
+            version_test: tests/Integration/Concurrency/ConcurrentVersionMySqlTest.php
           - image: 'mariadb:11.4'
             port: 3306
             health: 'healthcheck.sh --connect --innodb_initialized'
@@ -344,6 +345,7 @@ jobs:
             url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
             test: tests/Integration/Concurrency/ConcurrentApplyMySqlTest.php
             install_test: tests/Integration/Concurrency/ConcurrentInstallMySqlTest.php
+            version_test: tests/Integration/Concurrency/ConcurrentVersionMySqlTest.php
           - image: 'postgres:16'
             port: 5432
             health: 'pg_isready -U postgres'
@@ -351,6 +353,7 @@ jobs:
             url: 'pdo-pgsql://postgres@127.0.0.1:5432/workflow'
             test: tests/Integration/Concurrency/ConcurrentApplyPostgreSqlTest.php
             install_test: tests/Integration/Concurrency/ConcurrentInstallPostgreSqlTest.php
+            version_test: tests/Integration/Concurrency/ConcurrentVersionPostgreSqlTest.php
 
     services:
       database:
@@ -408,6 +411,12 @@ jobs:
         env:
           ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.install_test }}
+
+      - name: Definition version race tests (REQ-RUNTIME-003 rule 4, since 2.2)
+        if: env.HEAVY == 'true'
+        env:
+          ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.version_test }}
 
   search-kit-databases:
     # Since 1.21.0: SearchKit's provider contract for every test subject (a string-backed enum status and a plain one)
