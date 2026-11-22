@@ -12,6 +12,7 @@
   - [Listeners run before the flush](#listeners-run-before-the-flush)
   - [Slugs and transition names are configuration](#slugs-and-transition-names-are-configuration)
 - [Runtime port (1.15)](#runtime-port-115)
+- [Definition catalog port (2.1)](#definition-catalog-port-21)
 - [Using it from a DDD / hexagonal application](#using-it-from-a-ddd--hexagonal-application)
   - [Keep the domain in charge](#keep-the-domain-in-charge)
   - [Known limitations](#known-limitations)
@@ -286,6 +287,61 @@ your own `WorkflowRuntimeInterface` service. A host service that still registers
 fails the build.
 
 See demo playgrounds: 0-param orders, 1-param documents, 2-param expenses, 3-param purchase orders, plus `/playground/resolver`.
+
+## Definition catalog port (2.1)
+
+`Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface` lists a tenant's workflow definitions and installs a
+global template for a tenant, with views, references and value objects only: a host with a private entity manager
+(the DDD shape above) does not read the definition tables or inject `WorkflowDefinitionRepository`. A template key is
+the slug of a published global definition (a definition without a tenant, e.g. one your seed writes).
+
+```php
+use Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface;
+use Nowo\WorkflowBundle\Model\WorkflowTenant;
+
+final readonly class ProvisionOrganizationWorkflows
+{
+    public function __construct(private WorkflowDefinitionCatalogInterface $catalog)
+    {
+    }
+
+    public function __invoke(string $organizationId): void
+    {
+        $tenant = new WorkflowTenant($organizationId);
+
+        // Idempotent: a second call (or a concurrent one) returns the existing definition, created = false.
+        $installation = $this->catalog->installTemplate('leave', $tenant, publish: true);
+        $installation->definition->ref->id;   // int row id
+        $installation->created;               // bool
+
+        $page = $this->catalog->list($tenant, page: 1, pageSize: 25);   // WorkflowDefinitionPage of WorkflowDefinitionView
+        $this->catalog->references($tenant);                            // list<WorkflowDefinitionRef>, no entities loaded
+        $this->catalog->count($tenant);
+        $this->catalog->isInstalled('leave', $tenant);
+    }
+}
+```
+
+- `list()` returns the latest version (draft, published or retired) of each slug the tenant owns, ordered by name, one
+  row per slug. Global templates are not listed, and never another tenant's definitions. A page past the last one
+  returns the last page.
+- `installTemplate()` copies the current published version of the global template into the tenant as a draft
+  (version 1), or as a published version 1 with `publish: true` (the clone-structure lock applies as for
+  `WorkflowVersionManagerInterface::cloneTemplate()`). When the tenant already owns the slug in any version or status,
+  nothing is written: the newest version comes back with `created = false`. A retired clone therefore counts as
+  installed; reinstate it with `WorkflowVersionManagerInterface::reinstate()`, or customize it again with `cloneTemplate()`.
+  A missing template throws `WorkflowNotFoundException`.
+- Concurrency (REQ-RUNTIME-003): two installs of one template for one tenant leave exactly one definition. The unique
+  `tenant_key, slug, version` key decides; the loser reads the scope again and returns the winner's definition with
+  `created = false`. Nothing is cached between calls, so it is safe in FrankenPHP worker mode with the kernel reset off.
+  That answer is guaranteed outside a transaction you opened. Inside one, the loser may get a `LogicException`
+  (on MySQL REPEATABLE READ its re-read does not see the winner's row): re-read after the commit. On DBAL 3, where
+  savepoints are off, the refused write also leaves your transaction unusable. One definition is stored either way.
+  A racing `publish: true` loser may receive the winner's draft with `created = false`.
+- Tenant keys and slugs are compared exactly (`org-a` is not `Org-A`): the SQL comparison only pre-filters and every row
+  is re-checked byte for byte in PHP.
+- The writes go through the bundle's private entity manager, never yours; inside a transaction you opened they join it
+  (a savepoint protects the refused write).
 
 ## Using it from a DDD / hexagonal application
 

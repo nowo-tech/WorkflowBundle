@@ -8,6 +8,7 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Enum\WorkflowDefinitionStatus;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
@@ -440,23 +441,9 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
         $total = count($ids);
         $pages = $pageSize > 0 ? max(1, (int) ceil($total / $pageSize)) : 1;
         $page  = $pageSize > 0 ? min($page, $pages) : 1;
-        $slice = $pageSize > 0 ? array_slice($ids, ($page - 1) * $pageSize, $pageSize) : $ids;
+        $slice = $pageSize > 0 ? array_values(array_slice($ids, ($page - 1) * $pageSize, $pageSize)) : array_values($ids);
 
-        $byId = [];
-        if ($slice !== []) {
-            /** @var list<WorkflowDefinition> $rows */
-            $rows = $this->createQueryBuilder('d')->where('d.id IN (:ids)')->setParameter('ids', $slice)->getQuery()->getResult();
-            foreach ($rows as $row) {
-                $byId[$row->getId()] = $row;
-            }
-        }
-        $items = [];
-        foreach ($slice as $id) {
-            if (isset($byId[$id])) {
-                $items[] = $byId[$id];
-            }
-        }
-        $this->loadListCollections($items);
+        $items = $this->hydrate($slice);
 
         return [
             'items'     => $items,
@@ -465,6 +452,70 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
             'pages'     => $pages,
             'page_size' => max(0, $pageSize),
         ];
+    }
+
+    /**
+     * The latest version (draft, published or retired) of every definition the tenant owns, one row per exact slug,
+     * ordered by name (since 2.1; what {@see WorkflowDefinitionCatalogInterface::list()} pages). Global templates are
+     * not included, and never another tenant's definition: the tenant key is compared in SQL and again byte for byte
+     * in PHP (audit NO-v N3), as is the slug that picks the latest version.
+     *
+     * @return list<array{id: int, slug: string, version: int, name: string}>
+     */
+    public function tenantListing(WorkflowTenant $tenant): array
+    {
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $this->createQueryBuilder('d')
+            ->select('d.id', 'd.tenantKey', 'd.slug', 'd.version', 'd.name')
+            ->where('d.tenantKey = :tenant')
+            ->setParameter('tenant', $tenant->key)
+            ->getQuery()
+            ->getArrayResult();
+
+        $latest = [];
+        foreach ($rows as $row) {
+            $key  = $row['tenantKey'] ?? null;
+            $slug = $row['slug'] ?? null;
+            if ($key !== $tenant->key || !is_string($slug) || !is_numeric($row['id'] ?? null) || !is_numeric($row['version'] ?? null)) {
+                continue;
+            }
+            if (!isset($latest[$slug]) || (int) $row['version'] > $latest[$slug]['version']) {
+                $latest[$slug] = ['id' => (int) $row['id'], 'slug' => $slug, 'version' => (int) $row['version'], 'name' => (string) ($row['name'] ?? '')];
+            }
+        }
+
+        $listing = array_values($latest);
+        usort($listing, static fn (array $a, array $b): int => [mb_strtolower($a['name']), $a['name'], $a['slug']] <=> [mb_strtolower($b['name']), $b['name'], $b['slug']]);
+
+        return $listing;
+    }
+
+    /**
+     * The definitions with these ids, in this order, with their places, transitions and match rules loaded.
+     *
+     * @param list<int> $ids
+     *
+     * @return list<WorkflowDefinition>
+     */
+    public function hydrate(array $ids): array
+    {
+        $byId = [];
+        if ($ids !== []) {
+            /** @var list<WorkflowDefinition> $rows */
+            $rows = $this->createQueryBuilder('d')->where('d.id IN (:ids)')->setParameter('ids', $ids)->getQuery()->getResult();
+            foreach ($rows as $row) {
+                $byId[$row->getId()] = $row;
+            }
+        }
+        $items = [];
+        foreach ($ids as $id) {
+            if (isset($byId[$id])) {
+                $items[] = $byId[$id];
+            }
+        }
+        $this->loadListCollections($items);
+
+        return $items;
     }
 
     /**

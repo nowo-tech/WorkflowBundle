@@ -33,6 +33,7 @@ services:
             - '../../EventListener/WorkflowUiRouteContextSubscriber.php'
             - '../../Service/WorkflowVersioning.php'
             - '../../Service/WorkflowVersionManager.php'
+            - '../../Service/WorkflowDefinitionCatalog.php'
             # Since 1.21: the SearchKit group (registered by the extension only with SearchKit) and its options VO.
             - '../../Bridge/'
             - '../../Search/'

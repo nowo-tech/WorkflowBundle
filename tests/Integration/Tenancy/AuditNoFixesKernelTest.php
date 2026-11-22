@@ -7,6 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Integration\Tenancy;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface;
 use Nowo\WorkflowBundle\Exception\WorkflowPinConflictException;
 use Nowo\WorkflowBundle\Model\WorkflowSubjectRef;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
@@ -98,6 +99,23 @@ final class AuditNoFixesKernelTest extends TestCase
             '_token'          => self::csrf($kernel, 'workflow_definition_form'),
         ]]);
         self::assertSame(422, $taken->getStatusCode());
+    }
+
+    #[Test]
+    public function theDefinitionCatalogNeverListsACaseVariantOfTheTenant(): void
+    {
+        $this->kernel = $kernel = $this->caseInsensitiveKernel();
+        self::seedLeaveTemplate($kernel);
+        $catalog = self::service($kernel, WorkflowDefinitionCatalogInterface::class, 'test.' . WorkflowDefinitionCatalogInterface::class);
+        self::assertTrue($catalog->installTemplate('leave', new WorkflowTenant('acme'))->created);
+
+        // The collation folds `Acme` onto the rows of `acme` in SQL; the PHP re-check drops them (2.1, B7).
+        $variant = new WorkflowTenant('Acme');
+        self::assertSame(0, $catalog->count($variant));
+        self::assertSame([], $catalog->references($variant));
+        self::assertSame([], $catalog->list($variant)->items);
+        self::assertFalse($catalog->isInstalled('leave', $variant));
+        self::assertSame(1, $catalog->count(new WorkflowTenant('acme')));
     }
 
     #[Test]

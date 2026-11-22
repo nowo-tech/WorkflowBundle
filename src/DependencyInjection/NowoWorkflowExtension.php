@@ -9,6 +9,7 @@ use Nowo\WorkflowBundle\Audit\AfterCommitDispatcher;
 use Nowo\WorkflowBundle\Audit\AuditMiddleware;
 use Nowo\WorkflowBundle\Bridge\SearchKit\WorkflowRequestSearchDefinition;
 use Nowo\WorkflowBundle\Collation\WorkflowExactKeyColumns;
+use Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface;
 use Nowo\WorkflowBundle\Contract\WorkflowVersionManagerInterface;
 use Nowo\WorkflowBundle\Controller\DashboardController;
 use Nowo\WorkflowBundle\Controller\WorkflowDefinitionController;
@@ -28,6 +29,7 @@ use Nowo\WorkflowBundle\Search\WorkflowRequestSearchOptions;
 use Nowo\WorkflowBundle\Service\DatabaseWorkflowRegistry;
 use Nowo\WorkflowBundle\Service\DemoSeedService;
 use Nowo\WorkflowBundle\Service\WorkflowApplicator;
+use Nowo\WorkflowBundle\Service\WorkflowDefinitionCatalog;
 use Nowo\WorkflowBundle\Service\WorkflowResolver;
 use Nowo\WorkflowBundle\Service\WorkflowVersioning;
 use Nowo\WorkflowBundle\Service\WorkflowVersionManager;
@@ -384,6 +386,9 @@ final class NowoWorkflowExtension extends Extension implements PrependExtensionI
         // it to change what their callers get.
         $container->register(WorkflowVersionManager::class, WorkflowVersionManager::class)->setAutowired(true)->setPublic(false);
         $container->setAlias(WorkflowVersionManagerInterface::class, WorkflowVersionManager::class);
+        // Since 2.1 (DDD-host checklist B7): list a tenant's definitions and install a template, as views and refs.
+        $container->register(WorkflowDefinitionCatalog::class, WorkflowDefinitionCatalog::class)->setAutowired(true)->setPublic(false);
+        $container->setAlias(WorkflowDefinitionCatalogInterface::class, WorkflowDefinitionCatalog::class);
 
         $container->getDefinition(WorkflowResolver::class)->setArgument('$tenancy', new Reference(TenancyContext::class));
         $container->getDefinition(DatabaseWorkflowRegistry::class)->setArgument('$locator', new Reference(WorkflowDefinitionLocator::class));
