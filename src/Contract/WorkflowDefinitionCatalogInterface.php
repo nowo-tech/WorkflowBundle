@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Nowo\WorkflowBundle\Contract;
 
+use LogicException;
 use Nowo\WorkflowBundle\Exception\WorkflowNotFoundException;
 use Nowo\WorkflowBundle\Exception\WorkflowStructureLockedException;
 use Nowo\WorkflowBundle\Model\WorkflowDefinitionPage;
@@ -60,9 +61,14 @@ interface WorkflowDefinitionCatalogInterface
      *
      * Two concurrent installs of the same template for one tenant leave exactly one definition (the unique
      * `tenant_key, slug, version` key decides; the loser returns the winner's definition with `created = false`).
+     * That answer is guaranteed outside a transaction the caller opened. Inside one, the loser's re-read may not see
+     * the winner's row (MySQL REPEATABLE READ snapshot) and a LogicException is thrown: re-read after the commit. On
+     * DBAL 3 (no savepoints) the refused write also leaves the caller's transaction unusable. Either way exactly one
+     * definition is stored. A racing `$publish = true` loser may receive the winner's draft with `created = false`.
      *
      * @throws WorkflowNotFoundException when there is no published global template with that key
      * @throws WorkflowStructureLockedException when $publish is set and the lock refuses the clone
+     * @throws LogicException when a concurrent install won inside the caller's transaction and the winner is not visible yet (see above)
      */
     public function installTemplate(string $templateKey, WorkflowTenant $tenant, bool $publish = false): WorkflowTemplateInstallation;
 }

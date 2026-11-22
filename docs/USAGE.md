@@ -334,6 +334,10 @@ final readonly class ProvisionOrganizationWorkflows
 - Concurrency (REQ-RUNTIME-003): two installs of one template for one tenant leave exactly one definition. The unique
   `tenant_key, slug, version` key decides; the loser reads the scope again and returns the winner's definition with
   `created = false`. Nothing is cached between calls, so it is safe in FrankenPHP worker mode with the kernel reset off.
+  That answer is guaranteed outside a transaction you opened. Inside one, the loser may get a `LogicException`
+  (on MySQL REPEATABLE READ its re-read does not see the winner's row): re-read after the commit. On DBAL 3, where
+  savepoints are off, the refused write also leaves your transaction unusable. One definition is stored either way.
+  A racing `publish: true` loser may receive the winner's draft with `created = false`.
 - Tenant keys and slugs are compared exactly (`org-a` is not `Org-A`): the SQL comparison only pre-filters and every row
   is re-checked byte for byte in PHP.
 - The writes go through the bundle's private entity manager, never yours; inside a transaction you opened they join it
