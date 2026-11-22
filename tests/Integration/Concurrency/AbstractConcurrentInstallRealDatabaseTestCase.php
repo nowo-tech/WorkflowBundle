@@ -7,7 +7,7 @@ namespace Nowo\WorkflowBundle\Tests\Integration\Concurrency;
 use Composer\InstalledVersions;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
-use Doctrine\DBAL\Platforms\MariaDBPlatform;
+use Doctrine\DBAL\TransactionIsolationLevel;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
@@ -160,6 +160,50 @@ abstract class AbstractConcurrentInstallRealDatabaseTestCase extends TestCase
     }
 
     /**
+     * Audit YS (2.1.1): in a READ COMMITTED session the plain read already sees the committed winner, so no locking read
+     * runs; another host installing a newer definition (another tenant) is not held up by the loser's open transaction.
+     */
+    #[Test]
+    public function aReadCommittedLoserInsideTheHostsTransactionTakesNoLockingReadAndBlocksNoOtherInstall(): void
+    {
+        [$a, $tool, $metadata] = $this->prepare();
+        $b                     = $this->connect();
+        $host                  = $b->getConnection();
+        $this->useSavepoints($host);
+        $host->setTransactionIsolation(TransactionIsolationLevel::READ_COMMITTED);
+        $c     = $this->connect();
+        $other = $c->getConnection();
+        $other->executeStatement($other->getDatabasePlatform() instanceof AbstractMySQLPlatform ? 'SET SESSION innodb_lock_wait_timeout = 3' : "SET lock_timeout = '3s'");
+
+        try {
+            $tenant = new WorkflowTenant('org-a');
+            $host->beginTransaction();
+            self::assertSame(0, $this->tenantRows($b, 'org-a'));
+            $winner = $this->catalog($a)->installTemplate(self::TEMPLATE, $tenant);
+            $result = $this->loserCatalog($b)->installTemplate(self::TEMPLATE, $tenant);
+
+            self::assertFalse($result->created);
+            self::assertSame($winner->definition->ref->id, $result->definition->ref->id);
+            self::assertSame(['draft', 'review'], $result->definition->placeNames);
+            // A newer definition (places and transitions included) for another tenant, while the loser's host is open.
+            self::assertTrue($this->catalog($c)->installTemplate(self::TEMPLATE, new WorkflowTenant('org-z'))->created);
+
+            self::assertTrue($host->isTransactionActive());
+            self::assertFalse($host->isRollbackOnly());
+            $host->commit();
+            self::assertSame(1, $this->tenantRows($a, 'org-a'));
+        } finally {
+            while ($host->isTransactionActive()) {
+                $host->rollBack();
+            }
+            $tool->dropSchema($metadata);
+            $a->getConnection()->close();
+            $host->close();
+            $other->close();
+        }
+    }
+
+    /**
      * Audit YP-L1 (2.1.1), the documented exception: on DBAL 3 with savepoints off the refused write cannot roll back
      * to a savepoint and marks the host's transaction rollback-only. The loser then reads nothing and throws a
      * LogicException; the bundle never rolls the host's transaction back (the host does).
@@ -220,15 +264,16 @@ abstract class AbstractConcurrentInstallRealDatabaseTestCase extends TestCase
     }
 
     /**
-     * MariaDB with `innodb_snapshot_isolation` on.
+     * A server with `innodb_snapshot_isolation` on (MariaDB), whatever platform class DBAL picked.
      */
     private function snapshotIsolation(Connection $connection): bool
     {
-        if (!$connection->getDatabasePlatform() instanceof MariaDBPlatform) {
+        if (!$connection->getDatabasePlatform() instanceof AbstractMySQLPlatform) {
             return false;
         }
+        $row = $connection->fetchNumeric("SHOW SESSION VARIABLES LIKE 'innodb_snapshot_isolation'");
 
-        return in_array($connection->fetchOne("SELECT VARIABLE_VALUE FROM information_schema.SESSION_VARIABLES WHERE VARIABLE_NAME = 'INNODB_SNAPSHOT_ISOLATION'"), ['ON', '1'], true);
+        return $row !== false && in_array($row[1] ?? null, ['ON', '1'], true);
     }
 
     /**

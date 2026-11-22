@@ -107,8 +107,9 @@ final readonly class WorkflowDefinitionCatalog implements WorkflowDefinitionCata
      *   MySQL / MariaDB, whose REPEATABLE READ snapshot may predate the winner's commit). When there was no savepoint
      *   (DBAL 3 with savepoints off) the refused write marked the caller's transaction rollback-only: nothing is read
      *   and a LogicException says so. When the caller's snapshot still hides the winner (PostgreSQL REPEATABLE READ /
-     *   SERIALIZABLE, MariaDB with `innodb_snapshot_isolation`), a LogicException says so too. The transaction is never
-     *   committed nor rolled back here.
+     *   SERIALIZABLE, MariaDB with `innodb_snapshot_isolation`), a LogicException says so too (PostgreSQL SERIALIZABLE
+     *   may raise its retryable serialization failure, 40001, first). The transaction is never committed nor rolled
+     *   back here.
      * - Any other refusal (the tenant already had the slug, the clone-structure lock): the scope is read again and the
      *   refusal is rethrown when it holds nothing.
      *

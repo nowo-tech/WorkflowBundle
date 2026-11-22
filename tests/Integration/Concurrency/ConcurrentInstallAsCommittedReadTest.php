@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Integration\Concurrency;
 
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Doctrine\DBAL\Platforms\MariaDBPlatform;
+use Doctrine\DBAL\Platforms\MySQL80Platform;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\ORMSetup;
@@ -21,15 +23,18 @@ use Nowo\WorkflowBundle\Tests\Support\Concurrency\LockingSqlMiddleware;
 use Nowo\WorkflowBundle\Tests\Support\Concurrency\RaceHarness;
 use Nowo\WorkflowBundle\Tests\Support\Concurrency\StaleReadDefinitionRepository;
 use Nowo\WorkflowBundle\Tests\Support\TestManagerRegistry;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 use function array_filter;
 use function array_values;
 use function dirname;
+use function implode;
 use function is_file;
 use function str_contains;
 use function str_ends_with;
+use function str_starts_with;
 use function sys_get_temp_dir;
 use function tempnam;
 use function unlink;
@@ -39,13 +44,14 @@ use const PHP_VERSION_ID;
 /**
  * Audit YP-L1 (2.1.1) in the default suite: a SQLite file stands in for a MySQL / MariaDB server
  * ({@see LockingSqlMiddleware}), so the loser of an install race inside the host's transaction reads the winner with
- * the locking read the bundle sends to InnoDB, and skips it on MariaDB with `innodb_snapshot_isolation` on. The real
+ * the locking read the bundle sends to InnoDB, and skips it in a READ COMMITTED session and with MariaDB's
+ * `innodb_snapshot_isolation` on (audit YS: read from the session variables, never from the platform class). The real
  * servers (snapshots, row locks, DBAL 3 and 4) are covered by ConcurrentInstallMySqlTest / ConcurrentInstallPostgreSqlTest.
  */
 final class ConcurrentInstallAsCommittedReadTest extends TestCase
 {
     private const TEMPLATE  = 'race_template';
-    private const VARIABLE  = 'INNODB_SNAPSHOT_ISOLATION';
+    private const SHOW      = 'SHOW SESSION VARIABLES';
     private const LOCK_READ = ' LOCK IN SHARE MODE';
 
     private string $path = '';
@@ -76,9 +82,9 @@ final class ConcurrentInstallAsCommittedReadTest extends TestCase
     }
 
     #[Test]
-    public function onMySqlTheLoserReadsTheWinnerWithALockingReadInsideTheHostsTransaction(): void
+    public function onMySqlRepeatableReadTheLoserReadsTheWinnerWithALockingReadInsideTheHostsTransaction(): void
     {
-        $locking = new LockingSqlMiddleware();
+        $locking = $this->server(new MySQL80Platform(), ['transaction_isolation' => 'REPEATABLE-READ']);
         $result  = $this->loseInsideTheHostsTransaction($locking);
 
         self::assertFalse($result['created']);
@@ -89,39 +95,39 @@ final class ConcurrentInstallAsCommittedReadTest extends TestCase
         self::assertStringContainsString(' LEFT JOIN ', $locks[0]);
     }
 
+    /**
+     * Audit YS: the server's own session variables decide, never the platform class (a MariaDB host configured with a
+     * MySQL `serverVersion` reports MySQL80Platform). A variable the server lacks is simply not listed.
+     *
+     * @param array<string, string> $variables
+     */
     #[Test]
-    public function onMariaDbWithoutTheSnapshotIsolationVariableTheLockingReadIsUsed(): void
+    #[DataProvider('sessions')]
+    public function theSessionDecidesWhetherTheLockingReadIsUsed(AbstractMySQLPlatform $platform, array $variables, bool $locks): void
     {
-        // A server without the variable (before 10.6.18 / 11.4.2): information_schema answers no row.
-        $locking = new LockingSqlMiddleware(new MariaDBPlatform(), [self::VARIABLE => 'SELECT 1 WHERE 0']);
+        $locking = $this->server($platform, $variables);
         $result  = $this->loseInsideTheHostsTransaction($locking);
 
-        self::assertFalse($result['created']);
-        self::assertCount(1, $this->lockingReads($locking));
+        self::assertFalse($result['created'], 'the loser answers the winner either way (SQLite has no snapshot)');
+        self::assertCount($locks ? 1 : 0, $this->lockingReads($locking));
+        self::assertNotSame([], array_filter($locking->statements, static fn (string $sql): bool => str_starts_with($sql, self::SHOW)));
     }
 
-    #[Test]
-    public function onMariaDbWithSnapshotIsolationOffTheLockingReadIsUsed(): void
+    /**
+     * @return iterable<string, array{AbstractMySQLPlatform, array<string, string>, bool}>
+     */
+    public static function sessions(): iterable
     {
-        $locking = new LockingSqlMiddleware(new MariaDBPlatform(), [self::VARIABLE => "SELECT 'OFF'"]);
-        $result  = $this->loseInsideTheHostsTransaction($locking);
-
-        self::assertFalse($result['created']);
-        self::assertCount(1, $this->lockingReads($locking));
-    }
-
-    #[Test]
-    public function onMariaDbWithSnapshotIsolationTheLockingReadIsNeverTried(): void
-    {
-        // innodb_snapshot_isolation on: a locking read of a row newer than the snapshot would fail with ER_CHECKREAD,
-        // so only the plain read runs (SQLite has no snapshot, so it sees the winner here; on a real MariaDB 11.8 the
-        // snapshot hides it and the LogicException of ConcurrentInstallMySqlTest follows).
-        $locking = new LockingSqlMiddleware(new MariaDBPlatform(), [self::VARIABLE => "SELECT 'ON'"]);
-        $result  = $this->loseInsideTheHostsTransaction($locking);
-
-        self::assertFalse($result['created']);
-        self::assertSame([], $this->lockingReads($locking));
-        self::assertNotSame([], array_filter($locking->statements, static fn (string $sql): bool => str_contains($sql, self::VARIABLE)));
+        yield 'MySQL without the snapshot variable' => [new MySQL80Platform(), ['transaction_isolation' => 'REPEATABLE-READ'], true];
+        yield 'MySQL SERIALIZABLE' => [new MySQL80Platform(), ['transaction_isolation' => 'SERIALIZABLE'], true];
+        yield 'MySQL READ COMMITTED: plain read, no lock' => [new MySQL80Platform(), ['transaction_isolation' => 'READ-COMMITTED'], false];
+        yield 'READ UNCOMMITTED: plain read' => [new MySQL80Platform(), ['transaction_isolation' => 'READ-UNCOMMITTED'], false];
+        yield 'old MariaDB tx_isolation READ COMMITTED' => [new MariaDBPlatform(), ['tx_isolation' => 'READ-COMMITTED'], false];
+        yield 'old MariaDB without the snapshot variable' => [new MariaDBPlatform(), ['tx_isolation' => 'REPEATABLE-READ'], true];
+        yield 'MariaDB snapshot isolation OFF' => [new MariaDBPlatform(), ['transaction_isolation' => 'REPEATABLE-READ', 'innodb_snapshot_isolation' => 'OFF'], true];
+        yield 'MariaDB snapshot isolation ON' => [new MariaDBPlatform(), ['transaction_isolation' => 'REPEATABLE-READ', 'innodb_snapshot_isolation' => 'ON'], false];
+        yield 'MariaDB behind a MySQL serverVersion, snapshot isolation ON' => [new MySQL80Platform(), ['transaction_isolation' => 'REPEATABLE-READ', 'innodb_snapshot_isolation' => 'ON'], false];
+        yield 'no variable listed at all' => [new MySQL80Platform(), [], true];
     }
 
     #[Test]
@@ -161,6 +167,21 @@ final class ConcurrentInstallAsCommittedReadTest extends TestCase
         $host->close();
 
         return ['created' => $result->created, 'places' => $result->definition->placeNames, 'transitions' => $result->definition->transitionNames];
+    }
+
+    /**
+     * A MySQL-family server whose session variables are $variables (the SHOW statement is answered by SQLite).
+     *
+     * @param array<string, string> $variables
+     */
+    private function server(AbstractMySQLPlatform $platform, array $variables): LockingSqlMiddleware
+    {
+        $rows = [];
+        foreach ($variables as $name => $value) {
+            $rows[] = "SELECT '" . $name . "', '" . $value . "'";
+        }
+
+        return new LockingSqlMiddleware($platform, [self::SHOW => $rows === [] ? 'SELECT 1, 1 WHERE 0' : implode(' UNION ALL ', $rows)]);
     }
 
     /**
