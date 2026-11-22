@@ -27,6 +27,7 @@ use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Doctrine\PrivateEntityManagerMiddleware;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use Nowo\WorkflowBundle\EventListener\TransitionGuardSubscriber;
@@ -121,7 +122,8 @@ final class AuditNoUnitTest extends TestCase
         $published->addPlace(new WorkflowPlace('a'));
         $repository = $this->createMock(WorkflowDefinitionRepository::class);
         $repository->method('findDraft')->willReturnOnConsecutiveCalls(null, $existing, null, null);
-        $repository->method('nextVersion')->willReturn(2);
+        // Since 2.2 the number is claimed in the insert's transaction: the write runs with the claimed number.
+        $repository->method('insertNextVersion')->willReturnCallback(static fn (string $slug, ?WorkflowTenant $tenant, callable $write): mixed => $write(2));
         $repository->method('save')->willThrowException($this->uniqueViolation());
         $repository->method('findCurrent')->willReturn($published);
         $repository->method('existsInScope')->willReturn(false);
@@ -396,7 +398,11 @@ final class AuditNoUnitTest extends TestCase
         $manager->method('getClassMetadata')->willReturnCallback(static function (string $class): ClassMetadata {
             /** @var class-string $class */
             $metadata = new ClassMetadata($class);
-            $metadata->setPrimaryTable(['name' => $class === WorkflowDefinition::class ? 'workflow_definition' : 'workflow_subject_pin']);
+            $metadata->setPrimaryTable(['name' => match ($class) {
+                WorkflowDefinition::class         => 'workflow_definition',
+                WorkflowDefinitionSequence::class => 'workflow_definition_sequence',
+                default                           => 'workflow_subject_pin',
+            }]);
 
             return $metadata;
         });

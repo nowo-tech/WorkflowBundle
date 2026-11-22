@@ -31,7 +31,7 @@ use function strtolower;
 final readonly class UnprefixedTablesGuard
 {
     /** The bundle tables with the default prefix. */
-    public const DEFAULT_TABLES = ['workflow_definition', 'workflow_place', 'workflow_transition', 'workflow_match_rule', 'workflow_subject_pin'];
+    public const DEFAULT_TABLES = ['workflow_definition', 'workflow_place', 'workflow_transition', 'workflow_match_rule', 'workflow_subject_pin', 'workflow_definition_sequence'];
 
     public function __construct(
         private TableNamePrefixer $prefixer,

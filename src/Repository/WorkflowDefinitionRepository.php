@@ -6,13 +6,17 @@ namespace Nowo\WorkflowBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
+use Nowo\TransactionDoctrine\DoctrineTransactionRunner;
+use Nowo\WorkflowBundle\Concurrency\DefinitionVersionSequence;
 use Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence;
 use Nowo\WorkflowBundle\Enum\WorkflowDefinitionStatus;
 use Nowo\WorkflowBundle\Model\WorkflowTenant;
 use SortDirection;
@@ -256,10 +260,11 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
     }
 
     /**
-     * The next version number of a slug in exactly this scope (since 1.15). Deliberately computed over every row the
-     * SQL comparison returns (under a case-insensitive collation that may include a case variant of the key): the
-     * number is then at least the exact maximum and can never collide in a unique index that folds the keys together;
-     * no row of another tenant is ever returned, only a number (audit NO-v N3).
+     * The next version number of a slug in exactly this scope (since 1.15), computed as `MAX(version)+1`.
+     *
+     * @deprecated since 2.2, an estimate only: two concurrent callers get the same number (REQ-RUNTIME-003 rule 4). The
+     *             bundle no longer calls it; insert a version with {@see insertNextVersion()}, which claims the number
+     *             from the scope's counter row in the insert's transaction.
      */
     public function nextVersion(string $slug, ?WorkflowTenant $tenant): int
     {
@@ -273,6 +278,56 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         return (int) $max + 1;
+    }
+
+    /**
+     * Writes a new version of a slug in exactly this scope with the next version number (since 2.2, REQ-RUNTIME-003
+     * rule 4). The scope's counter row is created first when it has none ({@see DefinitionVersionSequence::ensure()}, a
+     * unit of its own). Then one transaction (nowo-tech/transaction-doctrine's runner on the definitions' connection, a
+     * savepoint inside a transaction the caller opened) claims the number from the counter row
+     * ({@see DefinitionVersionSequence::claim()}) and runs $write with it; $write saves the version through this
+     * repository. The counter row stays locked until the commit: a concurrent writer of the same scope waits, then gets
+     * the next number, so $write may re-check the scope under the claim. A rollback gives the number back.
+     *
+     * Failures:
+     *
+     * - a deadlock, lock wait timeout or serialization failure: the runner rolls back to where it started (closing the
+     *   connection when even that rollback fails, audit ZH-M1) and throws a retryable `TransientStorageFailure`
+     *   (409 + `CONFLICT_001` on the bundle's routes);
+     * - the unique `(tenant_key, slug, version)` key refuses the number: the counter was behind the stored versions
+     *   (versions written without it, a slug renamed into the scope). The counter is moved up to the highest stored
+     *   version ({@see DefinitionVersionSequence::realign()}, never down) and the write runs once more; the violation
+     *   is rethrown when nothing moved, the caller's transaction is rollback-only (DBAL 3 without savepoints), or the
+     *   manager stays closed (a plain manager instead of the bundle's private one, which replaces itself);
+     * - anything else is rethrown unchanged after the rollback.
+     *
+     * @template T
+     *
+     * @param callable(int): T $write receives the claimed version number
+     * @param int|null $retryAfterSeconds Retry-After hint of a conflict
+     *
+     * @return T
+     */
+    public function insertNextVersion(string $slug, ?WorkflowTenant $tenant, callable $write, ?int $retryAfterSeconds = 1): mixed
+    {
+        $connection = $this->connection();
+        $sequence   = $this->versionSequence($connection, $retryAfterSeconds);
+        $runner     = DoctrineTransactionRunner::forConnection($connection, $retryAfterSeconds);
+
+        // The scope's counter row first, in a unit of its own (committed before the claim when no transaction is open).
+        $this->runUnit($runner, $connection, static fn () => $sequence->ensure($slug, $tenant));
+
+        try {
+            return $this->runUnit($runner, $connection, static fn (): mixed => $write($sequence->claim($slug, $tenant)));
+        } catch (UniqueConstraintViolationException $collision) {
+            // The bundle's private manager replaces itself after the failed flush closed it; a plain manager does not.
+            if (!$this->getEntityManager()->isOpen() || ($connection->isTransactionActive() && $connection->isRollbackOnly())
+                || !$this->runUnit($runner, $connection, static fn (): bool => $sequence->realign($slug, $tenant))) {
+                throw $collision;
+            }
+        }
+
+        return $this->runUnit($runner, $connection, static fn (): mixed => $write($sequence->claim($slug, $tenant)));
     }
 
     /**
@@ -366,6 +421,51 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
         }
 
         return !in_array($variables['innodb_snapshot_isolation'] ?? '', ['ON', '1'], true);
+    }
+
+    /**
+     * Runs one unit of the version claim. A unit the bundle opens itself (no transaction open) on MySQL / MariaDB runs at
+     * READ COMMITTED (`SET TRANSACTION`, the next transaction only; the session's level is untouched): a claim that
+     * waited for a concurrent writer then reads that writer's commit, no gap lock is taken, and MariaDB's
+     * `innodb_snapshot_isolation` (REPEATABLE READ and above) cannot refuse the wait. PostgreSQL's default is already
+     * READ COMMITTED. Inside the caller's transaction its level applies.
+     *
+     * @template T
+     *
+     * @param callable(): T $operation
+     *
+     * @return T
+     */
+    private function runUnit(DoctrineTransactionRunner $runner, Connection $connection, callable $operation): mixed
+    {
+        if (!$connection->isTransactionActive() && $connection->getDatabasePlatform() instanceof AbstractMySQLPlatform) {
+            $connection->executeStatement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+        }
+
+        return $runner->run($operation);
+    }
+
+    /**
+     * The counter of the definition versions on this connection (table and column names from the mapping, table prefix
+     * included), created per call: no state outlives it.
+     */
+    private function versionSequence(Connection $connection, ?int $retryAfterSeconds): DefinitionVersionSequence
+    {
+        $manager    = $this->getEntityManager();
+        $platform   = $connection->getDatabasePlatform();
+        $quote      = static fn (string $name): string => $platform->quoteSingleIdentifier($name);
+        $counter    = $manager->getClassMetadata(WorkflowDefinitionSequence::class);
+        $definition = $manager->getClassMetadata(WorkflowDefinition::class);
+
+        return new DefinitionVersionSequence(
+            $connection,
+            $counter->getTableName(),
+            ['tenant' => $quote($counter->getColumnName('tenantKey')), 'slug' => $quote($counter->getColumnName('slug')), 'last' => $quote($counter->getColumnName('lastVersion'))],
+            $definition->getTableName(),
+            ['tenant' => $quote($definition->getColumnName('tenantKey')), 'slug' => $quote($definition->getColumnName('slug')), 'version' => $quote($definition->getColumnName('version'))],
+            fn (): bool => $this->lockingReadSeesCommittedRows($connection),
+            $retryAfterSeconds,
+        );
     }
 
     /**

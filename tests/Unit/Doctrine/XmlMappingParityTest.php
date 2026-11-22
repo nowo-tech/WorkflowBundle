@@ -14,6 +14,7 @@ use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\Persistence\Mapping\Driver\MappingDriver;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence;
 use Nowo\WorkflowBundle\Entity\WorkflowMatchRule;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
@@ -44,7 +45,7 @@ final class XmlMappingParityTest extends TestCase
      */
     public static function entities(): iterable
     {
-        foreach ([WorkflowDefinition::class, WorkflowMatchRule::class, WorkflowPlace::class, WorkflowSubjectPin::class, WorkflowTransition::class] as $class) {
+        foreach ([WorkflowDefinition::class, WorkflowDefinitionSequence::class, WorkflowMatchRule::class, WorkflowPlace::class, WorkflowSubjectPin::class, WorkflowTransition::class] as $class) {
             yield $class => [$class];
         }
     }
@@ -75,7 +76,7 @@ final class XmlMappingParityTest extends TestCase
         $from      = (new SchemaTool($attribute))->getSchemaFromMetadata($attribute->getMetadataFactory()->getAllMetadata());
         $to        = (new SchemaTool($xml))->getSchemaFromMetadata($xml->getMetadataFactory()->getAllMetadata());
 
-        self::assertCount(5, $xml->getMetadataFactory()->getAllMetadata());
+        self::assertCount(6, $xml->getMetadataFactory()->getAllMetadata());
         self::assertTrue($attribute->getConnection()->createSchemaManager()->createComparator()->compareSchemas($from, $to)->isEmpty());
     }
 

@@ -33,6 +33,10 @@ use function sprintf;
  * with, while subjects already running keep the version they are pinned to. Writes go through the bundle's private
  * entity manager (the repository), never through an application manager.
  *
+ * Since 2.2 (REQ-RUNTIME-003 rule 4) a next version number is claimed from the scope's counter row in the transaction
+ * that inserts the version ({@see WorkflowDefinitionRepository::insertNextVersion()}), never computed as
+ * `MAX(version)+1`; the claim holds the counter row until the commit, so the scope is re-checked under it.
+ *
  * Owner rule (2026-11-12): {@see self::delete()} refuses a published definition while subjects are pinned to any of
  * its versions (the pin foreign key is ON DELETE RESTRICT, so the database refuses it as well).
  *
@@ -40,17 +44,20 @@ use function sprintf;
  */
 final readonly class WorkflowVersioning
 {
+    private CloneStructureLock $lock;
+
     /**
      * @param bool $lockCloneStructure `tenancy.lock_clone_structure` (since 1.16): tenant clones keep the places and
      *                                 transitions of their global template, only guards and conditions are edited
+     * @param int|null $retryAfterSeconds `runtime.concurrency.retry_after` (since 2.2): Retry-After hint of a conflict
+     *                                    while claiming a version number
      */
-    private CloneStructureLock $lock;
-
     public function __construct(
         private WorkflowDefinitionRepository $repository,
         private ?DatabaseWorkflowRegistry $registry = null,
         private ?SubjectPinStore $pins = null,
         bool $lockCloneStructure = false,
+        private ?int $retryAfterSeconds = 1,
     ) {
         $this->lock = new CloneStructureLock($repository, $lockCloneStructure);
     }
@@ -70,24 +77,37 @@ final readonly class WorkflowVersioning
         if (!$template instanceof WorkflowDefinition) {
             throw WorkflowNotFoundException::forSlug($slug);
         }
-        $version = 1;
-        if ($this->repository->existsInScope($slug, $tenant)) {
-            // Since 1.16: a retired clone (no draft, no published version) can be customized again from the current
-            // template, as its next version; its retired versions keep running their pinned subjects.
-            if (!$this->isRetiredScope($slug, $tenant)) {
-                throw new LogicException(sprintf('The tenant already has a workflow "%s".', $slug));
+        $copyAs = function (int $version) use ($template, $tenant, $publish): WorkflowDefinition {
+            $copy = $template->copyAsDraft($tenant, $version, $template->getVersion());
+            if ($publish) {
+                // Audit OD M3: a published clone passes the lock like any other publish.
+                $this->lock->assertAllowed($copy);
+                $copy->publish();
             }
-            $version = $this->repository->nextVersion($slug, $tenant);
-        }
-
-        $copy = $template->copyAsDraft($tenant, $version, $template->getVersion());
-        if ($publish) {
-            // Audit OD M3: a published clone passes the lock like any other publish.
-            $this->lock->assertAllowed($copy);
-            $copy->publish();
-        }
-        try {
             $this->repository->save($copy);
+
+            return $copy;
+        };
+
+        try {
+            if (!$this->repository->existsInScope($slug, $tenant)) {
+                $copy = $copyAs(1);
+            } elseif (!$this->isRetiredScope($slug, $tenant)) {
+                throw new LogicException(sprintf('The tenant already has a workflow "%s".', $slug));
+            } else {
+                // Since 1.16: a retired clone (no draft, no published version) can be customized again from the current
+                // template, as its next version; its retired versions keep running their pinned subjects. Since 2.2 the
+                // number is claimed from the scope's counter, and the scope is checked again under that claim.
+                $hostTransaction = $this->repository->connection()->isTransactionActive();
+                // @igor-ignore - A call argument run once inside insertNextVersion(), never stored by the repository.
+                $copy = $this->repository->insertNextVersion($slug, $tenant, function (int $version) use ($slug, $tenant, $hostTransaction, $copyAs): WorkflowDefinition {
+                    if (!$this->retiredVersions($this->scopeUnderClaim($slug, $tenant, $hostTransaction))) {
+                        throw new LogicException(sprintf('The tenant already has a workflow "%s".', $slug));
+                    }
+
+                    return $copyAs($version);
+                }, $this->retryAfterSeconds);
+            }
         } catch (UniqueConstraintViolationException $exception) {
             throw new LogicException(sprintf('The tenant already has a workflow "%s".', $slug), 0, $exception);
         }
@@ -128,15 +148,26 @@ final readonly class WorkflowVersioning
             return $draft;
         }
 
-        $draft = $definition->copyAsDraft($tenant, $this->repository->nextVersion($slug, $tenant));
+        // Since 2.2: the number is claimed from the scope's counter. A concurrent request that created a draft first held
+        // the counter until its commit: under the claim its draft is visible, and it is the draft (L3).
+        $hostTransaction = $this->repository->connection()->isTransactionActive();
         try {
-            $this->repository->save($draft);
+            // @igor-ignore - A call argument run once inside insertNextVersion(), never stored by the repository.
+            return $this->repository->insertNextVersion($slug, $tenant, function (int $version) use ($definition, $slug, $tenant, $hostTransaction): WorkflowDefinition {
+                foreach ($this->scopeUnderClaim($slug, $tenant, $hostTransaction) as $row) {
+                    if ($row->isDraft()) {
+                        return $row;
+                    }
+                }
+                $draft = $definition->copyAsDraft($tenant, $version);
+                $this->repository->save($draft);
+
+                return $draft;
+            }, $this->retryAfterSeconds);
         } catch (UniqueConstraintViolationException $exception) {
-            // A concurrent request created the same version first: that draft is the draft.
+            // The counter could not be realigned with a version stored without it: an existing draft is the draft.
             return $this->repository->findDraft($slug, $tenant) ?? throw $exception;
         }
-
-        return $draft;
     }
 
     /**
@@ -267,15 +298,37 @@ final readonly class WorkflowVersioning
      */
     public function isRetiredScope(string $slug, ?WorkflowTenant $tenant): bool
     {
-        $retired = false;
-        foreach ($this->repository->findVersions($slug, $tenant) as $version) {
+        return $this->retiredVersions($this->repository->findVersions($slug, $tenant));
+    }
+
+    /**
+     * Every version of the scope, read under the counter claim of {@see WorkflowDefinitionRepository::insertNextVersion()}
+     * (since 2.2). The claim waited for any concurrent writer of the scope to commit. In a transaction the bundle opened,
+     * the claim was its first statement, so a plain read sees that commit (on MySQL / MariaDB REPEATABLE READ the
+     * snapshot starts after the claim). Inside the caller's transaction the snapshot may be older: the versions are read
+     * as last committed ({@see WorkflowDefinitionRepository::findVersionsAsCommitted()}, the 2.1.1 locking read).
+     *
+     * @return list<WorkflowDefinition>
+     */
+    private function scopeUnderClaim(string $slug, ?WorkflowTenant $tenant, bool $hostTransaction): array
+    {
+        return $hostTransaction ? $this->repository->findVersionsAsCommitted($slug, $tenant) : $this->repository->findVersions($slug, $tenant);
+    }
+
+    /**
+     * Whether every version is retired and there is at least one (no draft, no published version).
+     *
+     * @param list<WorkflowDefinition> $versions
+     */
+    private function retiredVersions(array $versions): bool
+    {
+        foreach ($versions as $version) {
             if (!$version->isRetired()) {
                 return false;
             }
-            $retired = true;
         }
 
-        return $retired;
+        return $versions !== [];
     }
 
     /**

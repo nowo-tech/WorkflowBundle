@@ -21,6 +21,7 @@ use Doctrine\ORM\Mapping\ClassMetadataFactory;
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
 use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence;
 use Nowo\WorkflowBundle\Tests\Support\RecordingLogger;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
@@ -189,7 +190,11 @@ final class BinaryKeyCollationSubscriberTest extends TestCase
         $manager->method('getClassMetadata')->willReturnCallback(static function (string $class): ClassMetadata {
             /** @var class-string $class */
             $metadata = new ClassMetadata($class);
-            $metadata->setPrimaryTable(['name' => $class === WorkflowDefinition::class ? 'workflow_definition' : 'workflow_subject_pin']);
+            $metadata->setPrimaryTable(['name' => match ($class) {
+                WorkflowDefinition::class         => 'workflow_definition',
+                WorkflowDefinitionSequence::class => 'workflow_definition_sequence',
+                default                           => 'workflow_subject_pin',
+            }]);
 
             return $metadata;
         });

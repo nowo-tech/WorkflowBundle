@@ -18,6 +18,7 @@ use Nowo\WorkflowBundle\Doctrine\BinaryKeyCollationSubscriber;
 use Nowo\WorkflowBundle\Doctrine\TableNamePrefixer;
 use Nowo\WorkflowBundle\Doctrine\TablePrefixSubscriber;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use PHPUnit\Framework\Attributes\Group;
 
@@ -95,6 +96,6 @@ final class WorkflowExactKeyColumnsTest extends ExactKeyColumnsTestCase
      */
     private function metadata(EntityManagerInterface $manager): array
     {
-        return [$manager->getClassMetadata(WorkflowDefinition::class), $manager->getClassMetadata(WorkflowSubjectPin::class)];
+        return [$manager->getClassMetadata(WorkflowDefinition::class), $manager->getClassMetadata(WorkflowSubjectPin::class), $manager->getClassMetadata(WorkflowDefinitionSequence::class)];
     }
 }

@@ -47,6 +47,15 @@ final class WorkflowDefinitionRepositoryIntegrationTest extends TestCase
         self::assertSame('Enabled order', $definition->getName());
     }
 
+    /**
+     * Deprecated since 2.2 (an estimate only): kept for BC, never used by the bundle to insert a version.
+     */
+    public function testTheDeprecatedNextVersionIsTheEstimateAfterTheHighestStoredVersion(): void
+    {
+        self::assertSame(2, $this->repository->nextVersion('enabled_order', null));
+        self::assertSame(1, $this->repository->nextVersion('unknown', null));
+    }
+
     public function testFindAllEnabled(): void
     {
         $definitions = $this->repository->findAllEnabled();

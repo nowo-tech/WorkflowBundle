@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Since 2.2.0: XML mapping of the bundle entity (same table, columns and constraints as its attributes). -->
+<doctrine-mapping xmlns="http://doctrine-project.org/schemas/orm/doctrine-mapping"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://doctrine-project.org/schemas/orm/doctrine-mapping https://www.doctrine-project.org/schemas/orm/doctrine-mapping.xsd">
+    <entity name="Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence" table="workflow_definition_sequence">
+        <id name="tenantKey" column="tenant_key" type="string" length="128"/>
+        <id name="slug" type="string" length="128"/>
+        <field name="lastVersion" column="last_version" type="integer"/>
+    </entity>
+</doctrine-mapping>

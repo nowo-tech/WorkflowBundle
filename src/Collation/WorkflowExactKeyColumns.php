@@ -38,6 +38,11 @@ final readonly class WorkflowExactKeyColumns implements ExactKeyColumnsInterface
             'workflow_slug' => 'definition slug the subject is pinned to',
             'subject_ref'   => 'host subject reference: an id supplied by the host, compared with =',
         ],
+        // Since 2.2.
+        'workflow_definition_sequence' => [
+            'tenant_key' => 'tenant key of the version counter, part of its primary key',
+            'slug'       => 'definition slug of the version counter, part of its primary key',
+        ],
     ];
 
     public function __construct(private TableNamePrefixer $prefixer)

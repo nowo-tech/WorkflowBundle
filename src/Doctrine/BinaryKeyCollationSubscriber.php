@@ -15,6 +15,7 @@ use Doctrine\DBAL\Schema\Table;
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
+use Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence;
 use Nowo\WorkflowBundle\Entity\WorkflowSubjectPin;
 use Psr\Log\LoggerInterface;
 
@@ -79,6 +80,8 @@ final readonly class BinaryKeyCollationSubscriber
     private const COLUMNS = [
         WorkflowDefinition::class => ['tenant_key', 'slug'],
         WorkflowSubjectPin::class => ['tenant_key', 'workflow_slug', 'subject_ref'],
+        // Since 2.2: the version counter of a scope, keyed like the definitions.
+        WorkflowDefinitionSequence::class => ['tenant_key', 'slug'],
     ];
 
     /**
