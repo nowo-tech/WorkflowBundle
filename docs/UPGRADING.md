@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [To 2.2.0](#to-220)
 - [To 2.1.1](#to-211)
 - [To 2.1.0](#to-210)
   - [To 2.1.0](#to-210-1)
@@ -97,6 +98,61 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+### To 2.2.0
+
+From **2.1.x**, minor release, no BC break. One new table:
+
+```bash
+composer update nowo-tech/workflow-bundle
+php bin/console doctrine:migrations:diff      # CREATE TABLE workflow_definition_sequence
+php bin/console doctrine:migrations:migrate
+# or, without DoctrineMigrations: php bin/console nowo:workflow:sync-schema
+```
+
+- **Why** (REQ-RUNTIME-003 rule 4): the next version number of a definition (a new draft, a retired clone customized
+  again) was `SELECT MAX(version)+1`. It now comes from a per-scope counter row, claimed with an atomic
+  `UPDATE … SET last_version = last_version + 1` in the transaction that inserts the version. See
+  [CONCURRENCY.md, "Definition versions"](CONCURRENCY.md#definition-versions).
+- **The table.** What the diff generates without a table prefix (with `nowo_workflow.table_prefix` the table is
+  `<prefix>definition_sequence`):
+
+  ```sql
+  -- MySQL 8.0.17+ (MariaDB: COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`)
+  CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, slug VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
+  -- PostgreSQL
+  CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) NOT NULL, slug VARCHAR(128) NOT NULL, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
+  ```
+
+- **No data migration needed.** The counter row of a scope is created at its first claim, seeded with the highest
+  version already stored. To backfill every scope at once anyway (optional, in the same migration, after the
+  `CREATE TABLE`):
+
+  ```sql
+  INSERT INTO workflow_definition_sequence (tenant_key, slug, last_version)
+  SELECT tenant_key, slug, MAX(version) FROM workflow_definition GROUP BY tenant_key, slug;
+  ```
+
+- **Deploy the migration before the code.** Without the table, creating a draft fails (table not found). Old
+  instances that still compute `MAX(version)+1` during a rolling deploy cannot corrupt anything: the unique
+  `(tenant_key, slug, version)` key still refuses a duplicate, and the new code moves a counter that fell behind up
+  to the stored versions (never down) and retries once.
+- **A host that maps the bundle entities itself** (`doctrine.register_mapping: false`, a dedicated manager) maps the
+  new entity too: `Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence` (attributes in `src/Entity`, XML in
+  `src/Resources/config/doctrine`). A mapping of the whole directory picks it up.
+- **MigrationsKit** (`nowo:migrations:check-key-collations`): `workflow_definition_sequence.tenant_key` and `.slug`
+  are declared exact-key columns; the generated table already has the binary NO PAD collation.
+- **Version numbers are never reused.** Deleting a draft or a whole definition keeps its scope's counter: the next
+  draft gets a higher number than before. Two concurrent "new draft" requests still end with one draft; the second
+  claim's number is then skipped.
+- **Contention.** A concurrent writer of the same scope waits for the first to commit, then gets the next number. A
+  deadlock, a lock wait timeout or a serialization failure answers 409 + `X-Conflict-Code: CONFLICT_001` +
+  `Retry-After` (`runtime.concurrency.retry_after`) on the bundle's routes; a host calling the ports gets a
+  `TransientStorageFailure` (or a `WorkflowConflictException` with `reason` `version_claim`). On MySQL / MariaDB a
+  deadlock inside your transaction makes the server roll back your whole transaction: the bundle closes the
+  connection rather than leaving it half-repaired, so roll back and retry your unit.
+- **Deprecated:** `WorkflowDefinitionRepository::nextVersion()` (an estimate only). Insert versions with
+  `WorkflowDefinitionRepository::insertNextVersion()`.
 
 ## To 2.1.1
 

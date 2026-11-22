@@ -2,7 +2,7 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/workflow-bundle`  
-**Last audited**: 2026-11-22 (v2.1.1)
+**Last audited**: 2026-11-22 (v2.2.0, unreleased)
 
 This file proves that **every production source artifact** under `src/` is referenced by the baseline specification. Test-only files under `tests/` and `*.test.ts` under `src/` are out of Packagist scope. Built assets under `Resources/public/` are documented as Vite/build outputs.
 
@@ -41,7 +41,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Entity/WorkflowMatchRule.php` | Persistence model | FR-ENTITY-001 |
 | `Entity/WorkflowPlace.php` | Persistence model | FR-ENTITY-001 |
 | `Entity/WorkflowTransition.php` | Persistence model | FR-ENTITY-001 |
-| `Repository/WorkflowDefinitionRepository.php` | Repository implementation | FR-REPO-002 |
+| `Repository/WorkflowDefinitionRepository.php` | Repository implementation (2.2: `insertNextVersion()`) | FR-REPO-002, FR-VER-005 |
 
 ## Forms
 
@@ -84,6 +84,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Util/SubjectClass.php` | Subject class matching (Doctrine proxies, subclasses) | FR-WF-003 |
 | `Concurrency/SubjectMarkingGuard.php` | Expected-marking compare-and-set of a subject (1.20, REQ-RUNTIME-003) | FR-WF-004 |
 | `Concurrency/WorkflowConcurrencyPolicy.php` | Per-workflow concurrency control (1.20) | FR-WF-004 |
+| `Concurrency/DefinitionVersionSequence.php` | Per-scope version counter: seed, atomic claim, realign (2.2, REQ-RUNTIME-003 rule 4) | FR-VER-005 |
 | `EventListener/WorkflowConflictResponseSubscriber.php` | Lock conflict answered as 409 / CONFLICT codes (1.20) | FR-WF-004, FR-EVT-001 |
 | `Bridge/SearchKit/WorkflowRequestSearchDefinition.php` | SearchKit group of workflow requests (1.21) | FR-ACL-001, FR-API-001 |
 | `Search/WorkflowRequestSearchCriteria.php` | Conditions a search narrower adds (1.21) | FR-ACL-001, FR-API-001 |
@@ -182,8 +183,10 @@ This file proves that **every production source artifact** under `src/` is refer
 | `Resources/config/doctrine/WorkflowDefinition.orm.xml` | XML mapping (parity with attributes) | FR-DB-007 |
 | `Resources/config/doctrine/WorkflowMatchRule.orm.xml` | XML mapping (parity with attributes) | FR-DB-007 |
 | `Resources/config/doctrine/WorkflowPlace.orm.xml` | XML mapping (parity with attributes) | FR-DB-007 |
+| `Resources/config/doctrine/WorkflowDefinitionSequence.orm.xml` | XML mapping (parity with attributes) | FR-DB-007, FR-VER-005 |
 | `Resources/config/doctrine/WorkflowSubjectPin.orm.xml` | XML mapping (parity with attributes) | FR-DB-007, FR-VER-003 |
 | `Resources/config/doctrine/WorkflowTransition.orm.xml` | XML mapping (parity with attributes) | FR-DB-007 |
+| `Entity/WorkflowDefinitionSequence.php` | Version counter row of a definition scope (2.2) | FR-VER-005 |
 | `Entity/WorkflowSubjectPin.php` | Persisted version pin of a subject | FR-VER-003 |
 | `Entity/LabelTranslationTrait.php` | Translatable label columns of places and transitions | FR-I18N-005 |
 
@@ -240,7 +243,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | --- | --- | --- |
 | `Service/WorkflowRuntime.php` | Default runtime port over `WorkflowApplicator` | FR-RT-001 |
 | `DependencyInjection/Compiler/WorkflowRuntimePass.php` | Runtime port wiring | FR-RT-001, FR-DI-003 |
-| `Service/WorkflowVersioning.php` | Drafts, publish, clone, retire, delete | FR-VER-001 |
+| `Service/WorkflowVersioning.php` | Drafts, publish, clone, retire, delete (2.2: version numbers claimed from the scope counter) | FR-VER-001, FR-VER-005 |
 | `Service/WorkflowVersionManager.php` | Default versioning port over the versioning SPI | FR-VER-002 |
 | `Service/WorkflowDefinitionCatalog.php` | Default catalog port: list and idempotent race-safe template install (2.1) | FR-CAT-001 |
 | `Tenancy/CloneStructureLock.php` | Locks a tenant clone to the template structure | FR-VER-004 |
