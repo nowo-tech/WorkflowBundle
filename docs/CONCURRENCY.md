@@ -25,6 +25,7 @@ data at the same moment give correct data and a clear, retryable answer, never a
 | Transition apply: `WorkflowRuntimeInterface::apply()`, `WorkflowApplicator::apply*()`, `applyAutomaticTransitions()` | users (host routes, messages, commands) | `flush_after_apply: true`: one transaction on the subject's connection (`nowo-tech/transaction-doctrine` runner; a savepoint inside the host's transaction). `false`: the host's | expected-marking compare-and-set under `SELECT … FOR UPDATE` (`lock`, default), or the subject's `#[Version]` (`optimistic`) | `WorkflowConflictException` → 409 + `Retry-After`, `CONFLICT_001` |
 | Subject version pin (`SubjectPinStore`, tenancy) | first apply of a subject | own insert, in a savepoint inside a host transaction | unique `(tenant_key, workflow_slug, subject_ref)` + catch, winner read with a locking read | `WorkflowPinConflictException` → 409, `CONFLICT_001` |
 | Definition editor (admin UI: new, edit, draft, publish, clone, retire, reinstate, delete) | administrators | one flush of the bundle's private entity manager per action | unique `(tenant_key, slug, version)` + catch; delete refused by the pin foreign key (`ON DELETE RESTRICT`) | 409 + `Retry-After`, `CONFLICT_001` on the bundle's routes |
+| Template install (`WorkflowDefinitionCatalogInterface::installTemplate()`) | host provisioning, admin | one flush of the bundle's private entity manager (a savepoint inside the host's transaction) | unique `(tenant_key, slug, version)` + catch, winner read as last committed (since 2.1.1, inside the host's transaction: a locking read on MySQL / MariaDB REPEATABLE READ / SERIALIZABLE; a plain read in READ COMMITTED, and with MariaDB's `innodb_snapshot_isolation`) | none: the loser returns the winner with `created = false`; `LogicException` only on DBAL 3 with savepoints off (host transaction rollback-only) or a snapshot older than the winner that cannot be read past (PostgreSQL REPEATABLE READ, MariaDB `innodb_snapshot_isolation`); PostgreSQL SERIALIZABLE may raise a retryable `DeadlockException` (40001) instead |
 | Version numbers (`WorkflowDefinitionRepository::nextVersion()`) | admin | inside the definition save | `MAX(version)+1`, decided by the unique `(tenant_key, slug, version)` key + catch | see [Definition versions](#definition-versions) |
 | Audit events (`WorkflowTransitionAppliedEvent`) | after a commit | none (dispatched after the commit, dropped on rollback) | — | — |
 | `nowo:workflow:sync-schema`, `nowo:workflow:seed-demo` | operators, demo | DDL / one flush | single operator | — |
@@ -150,7 +151,14 @@ the conflict subscriber hold no per-request state, and the transaction runner is
 - `ConcurrentApplyMySqlTest` / `ConcurrentApplyPostgreSqlTest` (group `database`, `make test-with-db`): the same race
   with real row locks, a held `FOR UPDATE` lock answered as a conflict (connection still usable, nothing committed),
   two processes racing (exactly one transition), and two writers racing for the next definition version.
-- The "Databases" CI job runs them on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16; it is a required check on `main`.
+- Template install (since 2.1.1, audit YP-L1): `ConcurrentInstallTest` and `ConcurrentInstallAsCommittedReadTest`
+  (default suite, SQLite; the second reports a MySQL / MariaDB platform to check the locking read and its MariaDB
+  `innodb_snapshot_isolation` skip), and `ConcurrentInstallMySqlTest` / `ConcurrentInstallPostgreSqlTest` (group
+  `database`): two processes racing, and a loser inside the host's transaction whose snapshot predates the winner
+  (answered with `created = false`, the host's transaction still usable and committed; on DBAL 3 with savepoints off,
+  the documented `LogicException` and the transaction left to the host).
+- The "Databases" CI job runs the apply and install race tests on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16, with DBAL
+  3 and 4; it is a required check on `main`.
 
 ## Accepted residual risks
 
@@ -167,5 +175,8 @@ the conflict subscriber hold no per-request state, and the transaction runner is
   same rows in the other order. The database picks a loser, which gets `WorkflowConflictException` (`reason` `lock`,
   connection usable, nothing of it committed); the data stays consistent. Keep one lock order (the subject first, then
   the rows a listener writes), or move those writes after the commit.
+- Template install inside the host's transaction (audit YS-L1, since 2.1.1): inside a REPEATABLE READ transaction the shared next-key locks also cover the index gap after the winner: other definition writes (any tenant) wait until you commit, and two such hosts can deadlock (retryable DeadlockException); keep the transaction short. The deadlock
+  victim's whole host transaction is rolled back by the server. In a READ COMMITTED session the loser takes no locking
+  read. On PostgreSQL SERIALIZABLE the host may instead get a retryable DeadlockException (SQLSTATE 40001, serialization failure) rather than the documented `LogicException`.
 - A first apply with tenancy commits the subject's version pin before the transition's unit (autocommit, outside a host
   transaction). The pin is idempotent and the first one wins, so a conflict after it still allows a safe retry.

@@ -334,10 +334,16 @@ final readonly class ProvisionOrganizationWorkflows
 - Concurrency (REQ-RUNTIME-003): two installs of one template for one tenant leave exactly one definition. The unique
   `tenant_key, slug, version` key decides; the loser reads the scope again and returns the winner's definition with
   `created = false`. Nothing is cached between calls, so it is safe in FrankenPHP worker mode with the kernel reset off.
-  That answer is guaranteed outside a transaction you opened. Inside one, the loser may get a `LogicException`
-  (on MySQL REPEATABLE READ its re-read does not see the winner's row): re-read after the commit. On DBAL 3, where
-  savepoints are off, the refused write also leaves your transaction unusable. One definition is stored either way.
-  A racing `publish: true` loser may receive the winner's draft with `created = false`.
+  Since 2.1.1 that answer also holds inside a transaction you opened: the refused write rolls back to its savepoint
+  only, and the loser reads the winner as last committed (a plain read in a READ COMMITTED session; on MySQL / MariaDB
+  REPEATABLE READ / SERIALIZABLE a locking read, `LOCK IN SHARE MODE`, because the snapshot may predate the winner's
+  commit). Accepted residual risk: inside a REPEATABLE READ transaction the shared next-key locks also cover the index gap after the winner: other definition writes (any tenant) wait until you commit, and two such hosts can deadlock (retryable DeadlockException); keep the transaction short. The bundle never commits or rolls back your transaction. A `LogicException` remains only when the winner
+  cannot be read without breaking your transaction: on DBAL 3 with savepoints off (the refused write marked your
+  transaction rollback-only: roll it back and install again; turn savepoints on to avoid it), or in a transaction whose
+  snapshot predates the winner and cannot be read past: PostgreSQL REPEATABLE READ / SERIALIZABLE, or MariaDB
+  REPEATABLE READ with `innodb_snapshot_isolation` on (its default since 11.6.2; a locking read would fail there, so
+  the bundle does not try it). Re-read after the commit. On PostgreSQL SERIALIZABLE the host may instead get a retryable DeadlockException (SQLSTATE 40001, serialization failure): retry your
+  transaction. One definition is stored either way. A racing `publish: true` loser may receive the winner's draft with `created = false`.
 - Tenant keys and slugs are compared exactly (`org-a` is not `Org-A`): the SQL comparison only pre-filters and every row
   is re-checked byte for byte in PHP.
 - The writes go through the bundle's private entity manager, never yours; inside a transaction you opened they join it

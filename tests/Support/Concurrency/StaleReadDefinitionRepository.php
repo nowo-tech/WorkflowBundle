@@ -17,12 +17,28 @@ final class StaleReadDefinitionRepository extends WorkflowDefinitionRepository
 {
     private bool $stale = true;
 
+    /** Whether the stale window outlives the first read (until catchUp()). */
+    private bool $held = false;
+
+    /**
+     * Keeps every plain read of a tenant scope stale until catchUp() (2.1.1, YP-L1): the loser's own clone check and
+     * its plain re-read miss the winner too, as under a REPEATABLE READ snapshot. The as-committed read
+     * ({@see WorkflowDefinitionRepository::findVersionsAsCommitted()}) always reads the store.
+     */
+    public function holdUntilCatchUp(): self
+    {
+        $this->held = true;
+
+        return $this;
+    }
+
     /**
      * Ends the stale window: later reads see the store.
      */
     public function catchUp(): void
     {
         $this->stale = false;
+        $this->held  = false;
     }
 
     public function existsInScope(string $slug, ?WorkflowTenant $tenant): bool
@@ -36,7 +52,7 @@ final class StaleReadDefinitionRepository extends WorkflowDefinitionRepository
     public function findVersions(string $slug, ?WorkflowTenant $tenant): array
     {
         if ($tenant instanceof WorkflowTenant && $this->stale) {
-            $this->stale = false;
+            $this->stale = $this->held;
 
             return [];
         }

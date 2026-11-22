@@ -336,18 +336,21 @@ jobs:
             url_var: NOWO_WORKFLOW_TEST_MYSQL_URL
             url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
             test: tests/Integration/Concurrency/ConcurrentApplyMySqlTest.php
+            install_test: tests/Integration/Concurrency/ConcurrentInstallMySqlTest.php
           - image: 'mariadb:11.4'
             port: 3306
             health: 'healthcheck.sh --connect --innodb_initialized'
             url_var: NOWO_WORKFLOW_TEST_MYSQL_URL
             url: 'pdo-mysql://root:root@127.0.0.1:3306/workflow'
             test: tests/Integration/Concurrency/ConcurrentApplyMySqlTest.php
+            install_test: tests/Integration/Concurrency/ConcurrentInstallMySqlTest.php
           - image: 'postgres:16'
             port: 5432
             health: 'pg_isready -U postgres'
             url_var: NOWO_WORKFLOW_TEST_PGSQL_URL
             url: 'pdo-pgsql://postgres@127.0.0.1:5432/workflow'
             test: tests/Integration/Concurrency/ConcurrentApplyPostgreSqlTest.php
+            install_test: tests/Integration/Concurrency/ConcurrentInstallPostgreSqlTest.php
 
     services:
       database:
@@ -399,6 +402,12 @@ jobs:
         env:
           ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
         run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.test }}
+
+      - name: Template install race tests (REQ-RUNTIME-003, audit YP-L1)
+        if: env.HEAVY == 'true'
+        env:
+          ${{ matrix.db.url_var }}: ${{ matrix.db.url }}
+        run: vendor/bin/phpunit --no-coverage --fail-on-skipped ${{ matrix.db.install_test }}
 
   search-kit-databases:
     # Since 1.21.0: SearchKit's provider contract for every test subject (a string-backed enum status and a plain one)

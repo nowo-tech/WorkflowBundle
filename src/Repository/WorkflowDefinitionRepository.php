@@ -6,7 +6,10 @@ namespace Nowo\WorkflowBundle\Repository;
 
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\LockMode;
+use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Doctrine\ORM\Mapping\ClassMetadata;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 use Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -25,9 +28,11 @@ use function count;
 use function in_array;
 use function is_array;
 use function is_numeric;
+use function is_scalar;
 use function is_string;
 use function max;
 use function mb_strtolower;
+use function mb_strtoupper;
 use function min;
 use function usort;
 
@@ -278,6 +283,89 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
     public function findVersions(string $slug, ?WorkflowTenant $tenant): array
     {
         return $this->scopeRows($slug, $tenant);
+    }
+
+    /**
+     * Every version of a slug in exactly this scope, newest first, as last committed (since 2.1.1, audit YP-L1): the
+     * read a loser of a unique-key race uses to find the winner inside the caller's open transaction.
+     *
+     * On MySQL / MariaDB (InnoDB) a plain read inside a REPEATABLE READ transaction answers from the transaction's
+     * snapshot, which may predate the winner's commit; this read is a locking read (`LOCK IN SHARE MODE`), which reads
+     * the latest committed rows. The places and transitions are fetched in the same locking statement, so the returned
+     * definitions never lazy-load them from the older snapshot. The shared locks are held until the caller's
+     * transaction ends. Accepted residual risk (audit YS-L1): inside a REPEATABLE READ transaction the shared next-key
+     * locks also cover the index gap after the winner: other definition writes (any tenant) wait until you commit, and
+     * two such hosts can deadlock (retryable DeadlockException); keep the transaction short.
+     *
+     * It is the plain read of {@see findVersions()} without an open transaction, in a READ COMMITTED / READ UNCOMMITTED
+     * session (it sees every committed row, no lock needed), with `innodb_snapshot_isolation` on (MariaDB; a locking
+     * read of a newer row fails there), and on the other platforms (PostgreSQL READ COMMITTED reads every committed
+     * row; its REPEATABLE READ snapshot hides rows from a locking read too; SQLite has one writer).
+     *
+     * Slug and tenant key are re-checked byte for byte in PHP, as in {@see findVersions()}.
+     *
+     * @return list<WorkflowDefinition>
+     */
+    public function findVersionsAsCommitted(string $slug, ?WorkflowTenant $tenant): array
+    {
+        $connection = $this->getEntityManager()->getConnection();
+        if (!$connection->isTransactionActive() || !$this->lockingReadSeesCommittedRows($connection)) {
+            return $this->scopeRows($slug, $tenant);
+        }
+
+        $key = WorkflowTenant::storageKey($tenant);
+        /** @var list<WorkflowDefinition> $rows */
+        $rows = $this->createQueryBuilder('d')
+            ->addSelect('p', 't')
+            ->leftJoin('d.places', 'p')
+            ->leftJoin('d.transitions', 't')
+            ->where('d.slug = :slug')
+            ->andWhere('d.tenantKey = :tenant')
+            ->setParameter('slug', $slug)
+            ->setParameter('tenant', $key)
+            ->orderBy('d.version', 'DESC')
+            ->addOrderBy('d.id', 'DESC')
+            ->getQuery()
+            // A row already in the identity map is overwritten with the committed state (collections included).
+            ->setHint(Query::HINT_REFRESH, true)
+            ->setLockMode(LockMode::PESSIMISTIC_READ)
+            ->getResult();
+
+        return array_values(array_filter($rows, static fn (WorkflowDefinition $row): bool => $row->getSlug() === $slug && $row->getTenantKey() === $key));
+    }
+
+    /**
+     * Whether the read as last committed needs a locking read inside the open transaction, and may use it (audit YP-L1,
+     * YS): only on a MySQL-family server, read from the session's own variables (never from the platform class, so a
+     * MariaDB configured with a MySQL `serverVersion` is still recognised):
+     *
+     * - READ COMMITTED / READ UNCOMMITTED: no, every plain read already sees the committed rows (and takes no lock);
+     * - `innodb_snapshot_isolation` on (MariaDB, the default since 11.6.2): no, a locking read of a row committed after
+     *   the transaction's snapshot fails there with ER_CHECKREAD ("Record has changed since last read");
+     * - otherwise (REPEATABLE READ, SERIALIZABLE): yes.
+     *
+     * `SHOW SESSION VARIABLES … WHERE` answers only the variables the server has: it never fails on a server without
+     * `innodb_snapshot_isolation` (MySQL, MariaDB before 10.6.18 / 11.4.2) or without `transaction_isolation` (MariaDB
+     * before 11.1 names it `tx_isolation`), so the caller's transaction is never touched.
+     */
+    private function lockingReadSeesCommittedRows(Connection $connection): bool
+    {
+        if (!$connection->getDatabasePlatform() instanceof AbstractMySQLPlatform) {
+            return false;
+        }
+        $variables = [];
+        foreach ($connection->fetchAllNumeric("SHOW SESSION VARIABLES WHERE Variable_name IN ('transaction_isolation', 'tx_isolation', 'innodb_snapshot_isolation')") as $row) {
+            [$name, $value] = $row + [null, null];
+            if (is_string($name) && is_scalar($value)) {
+                $variables[mb_strtolower($name)] = mb_strtoupper((string) $value);
+            }
+        }
+        $isolation = $variables['transaction_isolation'] ?? $variables['tx_isolation'] ?? '';
+        if (in_array($isolation, ['READ-COMMITTED', 'READ-UNCOMMITTED'], true)) {
+            return false;
+        }
+
+        return !in_array($variables['innodb_snapshot_isolation'] ?? '', ['ON', '1'], true);
     }
 
     /**
