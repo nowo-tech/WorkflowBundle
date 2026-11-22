@@ -136,13 +136,10 @@ php bin/console doctrine:migrations:migrate
   CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) NOT NULL, slug VARCHAR(128) NOT NULL, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
   ```
 
-- **Set the table default once, in the host (recommended).** The table's default collation matters for *future*
-  columns, not for the two that exist (those carry their own binary `COLLATE`). A text column added later without an
-  explicit `COLLATE` inherits the table default; when that is the server's own default (typically
-  `utf8mb4_0900_ai_ci`) instead of the database's uniform collation, the column no longer matches the rest of the
-  database and a join against it fails with MySQL error 1267 (illegal mix of collations), long after and far from the
-  change that caused it. Doctrine builds every table from `default_table_options`, so the host should configure it
-  once instead of patching each table:
+- **Set the table default once, in the host (recommended).** The table's default collation applies to *future*
+  columns, not to the two that exist (those carry their own binary `COLLATE`). A text column added later without an
+  explicit `COLLATE` inherits the table default. Doctrine builds every table from `default_table_options`, so the host
+  should configure it once instead of patching each table:
 
   ```yaml
   # config/packages/doctrine.yaml
@@ -153,13 +150,26 @@ php bin/console doctrine:migrations:migrate
               collation: utf8mb4_unicode_ci   # the database's uniform collation, NOT the exact-key one
   ```
 
-  **This is the database's uniform collation, not the binary one.** The exact-key columns (`tenant_key`, `slug`) are
-  declared separately and are binary NO PAD precisely because the database default is not; putting a binary collation
-  here would make every new table binary, break the uniform-collation check (`check-collations`,
-  `collation_check.expected_collation`), change how ordinary text (names, titles) compares, and leave the exact-key
-  columns indistinguishable from the rest. With the setting, `doctrine:schema:update --dump-sql`,
-  `doctrine:migrations:diff` and `nowo:workflow:sync-schema` emit the `DEFAULT CHARACTER SET … COLLATE` clause on their
-  own, for this table and every other one. Without it those routes create the table with the server's default.
+  **This is the database's uniform collation (the example is `utf8mb4_unicode_ci`; use your own), not the binary
+  one.** The exact-key columns (`tenant_key`, `slug`) are declared separately and are binary NO PAD precisely because
+  the database default is not; putting a binary collation here would make every new table binary, break the
+  uniform-collation check (`check-collations`, `collation_check.expected_collation`), change how ordinary text (names,
+  titles) compares, and leave the exact-key columns indistinguishable from the rest. With the setting,
+  `doctrine:schema:update --dump-sql`, `doctrine:migrations:diff` and `nowo:workflow:sync-schema` emit the
+  `DEFAULT CHARACTER SET … COLLATE` clause on their own, for this table and every other one. Without it those routes
+  create the table with the server's default.
+
+  **What the setting buys:** every new table follows the database's declared uniform collation, so the uniformity
+  check passes, behaviour is predictable, and two ordinary text columns can no longer end up on different collations
+  (MySQL error 1267 between them) depending on how each table was created.
+
+  **What it does not buy:** it does not stop a new column from folding case and accents (a uniform collation is
+  case- and accent-insensitive, exactly like the server default), and it does not prevent error 1267 when such a column
+  is joined against `tenant_key` or `slug`. The only protection against folding is to declare the column as an exact
+  key with the binary NO PAD collation, which is what REQ-SEC-006 asks for and what the exact-key check verifies per
+  column. With the setting there is a single possible reason for that 1267, and it is informative: an ordinary column
+  was joined against an exact key and should probably have been declared as one. Without the setting the same error
+  also appears because tables disagree with each other, and the two causes cannot be told apart.
 - **Why the statement above carries the clause anyway.** A host that has not configured `default_table_options`, or that
   runs the `CREATE TABLE` by hand, needs it written out (with its own uniform collation in place of
   `utf8mb4_unicode_ci`); keeping it does no harm to a host that has configured it.
