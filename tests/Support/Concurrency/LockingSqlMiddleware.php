@@ -75,6 +75,11 @@ final class LockingSqlMiddleware implements Middleware
                     {
                         return parent::query($this->log->strip($sql));
                     }
+
+                    public function exec(string $sql): int|string
+                    {
+                        return parent::exec($this->log->strip($sql));
+                    }
                 };
             }
         };
