@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[2.2.0] - 2026-11-22](#220---2026-11-22)
 - [[2.1.1] - 2026-11-22](#211---2026-11-22)
 - [[2.1.0] - 2026-11-22](#210---2026-11-22)
 - [[1.22.1] - 2026-11-20](#1221---2026-11-20)
@@ -65,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-22
+
 ### Changed
 
 - **Definition version numbers come from a per-scope counter row** (REQ-RUNTIME-003 rule 4; owner decision 2026-11-22). The next version of a draft (`WorkflowVersioning::createDraftOf()`, the admin UI's "new draft", `WorkflowVersionManagerInterface::createDraft*()`) and of a retired clone customized again (`cloneTemplate()`, `WorkflowDefinitionCatalogInterface::installTemplate()`) was `SELECT MAX(version)+1`, protected only by the unique `(tenant_key, slug, version)` key plus a catch. It is now claimed from the new `workflow_definition_sequence` table (one row per tenant key and slug) with an atomic `UPDATE … SET last_version = last_version + 1`, in the same transaction as the version's insert (nowo-tech/transaction-doctrine's runner on the definitions' connection; a savepoint inside the host's transaction). The row lock serialises the writers of one scope: a concurrent writer waits and gets the next number, or a retryable conflict (deadlock, lock wait timeout, serialization failure: 409 + `X-Conflict-Code: CONFLICT_001` and `Retry-After` on the bundle's routes, through the existing conflict path). The scope is re-checked under the claim, so two concurrent "new draft" requests still end with one draft (a version number may then be skipped). A unit the bundle opens itself runs at READ COMMITTED on MySQL / MariaDB (`SET TRANSACTION`, the next transaction only), so a waiting claim reads the winner's commit, takes no gap lock and is not refused by MariaDB's `innodb_snapshot_isolation`; inside the host's transaction its isolation level applies and the scope is read as last committed (the 2.1.1 locking read of `findVersionsAsCommitted()`, unchanged). The counter row of a scope is created at its first claim, seeded with the highest version already stored (decided by its primary key, in a unit of its own), so existing data needs no backfill; a counter left behind the stored versions (versions written without it) is moved up once and the write retried. Version numbers are never reused while the scope has versions (a deleted draft's number is not handed out again). With no transaction open, an existing counter row is checked with a plain autocommit read, so a claim conflict commits nothing and answers `CONFLICT_001` also with commit detection on (only a scope's first claim may answer `CONFLICT_002`, audit ZI-L1). With `binlog_format` STATEMENT the bundle's units keep the session's isolation level (READ COMMITTED would make InnoDB refuse the writes, audit ZI-L2). After a deadlock that dropped the savepoints (MySQL / MariaDB), the runner closes the connection instead of leaving the nesting level raised (audit ZH-M1): the answer is a 409, never a 500. Covered by two-connection and two-process race tests on SQLite, MySQL 8.4, MariaDB 11.4 (also with `innodb_snapshot_isolation`) and PostgreSQL 16, with DBAL 3 and 4 (CI "Databases" job). No BC break.
@@ -78,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 - `WorkflowDefinitionRepository::nextVersion()`: an estimate only (two concurrent callers get the same number); the bundle no longer calls it. Use `insertNextVersion()`.
+
+[2.2.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v2.2.0
 
 ## [2.1.1] - 2026-11-22
 
