@@ -136,21 +136,33 @@ php bin/console doctrine:migrations:migrate
 - **Deploy the migration before the code.** Without the table, creating a draft fails (table not found). Old
   instances that still compute `MAX(version)+1` during a rolling deploy cannot corrupt anything: the unique
   `(tenant_key, slug, version)` key still refuses a duplicate, and the new code moves a counter that fell behind up
-  to the stored versions (never down) and retries once.
+  to the stored versions (never down) and retries once. One exception (audit ZI-I3): a draft created inside your own
+  transaction on MariaDB with `innodb_snapshot_isolation` on may not see the old instances' versions, and then fails
+  with the unique violation; finish the rolling deploy, or retry outside the transaction.
+- **MySQL / MariaDB binary logging.** The bundle's own claim units run at READ COMMITTED, except when
+  `binlog_format` is `STATEMENT` (InnoDB refuses writes at READ COMMITTED then, error 1665): the bundle reads
+  `@@SESSION.binlog_format` and keeps the session's level in that case (audit ZI-L2). `ROW` (MySQL default) and
+  `MIXED` (MariaDB default) need nothing.
+- **PostgreSQL** units run at the server's default level. With `default_transaction_isolation = 'repeatable read'`
+  the loser of a same-scope race gets a retryable 409 instead of waiting (audit ZI-I2).
 - **A host that maps the bundle entities itself** (`doctrine.register_mapping: false`, a dedicated manager) maps the
   new entity too: `Nowo\WorkflowBundle\Entity\WorkflowDefinitionSequence` (attributes in `src/Entity`, XML in
   `src/Resources/config/doctrine`). A mapping of the whole directory picks it up.
 - **MigrationsKit** (`nowo:migrations:check-key-collations`): `workflow_definition_sequence.tenant_key` and `.slug`
   are declared exact-key columns; the generated table already has the binary NO PAD collation.
-- **Version numbers are never reused.** Deleting a draft or a whole definition keeps its scope's counter: the next
-  draft gets a higher number than before. Two concurrent "new draft" requests still end with one draft; the second
+- **Version numbers are never reused while the scope has versions.** Deleting a draft keeps its scope's counter: the
+  next draft gets a higher number than before. A definition deleted entirely and created again starts at version 1
+  again (version 1 is written without the counter); its later drafts continue after the counter (audit ZI-I6). Two concurrent "new draft" requests still end with one draft; the second
   claim's number is then skipped.
 - **Contention.** A concurrent writer of the same scope waits for the first to commit, then gets the next number. A
   deadlock, a lock wait timeout or a serialization failure answers 409 + `X-Conflict-Code: CONFLICT_001` +
   `Retry-After` (`runtime.concurrency.retry_after`) on the bundle's routes; a host calling the ports gets a
   `TransientStorageFailure` (or a `WorkflowConflictException` with `reason` `version_claim`). On MySQL / MariaDB a
   deadlock inside your transaction makes the server roll back your whole transaction: the bundle closes the
-  connection rather than leaving it half-repaired, so roll back and retry your unit.
+  connection rather than leaving it half-repaired, so roll back and retry your unit. With DBAL 3 and savepoints off,
+  any failure of the claim inside your transaction marks it rollback-only (audit ZI-I4): turn savepoints on.
+- **Conflict codes.** With transaction-doctrine's commit detection on, a claim conflict answers `CONFLICT_001`; only a
+  scope's very first claim (its counter row inserted in a committed unit of its own) may answer `CONFLICT_002`.
 - **Deprecated:** `WorkflowDefinitionRepository::nextVersion()` (an estimate only). Insert versions with
   `WorkflowDefinitionRepository::insertNextVersion()`.
 

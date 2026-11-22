@@ -24,6 +24,7 @@ use function array_filter;
 use function array_values;
 use function dirname;
 use function is_file;
+use function str_contains;
 use function str_starts_with;
 use function sys_get_temp_dir;
 use function tempnam;
@@ -33,7 +34,8 @@ use const PHP_VERSION_ID;
 
 /**
  * Since 2.2 (default suite): on MySQL / MariaDB a version-claim unit the bundle opens itself runs at READ COMMITTED
- * (`SET TRANSACTION`, the next transaction only); inside the host's transaction its level applies and nothing is set.
+ * (`SET TRANSACTION`, the next transaction only) unless the session logs statements (`binlog_format` STATEMENT, audit
+ * ZI-L2); inside the host's transaction its level applies and nothing is set.
  * A SQLite file reports a MySQL platform ({@see LockingSqlMiddleware}); the real servers run ConcurrentVersion*Test.
  */
 final class ConcurrentVersionReadCommittedTest extends TestCase
@@ -66,7 +68,7 @@ final class ConcurrentVersionReadCommittedTest extends TestCase
         $plain->flush();
         $plain->getConnection()->close();
 
-        $locking    = new LockingSqlMiddleware(new MySQL80Platform(), [self::SET => 'SELECT 1', 'SHOW SESSION VARIABLES' => 'SELECT 1, 1 WHERE 0']);
+        $locking    = $this->server('ROW');
         $manager    = $this->mysqlManager($locking);
         $repository = new WorkflowDefinitionRepository(new TestManagerRegistry($manager));
         $source     = $repository->findCurrent('leave', null);
@@ -86,7 +88,34 @@ final class ConcurrentVersionReadCommittedTest extends TestCase
         self::assertSame(3, $repository->insertNextVersion('leave', null, $write));
         $connection->commit();
         self::assertSame([], $this->sets($locking), 'inside the host\'s transaction its level applies');
+
+        // Audit ZI-L1: an existing counter row is checked with a plain read, so only the claim unit is opened.
+        $locking->statements = [];
+        self::assertSame(4, $repository->insertNextVersion('leave', null, $write));
+        self::assertCount(1, $this->sets($locking), 'the claim unit only');
         $connection->close();
+
+        // Audit ZI-L2: with statement-based binary logging InnoDB refuses writes at READ COMMITTED: the level stays.
+        $statement  = $this->server('statement');
+        $repository = new WorkflowDefinitionRepository(new TestManagerRegistry($this->mysqlManager($statement)));
+        $source     = $repository->findCurrent('leave', null);
+        self::assertInstanceOf(WorkflowDefinition::class, $source);
+        self::assertSame(5, $repository->insertNextVersion('leave', null, static function (int $version) use ($repository, $source): int {
+            $repository->save($source->copyAsDraft(null, $version));
+
+            return $version;
+        }));
+        self::assertSame([], $this->sets($statement));
+        self::assertNotSame([], array_filter($statement->statements, static fn (string $sql): bool => str_contains($sql, 'binlog_format')));
+    }
+
+    private function server(string $binlogFormat): LockingSqlMiddleware
+    {
+        return new LockingSqlMiddleware(new MySQL80Platform(), [
+            self::SET                => 'SELECT 1',
+            'SHOW SESSION VARIABLES' => 'SELECT 1, 1 WHERE 0',
+            'binlog_format'          => "SELECT '" . $binlogFormat . "'",
+        ]);
     }
 
     /**

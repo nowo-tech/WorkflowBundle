@@ -81,11 +81,11 @@ final readonly class DefinitionVersionSequence
     public function ensure(string $slug, ?WorkflowTenant $tenant): void
     {
         $this->assertTransaction();
-        $key = WorkflowTenant::storageKey($tenant);
-        $s   = $this->sequenceColumns;
-        if ($this->connection->fetchOne('SELECT 1 FROM ' . $this->sequenceTable . ' WHERE ' . $s['tenant'] . ' = ? AND ' . $s['slug'] . ' = ?', [$key, $slug], [ParameterType::STRING, ParameterType::STRING]) !== false) {
+        if ($this->exists($slug, $tenant)) {
             return;
         }
+        $key = WorkflowTenant::storageKey($tenant);
+        $s   = $this->sequenceColumns;
 
         $highest = $this->highestStored($key, $slug, false);
         $this->connection->createSavepoint(self::SAVEPOINT);
@@ -110,6 +110,21 @@ final readonly class DefinitionVersionSequence
         if ($this->connection->getDatabasePlatform()->supportsReleaseSavepoints()) {
             $this->connection->releaseSavepoint(self::SAVEPOINT);
         }
+    }
+
+    /**
+     * Whether the scope's counter row exists (a plain read: outside a transaction an autocommit SELECT, which commits
+     * nothing and is never counted by commit tracking).
+     */
+    public function exists(string $slug, ?WorkflowTenant $tenant): bool
+    {
+        $s = $this->sequenceColumns;
+
+        return $this->connection->fetchOne(
+            'SELECT 1 FROM ' . $this->sequenceTable . ' WHERE ' . $s['tenant'] . ' = ? AND ' . $s['slug'] . ' = ?',
+            [WorkflowTenant::storageKey($tenant), $slug],
+            [ParameterType::STRING, ParameterType::STRING],
+        ) !== false;
     }
 
     /**

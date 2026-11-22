@@ -315,7 +315,12 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
         $runner     = DoctrineTransactionRunner::forConnection($connection, $retryAfterSeconds);
 
         // The scope's counter row first, in a unit of its own (committed before the claim when no transaction is open).
-        $this->runUnit($runner, $connection, static fn () => $sequence->ensure($slug, $tenant));
+        // Audit ZI-L1: with no transaction open the unit runs only when a plain autocommit read finds no row, so an
+        // existing counter never adds a COMMIT to the request (commit tracking would then answer a later claim conflict
+        // CONFLICT_002 instead of CONFLICT_001); ensure() checks again for a concurrent first claim.
+        if ($connection->isTransactionActive() || !$sequence->exists($slug, $tenant)) {
+            $this->runUnit($runner, $connection, static fn () => $sequence->ensure($slug, $tenant));
+        }
 
         try {
             return $this->runUnit($runner, $connection, static fn (): mixed => $write($sequence->claim($slug, $tenant)));
@@ -425,7 +430,8 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
 
     /**
      * Runs one unit of the version claim. A unit the bundle opens itself (no transaction open) on MySQL / MariaDB runs at
-     * READ COMMITTED (`SET TRANSACTION`, the next transaction only; the session's level is untouched): a claim that
+     * READ COMMITTED (`SET TRANSACTION`, the next transaction only; the session's level is untouched), unless the session
+     * logs statements ({@see statementBinlog()}): a claim that
      * waited for a concurrent writer then reads that writer's commit, no gap lock is taken, and MariaDB's
      * `innodb_snapshot_isolation` (REPEATABLE READ and above) cannot refuse the wait. PostgreSQL's default is already
      * READ COMMITTED. Inside the caller's transaction its level applies.
@@ -438,11 +444,26 @@ class WorkflowDefinitionRepository extends ServiceEntityRepository
      */
     private function runUnit(DoctrineTransactionRunner $runner, Connection $connection, callable $operation): mixed
     {
-        if (!$connection->isTransactionActive() && $connection->getDatabasePlatform() instanceof AbstractMySQLPlatform) {
+        if (!$connection->isTransactionActive() && $connection->getDatabasePlatform() instanceof AbstractMySQLPlatform
+            && !$this->statementBinlog($connection)) {
             $connection->executeStatement('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
         }
 
         return $runner->run($operation);
+    }
+
+    /**
+     * Whether the session logs statements (`@@SESSION.binlog_format = 'STATEMENT'`, audit ZI-L2): InnoDB refuses writes at
+     * READ COMMITTED then (error 1665), so the unit keeps the session's level. That is still correct on MySQL / MariaDB
+     * REPEATABLE READ: the claim's UPDATE is a current read, and the re-check's snapshot starts after it (MariaDB with
+     * `innodb_snapshot_isolation` answers a waited claim with a retryable conflict instead). Read on every unit: the
+     * session variable can change, and no per-connection state is kept in this shared service (worker mode).
+     */
+    private function statementBinlog(Connection $connection): bool
+    {
+        $format = $connection->fetchOne('SELECT @@SESSION.binlog_format');
+
+        return is_string($format) && mb_strtoupper($format) === 'STATEMENT';
     }
 
     /**

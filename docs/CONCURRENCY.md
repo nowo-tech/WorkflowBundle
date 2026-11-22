@@ -138,7 +138,9 @@ Each scope (tenant key and slug) has a counter row in `workflow_definition_seque
 writes a new version in two units, both through nowo-tech/transaction-doctrine's `DoctrineTransactionRunner` on the
 definitions' connection:
 
-1. **The counter row exists.** When the scope has none yet (its first claim since 2.2), it is inserted with the
+1. **The counter row exists.** With no transaction open, a plain autocommit `SELECT 1` checks it first and this unit
+   runs only when the row is missing (audit ZI-L1: an existing counter adds no COMMIT to the request). When the
+   scope has none yet (its first claim since 2.2), it is inserted with the
    highest version already stored, in a savepoint. Two first claims are decided by the primary key: the loser rolls
    back to its savepoint and goes on. This is the one-time backfill; the number itself always comes from step 2. It
    runs in its own transaction when the host has none open, so the row is committed before any claim. A claim
@@ -154,7 +156,7 @@ definitions' connection:
 | Two writers of one scope | the second waits for the first, then gets the next number |
 | Two "new draft" requests for one definition | one draft: the second re-reads the scope under the claim and returns the first one's draft; its number is skipped (versions may have gaps) |
 | A retired clone customized again by two requests | one copy: the second finds the scope no longer retired under the claim and is refused ("already has a workflow"; `installTemplate()` answers the winner with `created = false`) |
-| A deleted draft or definition | its numbers are never handed out again (the counter row stays) |
+| A deleted draft, or a scope that still has versions | its numbers are never handed out again (the counter row stays). A scope deleted entirely and created again starts at version 1 again (version 1 is written without the counter, audit ZI-I6); its next drafts still continue after the counter |
 | The counter behind the stored versions (versions written without it: a host's own SQL, a slug renamed into the scope, an instance still on 2.1 during a rolling deploy) | the unique `(tenant_key, slug, version)` key refuses the number; the counter is moved up to the highest stored version (a guarded `UPDATE … WHERE last_version < ?`, never down) and the write runs once more |
 | Deadlock, lock wait timeout, serialization failure (MySQL 1213 / 1205, MariaDB 1020, PostgreSQL 40001 / 40P01 / 55P03) | the runner rolls back to where it started and throws `TransientStorageFailure`: 409 + `X-Conflict-Code: CONFLICT_001` + `Retry-After` on the bundle's routes |
 | The counter row committed after the snapshot of the host's REPEATABLE READ transaction (PostgreSQL) | `WorkflowConflictException`, `reason` `version_claim`: 409, `CONFLICT_001`; nothing written |
@@ -162,7 +164,13 @@ definitions' connection:
 **Isolation.** A unit the bundle opens itself runs at READ COMMITTED on MySQL / MariaDB (`SET TRANSACTION ISOLATION
 LEVEL READ COMMITTED`, which applies to the next transaction only; the session's level is untouched). A claim that
 waited therefore reads the winner's commit; no gap lock is taken; and MariaDB's `innodb_snapshot_isolation` (on by
-default since 11.6.2) cannot refuse the wait. PostgreSQL already defaults to READ COMMITTED. Inside the host's
+default since 11.6.2) cannot refuse the wait. With statement-based binary logging (`@@SESSION.binlog_format =
+'STATEMENT'`, read on every unit) InnoDB refuses writes at READ COMMITTED (error 1665), so the level is left as it is
+(audit ZI-L2): REPEATABLE READ is still correct here (the claim's UPDATE is a current read, and the re-check's snapshot
+starts after it); with MariaDB's `innodb_snapshot_isolation` on, a waited claim then answers a retryable conflict.
+PostgreSQL units run at the server's default, READ COMMITTED (audit ZI-I2): a host that sets
+`default_transaction_isolation = 'repeatable read'` gets a retryable 409 (40001) for the loser of a same-scope race
+instead of a wait. Inside the host's
 transaction its isolation level applies. The re-check under the claim then reads the scope as last committed
 (`findVersionsAsCommitted()`, the 2.1.1 locking read on MySQL / MariaDB REPEATABLE READ, unchanged). With
 `innodb_snapshot_isolation` on, a claim of a counter row changed after the host's snapshot fails with ER_CHECKREAD
@@ -174,6 +182,14 @@ The runner rolls back to its entry level, and closes the connection when that ro
 never left raised (the next statement reconnects). The original transient failure is what the caller gets (a 409),
 never the rollback error. The counter's own savepoint (step 1) rethrows the original unique violation when its
 rollback fails. On PostgreSQL only the runner's savepoint is rolled back, and the host's transaction stays usable.
+
+**Conflict codes (audit ZI-L1).** A claim conflict commits nothing in the request, so with transaction-doctrine's
+commit detection on it answers `CONFLICT_001`. Only a scope's very first claim (when the counter row is inserted in
+its own committed unit) may answer `CONFLICT_002` ("read again, do not repeat") if the claim then conflicts.
+
+**DBAL 3 without savepoints (audit ZI-I4).** Inside the host's transaction a refused clone or a transient failure of
+the claim rolls back an emulated nested level, which marks the host's transaction rollback-only (as for the template
+install). The realign retry is then skipped. Turn savepoints on (DoctrineBundle `use_savepoints`, DBAL 4 always).
 
 **Case-insensitive collations.** The key columns get the binary NO PAD collation like the definitions' (and are
 declared to MigrationsKit). On a table converted by hand to a case-insensitive collation, `Acme` and `acme` share one
@@ -205,12 +221,15 @@ version counter (`DefinitionVersionSequence`) and its runner are created per `in
   (answered with `created = false`, the host's transaction still usable and committed; on DBAL 3 with savepoints off,
   the documented `LogicException` and the transaction left to the host).
 - Definition versions (since 2.2): `ConcurrentVersionTest` (default suite, SQLite: the counter seeded after the stored
-  versions, a rolled-back write giving its number back, numbers never reused, a draft committed by another connection
+  versions, a rolled-back write giving its number back, numbers never reused while the scope has versions, a draft committed by another connection
   found under the claim, a counter behind the versions realigned, a collision it cannot explain rethrown, a held claim
   answered as a retryable conflict) and `ConcurrentVersionMySqlTest` / `ConcurrentVersionPostgreSqlTest` (group
   `database`, the same plus: two processes claiming 10 numbers each from a scope without a counter row, a draft race
   inside the host's transaction, a first claim committed after a REPEATABLE READ snapshot, and a real deadlock on the
-  claim inside the host's transaction, audit ZH-M1: 409, connection repaired). `DefinitionVersionSequenceTest` (unit)
+  claim inside the host's transaction, audit ZH-M1: 409, connection repaired; and a claim conflict on an existing
+  counter with commit tracking on answering `CONFLICT_001`, audit ZI-L1). `ConcurrentVersionReadCommittedTest`
+  (default suite) checks the `SET TRANSACTION` of the bundle's own units and its skip with `binlog_format` STATEMENT
+  (audit ZI-L2). `DefinitionVersionSequenceTest` (unit)
   covers a lost savepoint never replacing the original failure.
 - The "Databases" CI job runs the apply, install and version race tests on MySQL 8.4, MariaDB 11.4 and PostgreSQL 16, with DBAL
   3 and 4; it is a required check on `main`.
@@ -233,6 +252,11 @@ version counter (`DefinitionVersionSequence`) and its runner are created per `in
 - Template install inside the host's transaction (audit YS-L1, since 2.1.1): inside a REPEATABLE READ transaction the shared next-key locks also cover the index gap after the winner: other definition writes (any tenant) wait until you commit, and two such hosts can deadlock (retryable DeadlockException); keep the transaction short. The deadlock
   victim's whole host transaction is rolled back by the server. In a READ COMMITTED session the loser takes no locking
   read. On PostgreSQL SERIALIZABLE the host may instead get a retryable DeadlockException (SQLSTATE 40001, serialization failure) rather than the documented `LogicException`.
+- Definition versions (since 2.2, audit ZI-I3): inside the host's transaction with MariaDB's
+  `innodb_snapshot_isolation` on, a counter behind versions written without it (a host's own SQL, a 2.1 instance
+  during a rolling deploy) may not be realigned (the stale read sees no higher version): the unique violation is then
+  rethrown (a "new draft" without an existing draft answers it as a 500). Retry outside the transaction, or finish
+  the rolling deploy first.
 - Definition versions (since 2.2): version numbers can have gaps (a lost "new draft" race, a deleted draft); they are
   unique and increasing per scope, not dense.
 - A first apply with tenancy commits the subject's version pin before the transition's unit (autocommit, outside a host

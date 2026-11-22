@@ -5,13 +5,20 @@ declare(strict_types=1);
 namespace Nowo\WorkflowBundle\Tests\Integration\Concurrency;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Mapping\ClassMetadata;
+use Doctrine\ORM\ORMSetup;
 use Doctrine\ORM\Tools\SchemaTool;
 use Nowo\TransactionContract\TransientStorageFailure;
+use Nowo\TransactionDoctrine\ConflictCode;
+use Nowo\TransactionDoctrine\WriteUnit\CommitLedger;
+use Nowo\TransactionDoctrine\WriteUnit\CommitMark;
+use Nowo\TransactionDoctrine\WriteUnit\Dbal\CommitTrackingMiddleware;
 use Nowo\WorkflowBundle\Doctrine\WorkflowEntityManager;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
 use Nowo\WorkflowBundle\Entity\WorkflowPlace;
@@ -25,8 +32,11 @@ use PHPUnit\Framework\Attributes\Test;
 use RuntimeException;
 
 use function array_map;
+use function dirname;
 use function is_numeric;
 use function sort;
+
+use const PHP_VERSION_ID;
 
 /**
  * REQ-RUNTIME-003 rule 4 for the definition version numbers (since 2.2): the next number is claimed from the scope's
@@ -213,6 +223,56 @@ trait ConcurrentVersionScenarios
             $b->getConnection()->close();
             $this->dropVersions($a, $tool, $metadata);
         }
+    }
+
+    /**
+     * Audit ZI-L1: with an existing counter row, a claim conflict commits nothing in the request (the counter check is a
+     * plain autocommit read, never a unit of its own), so commit detection answers CONFLICT_001, not CONFLICT_002.
+     */
+    #[Test]
+    public function aClaimConflictOnAnExistingCounterCommitsNothingAndIsRetrySafe(): void
+    {
+        [$a, $tool, $metadata, $published] = $this->prepareVersions();
+        $ledger                            = new CommitLedger();
+        $b                                 = $this->trackedConnect($a, $ledger);
+        $holder                            = $a->getConnection();
+
+        try {
+            $this->insertCopy($this->versionRepository($a), $published);
+            $this->shortLockWait($b->getConnection());
+            $holder->beginTransaction();
+            $holder->executeStatement("UPDATE workflow_definition_sequence SET last_version = last_version + 1 WHERE tenant_key = '' AND slug = ?", [self::VERSIONS_SLUG]);
+
+            $mark = new CommitMark($ledger);
+            try {
+                $this->insertCopy($this->versionRepository($b), $published);
+                self::fail('The counter row is locked by the other transaction.');
+            } catch (TransientStorageFailure $conflict) {
+                self::assertFalse($mark->committedSince(), 'nothing was committed in this request');
+                self::assertSame(ConflictCode::RetrySafe, ConflictCode::forFailure($conflict, $mark));
+            }
+        } finally {
+            while ($holder->isTransactionActive()) {
+                $holder->rollBack();
+            }
+            $b->getConnection()->close();
+            $this->dropVersions($a, $tool, $metadata);
+        }
+    }
+
+    /**
+     * Another manager on the same database whose connection records its commits in $ledger (transaction-doctrine's
+     * commit detection, as a host with `commit_detection` on has it).
+     */
+    protected function trackedConnect(EntityManagerInterface $manager, CommitLedger $ledger): EntityManagerInterface
+    {
+        $config = ORMSetup::createAttributeMetadataConfiguration([dirname(__DIR__, 3) . '/src/Entity'], true);
+        $config->setMiddlewares([new CommitTrackingMiddleware($ledger)]);
+        if (PHP_VERSION_ID >= 80400) {
+            $config->enableNativeLazyObjects(true);
+        }
+
+        return new EntityManager(DriverManager::getConnection($manager->getConnection()->getParams(), $config), $config);
     }
 
     /**
