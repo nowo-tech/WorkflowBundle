@@ -139,8 +139,8 @@ php bin/console doctrine:migrations:migrate
   `COLLATE` inherits the table default, and without this clause that is the server's accent- and case-insensitive one
   (typically `utf8mb4_0900_ai_ci`); a join against `tenant_key` or `slug` then fails with MySQL error 1267 (illegal
   mix of collations), long after and far from the change that caused it. Neither route that builds the DDL from the ORM metadata
-  emits the table default: `doctrine:schema:update --dump-sql` (and a migration written from that dump, as one host
-  did) and `nowo:workflow:sync-schema`. With `sync-schema` there is also no statement the host can read and correct, it
+  emits the table default: `doctrine:schema:update --dump-sql` (and any migration written from that
+  dump) and `nowo:workflow:sync-schema`. With `sync-schema` there is also no statement the host can read and correct, it
   executes the DDL itself, so the host must run the repair `ALTER TABLE` below afterwards. **The clause cannot be
   checked by looking at the new table's columns:** every existing column can be correct while the table default is
   wrong, and `SHOW CREATE TABLE` read column by column will look fine. Check the table instead:
