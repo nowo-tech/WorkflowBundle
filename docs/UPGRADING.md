@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [To 2.1.0](#to-210)
 - [To 2.0.0](#to-200)
   - [Before you upgrade](#before-you-upgrade)
   - [runtime.flush_after_apply defaults to false](#runtimeflush_after_apply-defaults-to-false)
@@ -94,6 +95,18 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+### To 2.1.0
+
+From **2.0.x**, minor release, no BC break:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
+
+- New port `Nowo\WorkflowBundle\Contract\WorkflowDefinitionCatalogInterface` (alias of `Service\WorkflowDefinitionCatalog`): list a tenant's definitions (`list`, `references`, `count`, `isInstalled`) and install a global template for a tenant (`installTemplate`, idempotent and race-safe). It is a separate interface, so a host decorating or replacing `WorkflowVersionManagerInterface` is unaffected and no existing interface gained a method.
+- A host that lists definitions or seeds templates through `WorkflowDefinitionRepository` (`paginateByName()`, `existsInScope()`, `save()`) can move to the port; the repository methods keep working.
+- Nothing to configure. No migration: the unique `tenant_key, slug, version` key the install relies on exists since 1.15.
 
 ## To 2.0.0
 

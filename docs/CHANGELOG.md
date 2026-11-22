@@ -64,7 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-11-21
+### Added
+
+- **`WorkflowDefinitionCatalogInterface`** (DDD-host checklist B7): a framework-free port to list a tenant's definitions and install a global template for a tenant, with views, references and value objects only (never the `WorkflowDefinition` entity), for hosts with a private entity manager that must not read the definition tables. `list($tenant, $page, $pageSize)` returns a `WorkflowDefinitionPage` of `WorkflowDefinitionView` (latest version of each slug, ordered by name; global templates and other tenants never), `references($tenant)` the `WorkflowDefinitionRef`s (ids included) without loading places and transitions, `count()` and `isInstalled($templateKey, $tenant)`. `installTemplate($templateKey, $tenant, $publish = false)` returns a `WorkflowTemplateInstallation` (`definition`, `created`) and is idempotent: when the tenant already owns the slug (any version or status, a retired clone included) nothing is written and the newest version is returned with `created = false`.
+- Concurrency (REQ-RUNTIME-003): two concurrent installs of one template for one tenant leave exactly one definition. The unique `tenant_key, slug, version` key arbitrates; the loser reads the scope again and returns the winner's definition with `created = false`. Tenant keys, slugs and template keys are compared exactly (SQL pre-filter plus a PHP `===` re-check). Covered on SQLite, MySQL 8.4 and PostgreSQL 16, including two real processes.
+- `WorkflowDefinitionRepository::tenantListing()` and `hydrate()` (the listing and page hydration the port uses; `paginateByName()` behaves as before).
+
+ - 2026-11-21
 
 ### Changed
 
