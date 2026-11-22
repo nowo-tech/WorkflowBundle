@@ -127,11 +127,23 @@ php bin/console doctrine:migrations:migrate
   `<prefix>definition_sequence`):
 
   ```sql
-  -- MySQL 8.0.17+ (MariaDB: COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`)
-  CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, slug VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
-  -- PostgreSQL
+  -- MySQL 8.0.17+ (MariaDB: COLLATE `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`, in the columns and in the table default)
+  CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, slug VARCHAR(128) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_bin`, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_0900_bin`;
+  -- PostgreSQL (no table-level collation there, nothing to add)
   CREATE TABLE workflow_definition_sequence (tenant_key VARCHAR(128) NOT NULL, slug VARCHAR(128) NOT NULL, last_version INT NOT NULL, PRIMARY KEY (tenant_key, slug));
   ```
+
+- **Keep the table default collation.** The trailing `DEFAULT CHARACTER SET utf8mb4 COLLATE …` matters for *future*
+  columns, not for the two that exist (those carry their own `COLLATE`). A text column added later without an explicit
+  `COLLATE` inherits the table default, and without this clause that is the server's accent- and case-insensitive one
+  (typically `utf8mb4_0900_ai_ci`); a join against `tenant_key` or `slug` then fails with MySQL error 1267 (illegal
+  mix of collations), long after and far from the change that caused it.
+- **Repairing a table created without it.** Run
+  `ALTER TABLE workflow_definition_sequence DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_bin;` (MariaDB:
+  `utf8mb4_nopad_bin`; older MySQL: `utf8mb4_bin`). It changes only the default for columns added from now on. **Never
+  use `ALTER TABLE … CONVERT TO CHARACTER SET …` for this:** `CONVERT TO` rewrites every column, which would move
+  `tenant_key` and `slug` out of their binary collation and start folding look-alike tenant keys, the exact failure
+  REQ-SEC-006 exists to prevent.
 
 - **No data migration needed.** The counter row of a scope is created at its first claim, seeded with the highest
   version already stored. To backfill every scope at once anyway (optional, in the same migration, after the

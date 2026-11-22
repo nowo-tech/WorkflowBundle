@@ -66,6 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Documentation: the `workflow_definition_sequence` `CREATE TABLE` in UPGRADING ("To 2.2.0") now sets the table's default collation** (`DEFAULT CHARACTER SET utf8mb4 COLLATE <binary>`) so a column added later without an explicit `COLLATE` cannot inherit the server's case-insensitive default and fail joins with MySQL error 1267. UPGRADING also gives the repair statement for an existing table and warns never to use `ALTER TABLE … CONVERT TO CHARACTER SET`, which would rewrite `tenant_key` and `slug` out of their binary collation. No code change.
+
 ## [2.2.0] - 2026-11-22
 
 ### Changed
