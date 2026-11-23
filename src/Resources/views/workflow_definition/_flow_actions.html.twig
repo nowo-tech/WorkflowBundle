@@ -1,0 +1,14 @@
+{#
+  Actions of a flow detail (since 2.3): in the dialog, Close (moved into the dialog footer by the UiKit remote dialog);
+  on the full page, a link back to the definition.
+
+  Required: definition, bundle.
+#}
+{% set _d = 'NowoWorkflowBundle' %}
+<div class="{{ nowo_ui_class('form_actions', bundle) }}" data-nowo-ui-dialog-actions>
+    {% if nowo_ui_dialog_request() %}
+        <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }}" data-nowo-ui-dialog-close>{{ 'action.close'|trans({}, _d) }}</button>
+    {% else %}
+        <a class="{{ nowo_ui_class('btn_secondary', bundle) }}" href="{{ path('nowo_workflow_definition_show', {id: definition.id}) }}">{{ 'action.back_to_definition'|trans({}, _d) }}</a>
+    {% endif %}
+</div>

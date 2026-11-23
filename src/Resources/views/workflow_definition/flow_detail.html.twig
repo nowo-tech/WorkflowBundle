@@ -1,0 +1,22 @@
+{#
+  One place / transition of a workflow definition as a full page (since 2.3, lazy dialogs) — UiKit page/show. The
+  flow diagram links here; with JavaScript the shared flow dialog of the show page loads only the fragment.
+
+  Variables: page (View\ShowPage from WorkflowPageFactory::flowDetail()), definition, graph, kind (place|transition),
+  item, fragment (template of the fragment), bundle, scope.
+  Data block: nowo_ui_show_sections (the fragment).
+#}
+{% extends '@NowoUiKit/page/show.html.twig' %}
+
+{% block nowo_ui_styles %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('css/nowo-workflow.css', 'nowo_workflow') }}">
+{% endblock %}
+
+{% block nowo_ui_show_sections %}
+    <section class="{{ nowo_ui_class('section', page.bundle) }} {{ nowo_ui_class('card', page.bundle) }}"{{ nowo_ui_attrs('card', page.bundle) }}>
+        <div class="{{ nowo_ui_class('card_body', page.bundle) }}">
+            {{ include(fragment, {item: item, graph: graph, definition: definition, bundle: page.bundle}, false) }}
+        </div>
+    </section>
+{% endblock %}

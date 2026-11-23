@@ -3,8 +3,8 @@
 
   Variables: page (View\ShowPage: header with edit / delete actions, detail sections general / runtime binding /
   match rules, created / updated meta), definition (WorkflowDefinition), graph (WorkflowGraphPresenter::present()).
-  Data blocks: nowo_ui_show_sections (flow diagram before the detail sections); nowo_ui_modals (place / transition
-  dialogs of the diagram, UiKit `dialog` partial).
+  Data blocks: nowo_ui_show_sections (flow diagram before the detail sections); nowo_ui_modals (since 2.3 the ONE
+  shared, empty flow dialog: each place / transition loads its own page into it when opened).
 #}
 {% extends '@NowoUiKit/page/show.html.twig' %}
 

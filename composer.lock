@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "17bdaa2745f081896d95660b67570876",
+    "content-hash": "13bbf4acd7bf2530ee6eb8ef514ff040",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -1304,16 +1304,16 @@
         },
         {
             "name": "nowo-tech/ui-kit-bundle",
-            "version": "v2.51.0",
+            "version": "v2.68.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nowo-tech/UiKitBundle.git",
-                "reference": "bd14774abdb7fb3bb755bf8fb2bf4aaee0258d15"
+                "reference": "b88274f85f5edbe2976debe53b0b6a766e7cba96"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/bd14774abdb7fb3bb755bf8fb2bf4aaee0258d15",
-                "reference": "bd14774abdb7fb3bb755bf8fb2bf4aaee0258d15",
+                "url": "https://api.github.com/repos/nowo-tech/UiKitBundle/zipball/b88274f85f5edbe2976debe53b0b6a766e7cba96",
+                "reference": "b88274f85f5edbe2976debe53b0b6a766e7cba96",
                 "shasum": ""
             },
             "require": {
@@ -1360,7 +1360,8 @@
                 "symfony/validator": "Colour validation in the optional appearance forms"
             },
             "bin": [
-                "bin/nowo-ui-token-lint"
+                "bin/nowo-ui-token-lint",
+                "bin/nowo-ui-demo-style-lint"
             ],
             "type": "symfony-bundle",
             "autoload": {
@@ -1402,7 +1403,8 @@
                 "issues": "https://github.com/nowo-tech/UiKitBundle/issues",
                 "source": "https://github.com/nowo-tech/UiKitBundle"
             },
-            "time": "2026-11-13T16:47:40+00:00"
+            "time": "2026-11-23T05:57:27+00:00",
+            "published-time": "2026-11-23T05:59:40+00:00"
         },
         {
             "name": "psr/cache",
@@ -1679,7 +1681,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-03-24T13:12:05+00:00"
+            "time": "2026-03-24T13:12:05+00:00",
+            "published-time": "2026-03-31T21:09:42+00:00"
         },
         {
             "name": "symfony/cache",
@@ -2194,7 +2197,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-16T14:15:10+00:00"
+            "time": "2026-09-16T14:15:10+00:00",
+            "published-time": "2026-11-04T11:25:34+00:00"
         },
         {
             "name": "symfony/doctrine-bridge",
@@ -3383,7 +3387,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-10T16:19:22+00:00"
+            "time": "2026-04-10T16:19:22+00:00",
+            "published-time": "2026-04-26T14:44:50+00:00"
         },
         {
             "name": "symfony/polyfill-intl-grapheme",
@@ -3723,7 +3728,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-28T09:35:49+00:00"
+            "time": "2026-10-28T09:35:49+00:00",
+            "published-time": "2026-10-28T10:07:45+00:00"
         },
         {
             "name": "symfony/polyfill-php83",
@@ -5776,7 +5782,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-25T13:20:01+00:00"
+            "time": "2026-09-25T13:20:01+00:00",
+            "published-time": "2026-09-25T13:20:14+00:00"
         }
     ],
     "packages-dev": [
@@ -9509,7 +9516,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-25T15:50:05+00:00"
+            "time": "2026-09-25T15:50:05+00:00",
+            "published-time": "2026-09-30T10:23:35+00:00"
         },
         {
             "name": "symfony/polyfill-php81",
@@ -9589,7 +9597,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-26T12:45:58+00:00"
+            "time": "2026-05-26T12:45:58+00:00",
+            "published-time": "2026-05-26T13:40:34+00:00"
         },
         {
             "name": "symfony/process",

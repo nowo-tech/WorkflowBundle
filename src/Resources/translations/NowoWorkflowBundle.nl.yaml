@@ -33,6 +33,7 @@ action:
   clone_template: 'Aanpassen voor deze organisatie'
   retire: 'Buiten gebruik stellen'
   reinstate: 'Opnieuw activeren'
+  back_to_definition: 'Terug naar de workflow'
 
 status:
   enabled: Actief

@@ -67,6 +67,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The flow diagram of the show page loads a place or a transition only when it is opened. Owner rule of 2026-11-23: "every dialog loads its content on demand". Until now the page printed one dialog per place and per transition, with their details. Now it prints **one** empty UiKit remote dialog. Each state and transition of the diagram, and each loop of "Return / loop transitions", is a real link to its own new page:
+  - `GET /definitions/{id}/places/{index}` (`nowo_workflow_definition_place`);
+  - `GET /definitions/{id}/transitions/{index}` (`nowo_workflow_definition_transition`).
+
+  When the link is opened, `js/nowo-ui-dialog.js` fetches it with `X-Nowo-Dialog: 1` and shows the fragment (`_flow_place.html.twig` / `_flow_transition.html.twig`). A place's transitions load into the same dialog. Without JavaScript, or opened as a deep link, the link shows the full page (`flow_detail.html.twig`, new template key `web_ui.templates.flow_detail`, with a link back to the definition). Both answers send `Vary: X-Nowo-Dialog`.
+
+  The new pages make the same access decision as the show page: the definition in scope (404 for another tenant's definition or a global draft) and the host's `WorkflowUiActionCheckerInterface` asked for `View` (403 when it refuses). They sit under the same `nowo_workflow_*` route check. An unknown index answers 404.
+
+  On a definition with 20 places and 20 transitions, the show page went from 145,418 to 43,440 bytes, and from 41 `<dialog>`s to 2 (the delete confirm and the shared shell).
+
+  `WorkflowGraphPresenter::present()` also returns `definitionId`. `WorkflowPageFactory::flowDetail()` builds the full page.
+- `nowo-tech/ui-kit-bundle` constraint `^2.2` → `^2.68` (the remote dialog protocol, `nowo_ui_dialog_request()`).
+- The collection editors (match rules / places / transitions) were checked against the same rule and are unchanged. The hidden entries are the fields of the **one** section form the page posts (one form, one CSRF token, one submit), not a form per row. The editor is one dialog whose body stays empty until an entry's fields move into it, and new entries clone a single `<template>` prototype. A test pins this: 2 or 20 entries give the same number of forms and dialogs.
+
 ### Fixed
 
 - Demo: the Spanish demo catalogue showed the navigation entry `nav.change_requests` in English ("Change requests"); it now reads "Solicitudes de cambio". Demo only, no bundle change.

@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+  - [Flow diagram dialogs load on demand](#flow-diagram-dialogs-load-on-demand)
 - [To 2.2.1](#to-221)
 - [To 2.2.0](#to-220)
   - [To 2.2.0](#to-220-1)
@@ -100,6 +101,27 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+### Flow diagram dialogs load on demand
+
+```bash
+composer update nowo-tech/workflow-bundle nowo-tech/ui-kit-bundle
+php bin/console cache:clear
+```
+
+- Requires `nowo-tech/ui-kit-bundle` `^2.68`.
+- No configuration change. The two new routes (`nowo_workflow_definition_place`, `nowo_workflow_definition_transition`) come with the bundle's routes. A host that imports the routes by hand imports the controller as before.
+- Host template overrides:
+  - **`workflow_definition/show.html.twig`** (`web_ui.templates.show`) that keeps `{{ parent() }}`, or still includes `_flow_dialogs.html.twig` in `nowo_ui_modals`: nothing to change. That template now prints the one empty shell (id `workflow-flow-detail`).
+  - **`_flow_dialogs.html.twig`** or **`_flow_diagram.html.twig`** copied into the host: replace the per-item dialogs with the shell (`remote_form_dialog`, id `workflow-flow-detail`). Make each state or transition opener a link to its page:
+
+    ```twig
+    <a href="{{ path('nowo_workflow_definition_place', {id: graph.definitionId, index: place.index}) }}"{{ nowo_ui_html_attrs(nowo_ui_remote_form_opener('workflow-flow-detail', place.displayLabel, false, path('nowo_workflow_definition_place', {id: graph.definitionId, index: place.index}))) }}>…</a>
+    ```
+
+    The detail markup moves to `_flow_place.html.twig` / `_flow_transition.html.twig`. The ids `workflow-place-<n>` and `workflow-transition-<n>` and `data-nowo-ui-dialog-replace` are gone.
+  - Host tests or scripts that open `#workflow-place-<n>` / `#workflow-transition-<n>`: open the link instead. The dialog is `#workflow-flow-detail`, and its body holds `[data-testid="workflow-flow-place"]` or `[data-testid="workflow-flow-transition"]` once loaded.
+- The diagram's states and transitions are now `<a>` elements styled as before (`nowo-workflow.css`). Host CSS that targets `button.nowo-workflow-diagram__state` must target `.nowo-workflow-diagram__state` instead.
 
 ## To 2.2.1
 

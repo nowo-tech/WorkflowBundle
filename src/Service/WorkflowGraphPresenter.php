@@ -30,6 +30,7 @@ final class WorkflowGraphPresenter
 
     /**
      * @return array{
+     *     definitionId: int|null,
      *     initialPlace: string,
      *     type: string,
      *     typeLabel: string,
@@ -82,6 +83,8 @@ final class WorkflowGraphPresenter
         }
 
         return [
+            // Lazy dialogs: the diagram links each place / transition to its own page of this definition.
+            'definitionId' => $definition->getId(),
             'initialPlace' => $definition->getInitialPlace(),
             'type'         => $definition->getType()->value,
             'typeLabel'    => $definition->getType()->label(),
