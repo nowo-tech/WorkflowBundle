@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Table of contents
 
 - [[Unreleased]](#unreleased)
+- [[2.3.0] - 2026-11-23](#230---2026-11-23)
 - [[2.2.1] - 2026-11-22](#221---2026-11-22)
 - [[2.2.0] - 2026-11-22](#220---2026-11-22)
 - [[2.1.1] - 2026-11-22](#211---2026-11-22)
@@ -67,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-23
+
 ### Changed
 
 - The flow diagram of the show page loads a place or a transition only when it is opened. Owner rule of 2026-11-23: "every dialog loads its content on demand". Until now the page printed one dialog per place and per transition, with their details. Now it prints **one** empty UiKit remote dialog. Each state and transition of the diagram, and each loop of "Return / loop transitions", is a real link to its own new page:
@@ -86,6 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Demo: the Spanish demo catalogue showed the navigation entry `nav.change_requests` in English ("Change requests"); it now reads "Solicitudes de cambio". Demo only, no bundle change.
+
+[2.3.0]: https://github.com/nowo-tech/WorkflowBundle/releases/tag/v2.3.0
 
 ## [2.2.1] - 2026-11-22
 

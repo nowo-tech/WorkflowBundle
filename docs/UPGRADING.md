@@ -3,6 +3,7 @@
 ## Table of contents
 
 - [Unreleased](#unreleased)
+- [To 2.3.0](#to-230)
   - [Flow diagram dialogs load on demand](#flow-diagram-dialogs-load-on-demand)
 - [To 2.2.1](#to-221)
 - [To 2.2.0](#to-220)
@@ -101,6 +102,14 @@
   - [Twig-CS-Fixer (maintainers)](#twig-cs-fixer-maintainers)
 
 ## Unreleased
+
+## To 2.3.0
+
+From **2.2.1**:
+
+```bash
+composer update nowo-tech/workflow-bundle
+```
 
 ### Flow diagram dialogs load on demand
 
