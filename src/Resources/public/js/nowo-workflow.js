@@ -3,8 +3,9 @@
  * no innerHTML / document.write / eval and no global API of its own (data-* attributes drive everything).
  *
  * - Dialogs: the UiKit `dialog` partial and js/nowo-ui-dialog.js open / close them (data-nowo-ui-dialog-open,
- *   data-nowo-ui-dialog-close, Esc, backdrop click). Place → transition links in the flow diagram swap dialogs
- *   through the UiKit 2.2 data-nowo-ui-dialog-replace opener (one dialog open at a time, focus handed over).
+ *   data-nowo-ui-dialog-close, Esc, backdrop click). Since 2.3 the flow diagram has ONE UiKit remote dialog: each
+ *   place / transition is a link to its own page that the dialog loads on open (a place's transition links load the
+ *   transition into the same dialog); nothing of the detail is in the page before.
  * - Flow diagram: hovering / focusing a transition label highlights its own connector (shared data-edge).
  * - Collection editors ([data-workflow-collection]): table of the CollectionType entries, add / edit in the UiKit
  *   dialog (the entry's fields move into it), remove behind the UiKit confirm dialog, optional TomSelect

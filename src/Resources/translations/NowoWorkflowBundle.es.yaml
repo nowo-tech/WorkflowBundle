@@ -33,6 +33,7 @@ action:
   clone_template: 'Personalizar para esta organización'
   retire: 'Retirar'
   reinstate: 'Reactivar'
+  back_to_definition: 'Volver al flujo'
 
 status:
   enabled: Activo

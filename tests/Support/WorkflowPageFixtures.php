@@ -83,6 +83,25 @@ final class WorkflowPageFixtures
     }
 
     /**
+     * Lazy dialogs (2.3): a linear state machine of `$places` places, one forward transition between neighbours and a
+     * loop back to the first place ($places transitions in all).
+     */
+    public static function largeDefinition(int $places, int $id = 9): WorkflowDefinition
+    {
+        $definition = new WorkflowDefinition('Large approval chain', 'large_chain', 'step_0', 'App\\Entity\\PurchaseOrder', WorkflowType::StateMachine);
+        for ($i = 0; $i < $places; ++$i) {
+            $definition->addPlace(new WorkflowPlace('step_' . $i, 'Step ' . $i, $i));
+        }
+        for ($i = 0; $i < $places - 1; ++$i) {
+            $definition->addTransition(new WorkflowTransition('advance_' . $i, ['step_' . $i], ['step_' . ($i + 1)], 'Advance ' . $i));
+        }
+        $definition->addTransition(new WorkflowTransition('restart', ['step_' . ($places - 1)], ['step_0'], 'Restart'));
+        self::setId($definition, $id);
+
+        return $definition;
+    }
+
+    /**
      * Document review: branching workflow with a loop (back edge), default matcher, disabled.
      */
     public static function documentReview(int $id = 2): WorkflowDefinition

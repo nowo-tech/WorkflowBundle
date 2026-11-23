@@ -1,0 +1,21 @@
+{#
+  One transition of the flow diagram (since 2.3, lazy dialogs): the fragment the shared flow dialog loads, also the
+  body of the full page (flow_detail.html.twig).
+
+  Required: item (a transition of WorkflowGraphPresenter::present()), graph, definition, bundle.
+#}
+{% set _d = 'NowoWorkflowBundle' %}
+{% set transition = item %}
+{% set _items = [{label: 'diagram.modal.name'|trans({}, _d), value: transition.name, href: null}] %}
+{% if transition.label %}
+    {% set _items = _items|merge([{label: 'diagram.modal.label'|trans({}, _d), value: transition.label, href: null}]) %}
+{% endif %}
+{% set _items = _items|merge([
+    {label: 'diagram.modal.from'|trans({}, _d), value: transition.fromPlaces|join(', '), href: null},
+    {label: 'diagram.modal.to'|trans({}, _d), value: transition.toPlaces|join(', '), href: null},
+]) %}
+<div class="nowo-workflow-flow-detail" data-testid="workflow-flow-transition" data-transition="{{ transition.name }}">
+    {{ include(nowo_ui_partial('detail_list', bundle), {items: _items, bundle: bundle}, false) }}
+    <p class="{{ nowo_ui_class('muted', bundle) }}">{{ (graph.type == 'state_machine' ? 'diagram.modal.state_machine_help' : 'diagram.modal.workflow_help')|trans({}, _d) }}</p>
+    {{ include('@NowoWorkflowBundle/workflow_definition/_flow_actions.html.twig', {definition: definition, bundle: bundle}, false) }}
+</div>

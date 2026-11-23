@@ -33,6 +33,7 @@ action:
   clone_template: 'Customize for this organization'
   retire: 'Retire'
   reinstate: 'Reinstate'
+  back_to_definition: 'Back to the workflow'
 
 status:
   enabled: Enabled

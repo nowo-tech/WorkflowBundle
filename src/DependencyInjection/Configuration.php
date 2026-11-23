@@ -53,6 +53,8 @@ final class Configuration implements ConfigurationInterface
         'show'      => '@NowoWorkflowBundle/workflow_definition/show.html.twig',
         'new'       => '@NowoWorkflowBundle/workflow_definition/form.html.twig',
         'edit'      => '@NowoWorkflowBundle/workflow_definition/edit.html.twig',
+        // Lazy dialogs: the full page of one place / transition of the flow diagram (its dialog loads the fragment).
+        'flow_detail' => '@NowoWorkflowBundle/workflow_definition/flow_detail.html.twig',
     ];
 
     /**

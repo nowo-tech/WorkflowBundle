@@ -1,10 +1,15 @@
 {#
-  Flow diagram card of a workflow definition (show page). States and transitions open their dialogs
-  (_flow_dialogs.html.twig) through the UiKit dialog opener (data-nowo-ui-dialog-open, js/nowo-ui-dialog.js).
+  Flow diagram card of a workflow definition (show page). Since 2.3 (lazy dialogs) every state and transition is a
+  link to its own page (nowo_workflow_definition_place / _transition) that the ONE shared dialog of
+  _flow_dialogs.html.twig loads on open (UiKit remote dialog opener, js/nowo-ui-dialog.js); without JavaScript the
+  link opens the full page. The page renders no place / transition detail until one is opened.
 
-  Required: graph (WorkflowGraphPresenter::present()), bundle.
+  Required: graph (WorkflowGraphPresenter::present(), with definitionId), bundle.
+  Optional: dialog_id (default workflow-flow-detail, the id of the _flow_dialogs.html.twig shell).
 #}
 {% set _d = 'NowoWorkflowBundle' %}
+{% set _dialog = dialog_id|default('workflow-flow-detail') %}
+{% set _id = graph.definitionId %}
 <section class="{{ nowo_ui_class('section', bundle) }} {{ nowo_ui_class('card', bundle) }} nowo-workflow-diagram" id="workflow-definition-diagram" data-testid="workflow-flow-diagram"{{ nowo_ui_attrs('card', bundle) }}>
     <header class="{{ nowo_ui_class('card_header', bundle) }}">
         <div class="nowo-ui-card__heading">
@@ -19,10 +24,10 @@
                 <div class="nowo-workflow-diagram__linear">
                     {% for item in graph.layout.sequence %}
                         {% if item.type == 'place' %}
-                            {{ _self.place_node(item.place, bundle) }}
+                            {{ _self.place_node(item.place, bundle, _id, _dialog) }}
                         {% else %}
                             <div class="nowo-workflow-diagram__link">
-                                {{ _self.transition_pill(item.transitionIndex, item.transitionLabel) }}
+                                {{ _self.transition_pill(item.transitionIndex, item.transitionLabel, null, _id, _dialog) }}
                                 <span class="nowo-workflow-diagram__line" aria-hidden="true"></span>
                             </div>
                         {% endif %}
@@ -47,12 +52,12 @@
                     </g>
                     {% for node in _diagram.nodes %}
                         <foreignObject class="nowo-workflow-diagram__box" x="{{ node.x }}" y="{{ node.y }}" width="{{ node.width }}" height="{{ node.height }}" data-place="{{ node.place.name }}">
-                            {{ _self.place_node(node.place, bundle) }}
+                            {{ _self.place_node(node.place, bundle, _id, _dialog) }}
                         </foreignObject>
                     {% endfor %}
                     {% for edge in _diagram.edges %}
                         <foreignObject class="nowo-workflow-diagram__label-box" data-edge="{{ loop.index0 }}" x="{{ edge.labelLeft }}" y="{{ edge.labelTop }}" width="{{ edge.labelWidth }}" height="{{ edge.labelHeight }}" data-from="{{ edge.fromPlace }}" data-to="{{ edge.toPlace }}">
-                            {{ _self.transition_pill(edge.transitionIndex, edge.transitionLabel, _labels[edge.fromPlace] ~ ' → ' ~ _labels[edge.toPlace]) }}
+                            {{ _self.transition_pill(edge.transitionIndex, edge.transitionLabel, _labels[edge.fromPlace] ~ ' → ' ~ _labels[edge.toPlace], _id, _dialog) }}
                         </foreignObject>
                     {% endfor %}
                 </svg>
@@ -65,9 +70,10 @@
                 <p class="{{ nowo_ui_class('muted', bundle) }}">{{ 'diagram.back_edges'|trans({}, _d) }}</p>
                 <div class="{{ nowo_ui_class('toolbar', bundle) }}">
                     {% for edge in graph.layout.backEdges %}
-                        <button type="button" class="{{ nowo_ui_class('btn_secondary', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}" data-nowo-ui-dialog-open="workflow-transition-{{ edge.transitionIndex }}">
+                        {% set _href = path('nowo_workflow_definition_transition', {id: _id, index: edge.transitionIndex}) %}
+                        <a href="{{ _href }}" class="{{ nowo_ui_class('btn_secondary', bundle) }} {{ nowo_ui_class('btn_sm', bundle) }}"{{ nowo_ui_html_attrs(nowo_ui_remote_form_opener(_dialog, edge.transitionLabel, false, _href)) }}>
                             <code class="{{ nowo_ui_class('code', bundle) }}">{{ edge.fromPlace }}</code> → {{ edge.transitionLabel }} → <code class="{{ nowo_ui_class('code', bundle) }}">{{ edge.toPlace }}</code>
-                        </button>
+                        </a>
                     {% endfor %}
                 </div>
             </div>
@@ -81,13 +87,15 @@
     </div>
 </section>
 
-{% macro place_node(place, bundle = null) %}
-    <button type="button" class="nowo-workflow-diagram__state{% if place.isInitial %} nowo-workflow-diagram__state--initial{% endif %}" data-nowo-ui-dialog-open="workflow-place-{{ place.index }}">
+{% macro place_node(place, bundle = null, definition_id = null, dialog_id = 'workflow-flow-detail') %}
+    {% set _href = path('nowo_workflow_definition_place', {id: definition_id, index: place.index}) %}
+    <a href="{{ _href }}" class="nowo-workflow-diagram__state{% if place.isInitial %} nowo-workflow-diagram__state--initial{% endif %}"{{ nowo_ui_html_attrs(nowo_ui_remote_form_opener(dialog_id, place.displayLabel, false, _href)) }}>
         <span class="nowo-workflow-diagram__state-title">{{ place.displayLabel }}</span>
         <span class="nowo-workflow-diagram__state-name"><code class="{{ nowo_ui_class('code', bundle) }}">{{ place.name }}</code></span>
-    </button>
+    </a>
 {% endmacro %}
 
-{% macro transition_pill(index, label, route = null) %}
-    <button type="button" class="nowo-workflow-diagram__transition" data-nowo-ui-dialog-open="workflow-transition-{{ index }}"{% if route %} title="{{ route }}"{% endif %}>{{ label }}</button>
+{% macro transition_pill(index, label, route = null, definition_id = null, dialog_id = 'workflow-flow-detail') %}
+    {% set _href = path('nowo_workflow_definition_transition', {id: definition_id, index: index}) %}
+    <a href="{{ _href }}" class="nowo-workflow-diagram__transition"{{ nowo_ui_html_attrs(nowo_ui_remote_form_opener(dialog_id, label, false, _href)) }}{% if route %} title="{{ route }}"{% endif %}>{{ label }}</a>
 {% endmacro %}

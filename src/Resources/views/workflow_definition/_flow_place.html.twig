@@ -1,0 +1,43 @@
+{#
+  One place of the flow diagram (since 2.3, lazy dialogs): the fragment the shared flow dialog loads, also the body of
+  the full page (flow_detail.html.twig). Its transitions link to their own page and load into the same dialog.
+
+  Required: item (a place of WorkflowGraphPresenter::present()), graph, definition, bundle.
+  Optional: dialog_id (default workflow-flow-detail).
+#}
+{% set _d = 'NowoWorkflowBundle' %}
+{% set _dialog = dialog_id|default('workflow-flow-detail') %}
+{% set place = item %}
+{% set _items = [{label: 'diagram.modal.name'|trans({}, _d), value: place.name, href: null}] %}
+{% if place.label %}
+    {% set _items = _items|merge([{label: 'diagram.modal.label'|trans({}, _d), value: place.label, href: null}]) %}
+{% endif %}
+{% set _items = _items|merge([{label: 'diagram.modal.sort_order'|trans({}, _d), value: place.sortOrder ~ '', href: null}]) %}
+<div class="nowo-workflow-flow-detail" data-testid="workflow-flow-place" data-place="{{ place.name }}">
+    {% if place.isInitial %}
+        <p><span class="{{ nowo_ui_class('badge_success', bundle) }}">{{ 'status.initial'|trans({}, _d) }}</span></p>
+    {% endif %}
+    {{ include(nowo_ui_partial('detail_list', bundle), {items: _items, bundle: bundle}, false) }}
+    {% for _direction in ['incoming', 'outgoing'] %}
+        {% set _transitions = attribute(place, _direction) %}
+        {% if _transitions %}
+            <h3 class="nowo-workflow-dialog__subtitle">{{ ('diagram.modal.' ~ _direction)|trans({}, _d) }}</h3>
+            <ul class="nowo-workflow-dialog__list">
+                {% for transition in _transitions %}
+                    {% set _href = path('nowo_workflow_definition_transition', {id: definition.id, index: transition.transitionIndex}) %}
+                    <li>
+                        <a href="{{ _href }}" class="{{ nowo_ui_class('btn_link', bundle) }}"{{ nowo_ui_html_attrs(nowo_ui_remote_form_opener(_dialog, transition.transitionLabel, false, _href)) }}>{{ transition.transitionLabel }}</a>
+                        <span class="{{ nowo_ui_class('muted', bundle) }}">
+                            {{ (_direction == 'incoming' ? 'diagram.transition_from' : 'diagram.transition_to')|trans({}, _d) }}
+                            {% for _place in (_direction == 'incoming' ? transition.fromPlaces : transition.toPlaces) %}<code class="{{ nowo_ui_class('code', bundle) }}">{{ _place }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endfor %}
+    {% if place.incoming is empty and place.outgoing is empty %}
+        <p class="{{ nowo_ui_class('muted', bundle) }}">{{ 'diagram.modal.no_transitions'|trans({}, _d) }}</p>
+    {% endif %}
+    {{ include('@NowoWorkflowBundle/workflow_definition/_flow_actions.html.twig', {definition: definition, bundle: bundle}, false) }}
+</div>

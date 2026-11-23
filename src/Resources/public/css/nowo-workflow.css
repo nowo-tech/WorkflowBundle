@@ -109,6 +109,18 @@
   fill: var(--nowo-ui-muted);
 }
 
+/* Since 2.3 the states and transitions are links to their own page (lazy dialogs), styled as the former buttons. */
+.nowo-workflow-diagram__state,
+.nowo-workflow-diagram__transition {
+  display: inline-block;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+.nowo-workflow-diagram__box > .nowo-workflow-diagram__state {
+  display: block;
+}
+
 .nowo-workflow-diagram__state {
   width: 10.5rem;
   min-height: 4.75rem;

@@ -215,6 +215,23 @@ final class WorkflowPageFactory
     }
 
     /**
+     * Since 2.3 (lazy dialogs): the full page of one place / transition of the flow diagram (the page its dialog
+     * opener links to; the dialog itself loads only the fragment). Header: the item's label, crumbs back to the
+     * definition; no actions.
+     */
+    public function flowDetail(WorkflowDefinition $definition, string $title): ShowPage
+    {
+        return new ShowPage(
+            new PageHeader($title, null, [], [...$this->definitionCrumbs($definition, true), new Crumb($title)]),
+            [],
+            [],
+            self::BUNDLE,
+            $this->layout,
+            ['data-testid' => 'workflow-flow-detail'],
+        );
+    }
+
+    /**
      * Builds the form page view model of the new-definition form.
      */
     public function newForm(FormView $form): FormPage

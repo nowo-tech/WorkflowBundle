@@ -8,6 +8,7 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use LogicException;
+use Nowo\UiKitBundle\Dialog\RemoteDialogResponder;
 use Nowo\WorkflowBundle\DependencyInjection\Configuration;
 use Nowo\WorkflowBundle\Doctrine\ClosedEntityManagerResetter;
 use Nowo\WorkflowBundle\Entity\WorkflowDefinition;
@@ -64,6 +65,7 @@ final class WorkflowDefinitionController extends AbstractController
         private readonly LoggerInterface $logger = new NullLogger(),
         private readonly WorkflowUiTenancy $tenancy = new WorkflowUiTenancy(),
         private readonly ?WorkflowVersioning $versioning = null,
+        private readonly RemoteDialogResponder $dialogs = new RemoteDialogResponder(),
     ) {
     }
 
@@ -217,6 +219,26 @@ final class WorkflowDefinitionController extends AbstractController
         $tenant = $this->tenancy->tenant($request);
 
         return $this->renderShow($request, $this->requireDefinitionById($id), $tenant);
+    }
+
+    /**
+     * Since 2.3 (lazy dialogs): one place of the flow diagram. The diagram links here; the shared UiKit remote dialog
+     * of the show page loads the fragment (`X-Nowo-Dialog: 1`), a plain request (no JavaScript, a deep link) gets the
+     * full page. Same access decision as the show page.
+     */
+    #[Route('/{id}/places/{index}', name: 'place', requirements: ['id' => '\d+', 'index' => '\d+'], methods: ['GET'])]
+    public function place(Request $request, int $id, int $index): Response
+    {
+        return $this->renderFlowItem($request, $id, 'place', $index);
+    }
+
+    /**
+     * Since 2.3 (lazy dialogs): one transition of the flow diagram, as {@see place()}.
+     */
+    #[Route('/{id}/transitions/{index}', name: 'transition', requirements: ['id' => '\d+', 'index' => '\d+'], methods: ['GET'])]
+    public function transition(Request $request, int $id, int $index): Response
+    {
+        return $this->renderFlowItem($request, $id, 'transition', $index);
     }
 
     /**
@@ -474,6 +496,44 @@ final class WorkflowDefinitionController extends AbstractController
             'graph'      => $this->graphPresenter->present($definition),
             'scope'      => $this->scope($tenant),
         ]);
+    }
+
+    /**
+     * The place / transition detail of the flow diagram: the dialog fragment for a dialog request, else the full
+     * page. Nothing of it is rendered by the show page any more (UiKit remote dialog, loaded on open).
+     *
+     * @param 'place'|'transition' $kind
+     */
+    private function renderFlowItem(Request $request, int $id, string $kind, int $index): Response
+    {
+        $tenant     = $this->tenancy->tenant($request);
+        $definition = $this->requireDefinitionById($id);
+        // Exactly the decision of renderShow(): the detail is part of the show page.
+        $this->tenancy->assertInScope($definition, $tenant, false);
+        $this->tenancy->denyUnlessAllowed($request, WorkflowUiAction::View, $tenant, $definition);
+
+        $graph = $this->graphPresenter->present($definition);
+        $item  = $graph[$kind === 'place' ? 'places' : 'transitions'][$index] ?? null;
+        if ($item === null) {
+            throw $this->createNotFoundException($this->translator->trans('error.not_found_id', ['%id%' => $id], 'NowoWorkflowBundle'));
+        }
+
+        $parameters = [
+            'definition' => $definition,
+            'graph'      => $graph,
+            'kind'       => $kind,
+            'item'       => $item,
+            'fragment'   => '@NowoWorkflowBundle/workflow_definition/_flow_' . $kind . '.html.twig',
+            'bundle'     => WorkflowPageFactory::BUNDLE,
+        ];
+        if ($this->dialogs->isDialog($request)) {
+            return $this->dialogs->fragment($this->render($parameters['fragment'], $parameters));
+        }
+
+        return $this->dialogs->fragment($this->render($this->template('flow_detail'), $parameters + [
+            'page'  => $this->pages->flowDetail($definition, $item['displayLabel']),
+            'scope' => $this->scope($tenant),
+        ]));
     }
 
     private function scope(?WorkflowTenant $tenant): WorkflowUiScope

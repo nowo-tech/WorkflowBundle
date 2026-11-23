@@ -46,27 +46,60 @@ test.describe('workflow admin (UiKit page contract)', () => {
     expect(errors).toEqual([]);
   });
 
-  test('show page: diagram dialogs and delete confirm', async ({ page }) => {
+  test('show page: diagram dialog loads on demand, and delete confirm', async ({ page }) => {
     const errors = collectErrors(page);
     const id = await definitionId(page, 'change_request_review');
 
     await page.goto(`/workflow/definitions/${id}`);
     await expect(page.getByTestId('workflow-flow-diagram')).toBeVisible();
 
-    await page.locator('.nowo-workflow-diagram__state').first().click();
-    const placeDialog = page.locator('dialog[open][data-nowo-ui-dialog]');
-    await expect(placeDialog).toHaveCount(1);
-    await placeDialog.locator('[data-nowo-ui-dialog-replace]').first().click();
-    // A dialog that is closing keeps `open` until its animation ends: only count the ones that are not closing.
-    await expect(page.locator('dialog[open]:not([data-nowo-ui-closing])')).toHaveAttribute('id', /^workflow-transition-/);
-    await page.keyboard.press('Escape');
+    // Lazy dialogs (2.3): ONE empty shell, nothing of a place / transition in the page before it is opened.
+    const dialog = page.locator('dialog#workflow-flow-detail');
+    await expect(dialog).toHaveCount(1);
+    await expect(page.locator('dialog[data-nowo-ui-dialog]')).toHaveCount(1);
+    await expect(dialog.locator('[data-nowo-ui-dialog-body]')).toBeEmpty();
+    await expect(page.locator('[data-testid="workflow-flow-place"], [data-testid="workflow-flow-transition"]')).toHaveCount(0);
+
+    // The opener is a real link; the dialog fetches its fragment with X-Nowo-Dialog: 1.
+    const state = page.locator('a.nowo-workflow-diagram__state').first();
+    await expect(state).toHaveAttribute('href', new RegExp(`/workflow/definitions/${id}/places/0$`));
+    const fragment = page.waitForRequest((request) => request.url().endsWith(`/definitions/${id}/places/0`) && request.headers()['x-nowo-dialog'] === '1');
+    await state.click();
+    await fragment;
+    await expect(dialog).toHaveAttribute('open', '');
+    const place = dialog.getByTestId('workflow-flow-place');
+    await expect(place).toBeVisible();
+    await expect(dialog.locator('#workflow-flow-detail-title')).toHaveText(((await state.locator('.nowo-workflow-diagram__state-title').textContent()) ?? '').trim());
+    await expect(place.locator('h1, header, nav')).toHaveCount(0); // a fragment, not the page
+
+    // A transition of the place loads into the same dialog.
+    await place.locator('.nowo-workflow-dialog__list a').first().click();
+    await expect(dialog.getByTestId('workflow-flow-transition')).toBeVisible();
+    await expect(page.locator('dialog[open]:not([data-nowo-ui-closing])')).toHaveCount(1);
+    await dialog.locator('[data-nowo-ui-dialog-footer] [data-nowo-ui-dialog-close]').click();
     await expect(page.locator('dialog[open]:not([data-nowo-ui-closing])')).toHaveCount(0);
+    await expect(dialog.locator('[data-nowo-ui-dialog-body] [data-testid]')).toHaveCount(0); // emptied again on close
+    await expect(state).toBeFocused(); // focus back to the opener
 
     await page.locator('[data-nowo-ui-region="header"] [data-nowo-confirm-open]').click();
     await expect(page.locator('dialog[open][data-nowo-ui-confirm]')).toBeVisible();
     await page.keyboard.press('Escape');
 
     expect(errors).toEqual([]);
+  });
+
+  test('flow detail without JavaScript: the opener link is the full page', async ({ browser }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    const id = await definitionId(page, 'change_request_review');
+    await page.goto(`/workflow/definitions/${id}`);
+    await page.locator('a.nowo-workflow-diagram__state').first().click();
+    await expect(page).toHaveURL(new RegExp(`/workflow/definitions/${id}/places/0$`));
+    await expect(page.getByTestId('workflow-flow-detail')).toBeVisible();
+    await expect(page.getByTestId('workflow-flow-place')).toBeVisible();
+    await page.getByRole('link', { name: 'Back to the workflow' }).click();
+    await expect(page).toHaveURL(new RegExp(`/workflow/definitions/${id}$`));
+    await context.close();
   });
 
   test('flow diagram: every connector ends at its own target, only true loops are listed', async ({ page }) => {
@@ -95,19 +128,20 @@ test.describe('workflow admin (UiKit page contract)', () => {
     });
     expect(misses).toEqual([]);
 
-    const label = (text: string) => svg.locator('.nowo-workflow-diagram__label-box').filter({ has: page.getByRole('button', { name: text, exact: true }) });
+    const label = (text: string) => svg.locator('.nowo-workflow-diagram__label-box').filter({ has: page.getByRole('link', { name: text, exact: true }) });
     await expect(label('Submit for review')).toHaveAttribute('data-to', 'review');
     await expect(label('Approve')).toHaveAttribute('data-to', 'approved');
     await expect(label('Request changes')).toHaveAttribute('data-to', 'changes_needed');
 
-    const loops = page.getByTestId('workflow-flow-back-edges').getByRole('button');
+    const loops = page.getByTestId('workflow-flow-back-edges').getByRole('link');
     await expect(loops).toHaveCount(2);
     await expect(loops).toContainText(['Resubmit', 'Reopen']);
 
-    await label('Approve').getByRole('button').hover();
+    await label('Approve').getByRole('link').hover();
     await expect(svg.locator('.nowo-workflow-diagram__edge.is-active')).toHaveAttribute('data-to', 'approved');
-    await label('Approve').getByRole('button').click();
-    await expect(page.locator('dialog[open]')).toHaveAttribute('id', /^workflow-transition-/);
+    await label('Approve').getByRole('link').click();
+    await expect(page.locator('dialog[open]')).toHaveAttribute('id', 'workflow-flow-detail');
+    await expect(page.locator('dialog[open]').getByTestId('workflow-flow-transition')).toHaveAttribute('data-transition', 'approve');
     await page.keyboard.press('Escape');
 
     expect(errors).toEqual([]);
