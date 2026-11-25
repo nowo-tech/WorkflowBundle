@@ -2,7 +2,7 @@
 
 **Baseline spec**: [`spec.md`](spec.md)  
 **Package**: `nowo-tech/workflow-bundle`  
-**Last audited**: 2026-11-22 (v2.2.0, unreleased)
+**Last audited**: 2026-11-27 (v2.3.0)
 
 This file proves that **every production source artifact** under `src/` is referenced by the baseline specification. Test-only files under `tests/` and `*.test.ts` under `src/` are out of Packagist scope. Built assets under `Resources/public/` are documented as Vite/build outputs.
 
@@ -31,7 +31,7 @@ This file proves that **every production source artifact** under `src/` is refer
 | --- | --- | --- |
 | `Controller/DashboardController.php` | Dashboard controller | FR-DASH-001 |
 | `Controller/LocaleController.php` | Locale switch controller | FR-I18N-001 |
-| `Controller/WorkflowDefinitionController.php` | Workflow CRUD controller (closed-EM recovery) | FR-WF-001, FR-WF-007 |
+| `Controller/WorkflowDefinitionController.php` | Workflow CRUD controller (closed-EM recovery); 2.3 adds `place` / `transition` routes that serve a flow item as a dialog fragment (`X-Nowo-Dialog: 1`) or a full page with the show page's access decision | FR-WF-001, FR-WF-007, FR-VIEW-009 |
 
 ## Persistence
 
@@ -145,14 +145,18 @@ This file proves that **every production source artifact** under `src/` is refer
 | Source file | Spec section | Requirement IDs |
 | --- | --- | --- |
 | `Resources/views/dashboard/index.html.twig` | Dashboard template | FR-VIEW-003 |
-| `Resources/views/workflow_definition/_flow_diagram.html.twig` | Workflow editor template | FR-VIEW-007 |
-| `Resources/views/workflow_definition/form.html.twig` | Workflow editor template | FR-VIEW-007 |
-| `Resources/views/workflow_definition/index.html.twig` | Workflow editor template | FR-VIEW-007 |
-| `Resources/views/workflow_definition/show.html.twig` | Workflow editor template | FR-VIEW-007 |
+| `Resources/views/workflow_definition/_flow_diagram.html.twig` | Flow diagram card of the show page: every state and transition is a link to its own page, loaded on open into the one shared dialog (2.3 lazy dialogs); no detail is rendered until one is opened | FR-VIEW-007, FR-VIEW-009 |
+| `Resources/views/workflow_definition/form.html.twig` | Create page of a workflow definition (UiKit form scaffold) | FR-VIEW-007 |
+| `Resources/views/workflow_definition/index.html.twig` | List of workflow definitions (UiKit list scaffold) | FR-VIEW-007 |
+| `Resources/views/workflow_definition/show.html.twig` | Show page of a definition: general data, match rules, flow diagram card and the one flow dialog | FR-VIEW-007, FR-VIEW-009 |
 | `Resources/views/workflow_definition/edit.html.twig` | Edit page (UiKit page/settings, one tab per section) | FR-VIEW-007, FR-UI-002 |
 | `Resources/views/workflow_definition/_general_fields.html.twig` | General fields grid | FR-VIEW-007 |
 | `Resources/views/workflow_definition/_collection_section.html.twig` | Collection editor (match rules, places, transitions) with UiKit dialog | FR-VIEW-007, FR-FORM-001 |
-| `Resources/views/workflow_definition/_flow_dialogs.html.twig` | Place / transition dialogs of the flow diagram | FR-VIEW-008 |
+| `Resources/views/workflow_definition/_flow_dialogs.html.twig` | The ONE empty UiKit `remote_form_dialog` shell of the flow diagram (2.3; before 2.3 it printed one dialog per place and per transition) | FR-VIEW-008, FR-VIEW-009 |
+| `Resources/views/workflow_definition/_flow_place.html.twig` | One place of the flow diagram: the fragment the shared dialog loads and the body of the full page; its transitions link to their own page and load into the same dialog | FR-VIEW-009 |
+| `Resources/views/workflow_definition/_flow_transition.html.twig` | One transition of the flow diagram (name, label, from and to places): dialog fragment and full-page body | FR-VIEW-009 |
+| `Resources/views/workflow_definition/_flow_actions.html.twig` | Actions of a flow detail: Close in the dialog footer, or a link back to the definition on the full page | FR-VIEW-009 |
+| `Resources/views/workflow_definition/flow_detail.html.twig` | Full page of one place / transition on the UiKit `page/show` scaffold (no-JavaScript fallback and deep link; template key `flow_detail`) | FR-VIEW-009 |
 
 ## Public assets
 
@@ -309,16 +313,16 @@ This file proves that **every production source artifact** under `src/` is refer
 | Persistence | 5 | 5 |
 | Forms | 7 | 7 |
 | Domain models | 4 | 4 |
-| Application services | 20 | 20 |
+| Application services | 21 | 21 |
 | Contracts & attributes | 2 | 2 |
 | Twig PHP | 2 | 2 |
 | Persistence integration | 5 | 5 |
 | Exceptions | 2 | 2 |
 | Symfony config | 2 | 2 |
 | Translations | 7 | 7 |
-| Twig views | 9 | 9 |
+| Twig views | 13 | 13 |
 | Public assets | 6 | 6 |
-| Doctrine private entity manager | 18 | 18 |
+| Doctrine private entity manager | 20 | 20 |
 | Ports (host contracts) | 14 | 14 |
 | Model value objects | 23 | 23 |
 | Versioning and tenancy services | 16 | 16 |
@@ -326,6 +330,6 @@ This file proves that **every production source artifact** under `src/` is refer
 | Events and audit | 8 | 8 |
 | Commands and shape validation | 3 | 3 |
 | Further exceptions | 7 | 7 |
-| **Total production sources** | **175** | **175** |
+| **Total production sources** | **182** | **182** |
 
-Audit: `git ls-files src | wc -l` → 176.
+Audit: `git ls-files src | wc -l` → 182 (2026-11-27, 2.3.0).

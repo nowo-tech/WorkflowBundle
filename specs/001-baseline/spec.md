@@ -48,6 +48,7 @@ Per SDD US-01–US-05: DB-backed definitions, CRUD UI with flow diagram, context
 - **FR-UI-003**: `Resources/public/js/nowo-workflow.js` / `css/nowo-workflow.css` — admin UI behaviour and styles without framework JS, inline handlers or `confirm()` (CSP-safe).
 - **FR-UI-004**: Vendored Tom Select 2.4.3 (`Resources/public/vendor/tom-select/`, with its LICENSE) for the searchable from/to place selects; optional at runtime (native `<select multiple>` fallback), never loaded from a CDN.
 - **FR-VIEW-008**: Flow diagram: `WorkflowGraphLayout` computes a layered (Sugiyama-style) layout; place / transition dialogs use the UiKit `dialog` partial.
+- **FR-VIEW-009** (2.3, lazy dialogs): the show page prints ONE empty UiKit `remote_form_dialog` (`_flow_dialogs.html.twig`) instead of one dialog per place and transition. Each state and transition of the diagram is a link to its own page (`nowo_workflow_definition_place` / `_transition`, `GET /{id}/places/{index}` and `/{id}/transitions/{index}`) that answers the fragment (`_flow_place` / `_flow_transition`) for `X-Nowo-Dialog: 1` and the full page (`flow_detail.html.twig`, template key `flow_detail`, UiKit `page/show`) otherwise, with exactly the show page's tenant scope and `View` access decision; an unknown index is a 404. `WorkflowGraphPresenter::present()` carries `definitionId` for the links.
 
 ### Infrastructure
 
@@ -120,7 +121,7 @@ None at this time. Planned work must be added here (or under `FUT-*` IDs) with e
 
 ## Success Criteria
 
-- **SC-001**: 100% of production files in `src/` appear in [`code-inventory.md`](code-inventory.md) with requirement IDs (**163/163**, audited 2026-11-17).
+- **SC-001**: 100% of production files in `src/` appear in [`code-inventory.md`](code-inventory.md) with requirement IDs (**182/182**, audited 2026-11-27 on 2.3.0).
 - **SC-002**: Configuration keys in `docs/CONFIGURATION.md` match `Configuration.php`.
 - **SC-003**: `composer qa` / `make release-check` pass in CI (PHPUnit, PHPStan where applicable).
 - **SC-004**: No Packagist-visible behavior change without spec, inventory, and test updates.
