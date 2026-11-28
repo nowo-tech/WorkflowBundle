@@ -240,7 +240,6 @@ final class WorkflowDefinitionControllerTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $em->expects(self::once())->method('persist')->willReturnCallback(static function (WorkflowDefinition $definition): void {
             $reflection = new ReflectionProperty(WorkflowDefinition::class, 'id');
-            $reflection->setAccessible(true);
             $reflection->setValue($definition, 42);
         });
         $em->expects(self::once())->method('flush');
@@ -442,7 +441,6 @@ final class WorkflowDefinitionControllerTest extends TestCase
         $definition = new WorkflowDefinition('Order', 'order', 'draft', 'App\\Entity\\Order');
         $definition->addPlace(new WorkflowPlace('draft'));
         $reflection = new ReflectionProperty(WorkflowDefinition::class, 'id');
-        $reflection->setAccessible(true);
         $reflection->setValue($definition, $id);
 
         return $definition;

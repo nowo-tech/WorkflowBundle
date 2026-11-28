@@ -276,7 +276,6 @@ final class SchemaSyncServiceTest extends TestCase
     {
         $service = new SchemaSyncService($this->createMock(EntityManagerInterface::class));
         $method  = new ReflectionMethod(SchemaSyncService::class, 'schemaManagerSupportsSequenceListing');
-        $method->setAccessible(true);
 
         self::assertTrue($method->invoke($service, $this->createMock(AbstractSchemaManager::class)));
     }

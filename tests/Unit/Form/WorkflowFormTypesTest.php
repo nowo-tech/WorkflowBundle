@@ -149,7 +149,6 @@ final class WorkflowFormTypesTest extends TypeTestCase
         $form->add('fromPlaces', TextType::class);
 
         $method = new ReflectionMethod(WorkflowTransitionType::class, 'configurePlaceField');
-        $method->setAccessible(true);
         $method->invoke(FormKitTestSupport::withMerger(new WorkflowTransitionType()), $form, 'fromPlaces', 'form.field.from_places', ['draft' => 'draft'], ['draft']);
 
         self::assertTrue($form->has('fromPlaces'));
