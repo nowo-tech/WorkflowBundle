@@ -30,7 +30,7 @@ final class WorkflowConflictExceptionTest extends TestCase
         );
         foreach ($conflicts as $conflict) {
             self::assertSame(TransientStorageFailure::class, get_parent_class($conflict));
-            self::assertContains(LockConflictExceptionInterface::class, class_implements($conflict));
+            self::assertInstanceOf(LockConflictExceptionInterface::class, $conflict); // not class_implements(): transaction-doctrine 1.10 moved the interface and keeps the old name as an alias
             self::assertSame(WorkflowConflictException::MESSAGE, $conflict->getMessage());
             self::assertSame('leave', $conflict->workflowSlug);
         }
